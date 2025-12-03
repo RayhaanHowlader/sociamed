@@ -1,0 +1,626 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import {
+  Search,
+  Send,
+  Paperclip,
+  Smile,
+  Phone,
+  Video,
+  MoreVertical,
+  Check,
+  CheckCheck,
+  PhoneOff,
+  Mic,
+  MicOff,
+} from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
+import { io, Socket } from 'socket.io-client';
+import { useVoiceCall } from './use-voice-call';
+
+interface FriendConversation {
+  userId: string;
+  name: string;
+  username: string;
+  avatarUrl?: string;
+}
+
+interface ChatMessage {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  content: string;
+  fileUrl?: string;
+  fileName?: string;
+  mimeType?: string;
+  isImage?: boolean;
+  createdAt: string;
+  status?: 'sent' | 'seen';
+}
+
+export function DirectMessages() {
+  const [friends, setFriends] = useState<FriendConversation[]>([]);
+  const [selectedChat, setSelectedChat] = useState<FriendConversation | null>(null);
+  const [message, setMessage] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const socketRef = useRef<Socket | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+
+  // Voice call hook
+  const {
+    callState,
+    initiateCall,
+    answerCall,
+    endCall,
+    rejectCall,
+    toggleMute,
+    localAudioRef,
+    remoteAudioRef,
+  } = useVoiceCall({
+    socket: socketRef.current,
+    currentUserId,
+    friendId: selectedChat?.userId || null,
+  });
+
+  useEffect(() => {
+    const loadFriends = async () => {
+      try {
+        const res = await fetch('/api/friends/list', { credentials: 'include' });
+        const data = await res.json();
+        if (!res.ok) return;
+        setFriends(data.friends ?? []);
+        if (data.friends?.length) {
+          setSelectedChat(data.friends[0]);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    const loadCurrentUser = async () => {
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        const data = await res.json();
+        if (res.ok && data.user?.sub) {
+          setCurrentUserId(String(data.user.sub));
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    loadFriends();
+    loadCurrentUser();
+  }, []);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
+    const socket = io(socketUrl);
+    socketRef.current = socket;
+
+    socket.on('chat:message', (payload: ChatMessage) => {
+      // Ignore messages we already added locally
+      if (payload.fromUserId === currentUserId) return;
+      setMessages((prev) => [...prev, payload]);
+
+      // Immediately acknowledge as seen back to the sender
+      socket.emit('chat:seen', {
+        messageId: payload.id,
+        fromUserId: payload.fromUserId,
+        toUserId: payload.toUserId,
+      });
+    });
+
+    socket.on('chat:seen', ({ messageId }: { messageId: string }) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, status: 'seen' as const } : m)),
+      );
+    });
+
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [currentUserId]);
+
+  useEffect(() => {
+    if (!socketRef.current || !currentUserId) return;
+    
+    // Join room for selected chat
+    if (selectedChat) {
+      socketRef.current.emit('chat:join', { userId: currentUserId, friendId: selectedChat.userId });
+    }
+    
+    // Join rooms for all friends so we can receive calls from any friend
+    friends.forEach((friend) => {
+      socketRef.current?.emit('chat:join', { userId: currentUserId, friendId: friend.userId });
+    });
+  }, [currentUserId, selectedChat, friends]);
+
+  // Load history whenever a chat is selected
+  useEffect(() => {
+    const loadHistory = async () => {
+      if (!currentUserId || !selectedChat) return;
+      try {
+        const res = await fetch(`/api/chat/history?friendId=${selectedChat.userId}`, {
+          credentials: 'include',
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          console.error(data.error || 'Unable to load chat history');
+          return;
+        }
+        setMessages(data.messages ?? []);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    loadHistory();
+  }, [currentUserId, selectedChat]);
+
+  const handleSend = (extra?: Partial<ChatMessage>) => {
+    if (!selectedChat || !currentUserId || !socketRef.current) return;
+    if (!message.trim() && !extra?.fileUrl) return;
+
+    const payload: ChatMessage = {
+      id: `${Date.now()}`,
+      fromUserId: currentUserId,
+      toUserId: selectedChat.userId,
+      content: message.trim(),
+      fileUrl: extra?.fileUrl,
+      fileName: extra?.fileName,
+      mimeType: extra?.mimeType,
+      isImage: extra?.isImage,
+      createdAt: new Date().toISOString(),
+      status: 'sent',
+    };
+
+    setMessages((prev) => [...prev, payload]);
+    socketRef.current.emit('chat:message', payload);
+
+    // Persist to history collection (fire-and-forget)
+    fetch('/api/chat/message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        toUserId: payload.toUserId,
+        content: payload.content,
+        fileUrl: payload.fileUrl,
+        fileName: payload.fileName,
+        mimeType: payload.mimeType,
+        isImage: payload.isImage,
+      }),
+    }).catch((err) => console.error('Failed to save chat message', err));
+
+    setMessage('');
+  };
+
+  const handleFileChange = async (file: File) => {
+    if (!selectedChat || !currentUserId) return;
+    setUploadingFile(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch('/api/chat/upload', {
+        method: 'POST',
+        body: form,
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        console.error(data.error || 'File upload failed');
+        return;
+      }
+      handleSend({
+        fileUrl: data.url,
+        fileName: data.fileName,
+        mimeType: data.mimeType,
+        isImage: data.isImage,
+      });
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  return (
+    <div className="h-full flex flex-col md:flex-row bg-white">
+      <div className="w-full md:w-80 border-b md:border-b-0 md:border-r border-slate-200 flex flex-col max-h-[40vh] md:max-h-none">
+        <div className="p-3 md:p4 border-b border-slate-200">
+          <h2 className="text-lg md:text-xl font-bold text-slate-900 mb-2 md:mb-4">Messages</h2>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <Input
+              placeholder="Search messages..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 border-slate-200"
+            />
+          </div>
+        </div>
+
+        <ScrollArea className="flex-1">
+          <div className="p-2">
+            {friends.length === 0 ? (
+              <p className="text-xs text-slate-500 px-2 py-4">
+                Add friends first to start conversations.
+              </p>
+            ) : (
+              friends
+                .filter((f) =>
+                  `${f.name} ${f.username}`.toLowerCase().includes(searchQuery.toLowerCase()),
+                )
+                .map((conv) => (
+              <button
+                    key={conv.userId}
+                onClick={() => setSelectedChat(conv)}
+                className={cn(
+                  'w-full p-3 rounded-lg flex items-center gap-3 hover:bg-slate-50 transition-colors',
+                      selectedChat?.userId === conv.userId && 'bg-blue-50',
+                )}
+              >
+                  <Avatar>
+                      <AvatarImage src={conv.avatarUrl} />
+                    <AvatarFallback>{conv.name[0]}</AvatarFallback>
+                  </Avatar>
+                <div className="flex-1 text-left overflow-hidden">
+                    <p className="font-semibold text-slate-900 text-sm">{conv.name}</p>
+                      <p className="text-xs text-slate-500">{conv.username}</p>
+                      <p className="text-sm text-slate-600 truncate">
+                        Start a conversation with {conv.name}
+                      </p>
+                  </div>
+              </button>
+                ))
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="p-3 md:p-4 border-b border-slate-200 flex items-center justify-between bg-white">
+          {selectedChat ? (
+          <div className="flex items-center gap-3">
+            <Avatar>
+                <AvatarImage src={selectedChat.avatarUrl} />
+              <AvatarFallback>{selectedChat.name[0]}</AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="font-semibold text-slate-900">{selectedChat.name}</p>
+                <p className="text-sm text-slate-500">Say hi to your new friend.</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">Select a friend to start chatting.</p>
+          )}
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                'text-slate-600 hover:text-blue-600',
+                (callState.isCalling || callState.isInCall) && 'text-blue-600 bg-blue-50'
+              )}
+              onClick={() => {
+                if (callState.isInCall) {
+                  endCall();
+                } else if (!callState.isCalling && selectedChat) {
+                  initiateCall();
+                }
+              }}
+              disabled={!selectedChat || callState.isReceivingCall}
+            >
+              {callState.isInCall || callState.isCalling ? (
+                <PhoneOff className="w-5 h-5" />
+              ) : (
+                <Phone className="w-5 h-5" />
+              )}
+            </Button>
+            <Button variant="ghost" size="icon" className="text-slate-600 hover:text-blue-600">
+              <Video className="w-5 h-5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="text-slate-600 hover:text-slate-900">
+              <MoreVertical className="w-5 h-5" />
+            </Button>
+          </div>
+        </div>
+
+        <ScrollArea className="flex-1 p-3 md:p-6 bg-slate-50">
+          {selectedChat ? (
+          <div className="space-y-4 max-w-3xl mx-auto">
+              {messages
+                .filter(
+                  (msg) =>
+                    (msg.fromUserId === currentUserId && msg.toUserId === selectedChat.userId) ||
+                    (msg.toUserId === currentUserId && msg.fromUserId === selectedChat.userId),
+                )
+                .map((msg) => {
+                  const isMine = msg.fromUserId === currentUserId;
+                  const time = new Date(msg.createdAt).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  });
+                  return (
+              <div
+                key={msg.id}
+                      className={cn('flex', isMine ? 'justify-end' : 'justify-start')}
+              >
+                <div
+                  className={cn(
+                    'max-w-md px-4 py-2 rounded-2xl',
+                          isMine
+                      ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-br-sm'
+                            : 'bg-white text-slate-900 rounded-bl-sm shadow-sm',
+                  )}
+                >
+                        {msg.isImage && msg.fileUrl ? (
+                          <div className="mb-2">
+                            <img
+                              src={msg.fileUrl}
+                              alt={msg.fileName || 'Attachment'}
+                              className="max-h-64 rounded-lg border border-white/10"
+                            />
+                          </div>
+                        ) : null}
+                        {msg.fileUrl && !msg.isImage && (
+                          <div className="mb-2">
+                            <a
+                              href={msg.fileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs underline break-all"
+                            >
+                              {msg.fileName || 'Download file'}
+                            </a>
+                          </div>
+                        )}
+                        {msg.content && <p className="text-sm">{msg.content}</p>}
+                        <div className="flex items-center justify-end gap-1 mt-1">
+                  <p
+                    className={cn(
+                              'text-xs',
+                              isMine ? 'text-blue-100' : 'text-slate-500',
+                    )}
+                  >
+                            {time}
+                  </p>
+                          {isMine && (
+                            <span className="inline-flex items-center text-xs">
+                              {msg.status === 'seen' ? (
+                                <CheckCheck className="w-3 h-3" />
+                              ) : (
+                                <Check className="w-3 h-3" />
+                              )}
+                            </span>
+                          )}
+                        </div>
+                </div>
+              </div>
+                  );
+                })}
+            </div>
+          ) : (
+            <div className="h-full flex items-center justify-center text-slate-400 text-sm">
+              Select a friend from the list to begin chatting.
+          </div>
+          )}
+        </ScrollArea>
+
+        <div className="p-3 md:p-4 border-t border-slate-200 bg-white">
+          <div className="flex items-center gap-2 max-w-3xl mx-auto">
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileChange(file);
+                }}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-slate-600 hover:text-blue-600"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!selectedChat || uploadingFile}
+              >
+              <Paperclip className="w-5 h-5" />
+            </Button>
+            </div>
+            <Button variant="ghost" size="icon" className="text-slate-600 hover:text-blue-600">
+              <Smile className="w-5 h-5" />
+            </Button>
+            <Input
+              placeholder={selectedChat ? 'Type a message...' : 'Select a friend to start chatting'}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className="flex-1 border-slate-200"
+              disabled={!selectedChat}
+            />
+            <Button
+              className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+              disabled={!selectedChat}
+              onClick={() => handleSend()}
+            >
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Incoming Call Dialog */}
+      <Dialog open={callState.isReceivingCall && !callState.isInCall} onOpenChange={(open) => !open && !callState.isInCall && rejectCall()}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Incoming Call</DialogTitle>
+            <DialogDescription>
+              {(() => {
+                const caller = friends.find((f) => f.userId === callState.callerId);
+                return caller ? `${caller.name} is calling you...` : 'Someone is calling you...';
+              })()}
+            </DialogDescription>
+          </DialogHeader>
+          {(() => {
+            const caller = friends.find((f) => f.userId === callState.callerId);
+            if (!caller) return null;
+            return (
+              <div className="flex flex-col items-center gap-6 py-4">
+                <Avatar className="w-24 h-24">
+                  <AvatarImage src={caller.avatarUrl} />
+                  <AvatarFallback className="text-3xl">{caller.name[0]}</AvatarFallback>
+                </Avatar>
+                <div className="text-center">
+                  <p className="text-xl font-semibold">{caller.name}</p>
+                  <p className="text-sm text-slate-500">@{caller.username}</p>
+                </div>
+                <div className="flex gap-4">
+                  <Button
+                    variant="destructive"
+                    size="lg"
+                    className="rounded-full w-16 h-16"
+                    onClick={rejectCall}
+                  >
+                    <PhoneOff className="w-6 h-6" />
+                  </Button>
+                  <Button
+                    size="lg"
+                    className="rounded-full w-16 h-16 bg-green-600 hover:bg-green-700"
+                    onClick={async () => {
+                      // Answer the call - this has user interaction context for audio
+                      await answerCall();
+                    }}
+                  >
+                    <Phone className="w-6 h-6" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Active Call UI - Show when in call or calling - stays open until call ends */}
+      {(() => {
+        // Debug logging
+        if (callState.isInCall || callState.isCalling) {
+          console.log('Call dialog should be visible:', {
+            isInCall: callState.isInCall,
+            isCalling: callState.isCalling,
+            callId: callState.callId,
+            callerId: callState.callerId,
+            hasRemoteStream: !!callState.remoteStream,
+          });
+        }
+        
+        return (callState.isInCall || callState.isCalling) && (() => {
+        // Determine who we're calling with
+        // If we initiated the call, use selectedChat
+        // If we received the call, use the caller
+        const callPartnerId = callState.isCalling 
+          ? selectedChat?.userId 
+          : callState.callerId || selectedChat?.userId;
+        const callPartner = friends.find((f) => f.userId === callPartnerId) || selectedChat;
+        
+        if (!callPartner) {
+          // If we don't have the partner info yet, show a loading state
+          return (
+            <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center">
+              <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+                <div className="flex flex-col items-center gap-6">
+                  <div className="text-center">
+                    <p className="text-2xl font-semibold">Connecting...</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
+        
+        return (
+          <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center">
+            <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+              <div className="flex flex-col items-center gap-6">
+                <Avatar className="w-32 h-32">
+                  <AvatarImage src={callPartner.avatarUrl} />
+                  <AvatarFallback className="text-4xl">{callPartner.name[0]}</AvatarFallback>
+                </Avatar>
+                <div className="text-center">
+                  <p className="text-2xl font-semibold">{callPartner.name}</p>
+                  <p className="text-sm text-slate-500 mt-1">
+                    {callState.isCalling ? 'Calling...' : callState.isInCall ? (callState.remoteStream ? 'Connected' : 'Connecting...') : ''}
+                  </p>
+                </div>
+                <div className="flex gap-4">
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="rounded-full w-14 h-14"
+                    onClick={toggleMute}
+                  >
+                    {callState.isMuted ? (
+                      <MicOff className="w-6 h-6" />
+                    ) : (
+                      <Mic className="w-6 h-6" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="lg"
+                    className="rounded-full w-14 h-14"
+                    onClick={endCall}
+                  >
+                    <PhoneOff className="w-6 h-6" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })();
+      })()}
+
+      {/* Hidden audio elements for call audio */}
+      <audio 
+        ref={localAudioRef} 
+        autoPlay 
+        muted 
+        playsInline
+        controls={false}
+        style={{ display: 'none', position: 'fixed', top: '-9999px' }}
+      />
+      <audio 
+        ref={remoteAudioRef} 
+        autoPlay 
+        playsInline
+        controls={false}
+        style={{ display: 'none', position: 'fixed', top: '-9999px' }}
+        onLoadedMetadata={(e) => {
+          console.log('Remote audio metadata loaded');
+          const audio = e.target as HTMLAudioElement;
+          audio.play().catch((err) => console.error('Auto-play failed on metadata:', err));
+        }}
+        onCanPlay={(e) => {
+          console.log('Remote audio can play');
+          const audio = e.target as HTMLAudioElement;
+          audio.play().catch((err) => console.error('Auto-play failed on canplay:', err));
+        }}
+      />
+    </div>
+  );
+}
