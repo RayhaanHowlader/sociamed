@@ -56,6 +56,14 @@ export function Sidebar({ activeView, onViewChange, onCreateShort }: SidebarProp
         })}
       </nav>
 
+
+
+
+
+
+
+      
+
       <div className="p-3 md:p-4 border-t border-slate-200">
         <Button
           className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
