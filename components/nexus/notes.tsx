@@ -139,6 +139,14 @@ export function Notes() {
       return;
     }
 
+    // Validate file size (50MB limit)
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    if (file.size > maxSize) {
+      alert('File is too large. Maximum size is 50MB.');
+      if (e.target) e.target.value = '';
+      return;
+    }
+
     setMusicFile(file);
     setMusicUrl(''); // Clear URL input if file is selected
 
@@ -154,19 +162,46 @@ export function Notes() {
         body: formData,
       });
 
-      if (!uploadRes.ok) {
-        throw new Error('Upload failed');
+      let uploadData;
+      try {
+        uploadData = await uploadRes.json();
+      } catch (parseError) {
+        console.error('Failed to parse upload response:', parseError);
+        alert('Failed to upload music file. Please try again.');
+        setMusicFile(null);
+        setMusicFileUrl('');
+        setUploadingMusic(false);
+        if (e.target) e.target.value = '';
+        return;
       }
 
-      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) {
+        const errorMessage = uploadData.details || uploadData.error || 'Failed to upload music file.';
+        alert(errorMessage);
+        setMusicFile(null);
+        setMusicFileUrl('');
+        setUploadingMusic(false);
+        if (e.target) e.target.value = '';
+        return;
+      }
+
+      if (!uploadData.url) {
+        alert('Invalid response from server. Please try again.');
+        setMusicFile(null);
+        setMusicFileUrl('');
+        setUploadingMusic(false);
+        if (e.target) e.target.value = '';
+        return;
+      }
+
       setMusicFileUrl(uploadData.url);
       setMusicUrl(uploadData.url); // Set the uploaded URL
       if (!musicTitle.trim()) {
         setMusicTitle(uploadData.fileName || file.name);
       }
     } catch (err) {
-      console.error(err);
-      alert('Failed to upload music file. Please try again.');
+      console.error('Error uploading music file:', err);
+      alert(err instanceof Error ? err.message : 'Failed to upload music file. Please try again.');
       setMusicFile(null);
       setMusicFileUrl('');
     } finally {
