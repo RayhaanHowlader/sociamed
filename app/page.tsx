@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { LogOut, Menu, X } from 'lucide-react';
 import { Sidebar } from '@/components/nexus/sidebar';
 import { Feed } from '@/components/nexus/feed';
@@ -12,8 +12,20 @@ import { FindFriends } from '@/components/nexus/find-friends';
 import { Notifications } from '@/components/nexus/notifications';
 import { Stories } from '@/components/nexus/stories';
 import { Notes } from '@/components/nexus/notes';
+import { NotificationPopup } from '@/components/nexus/notification-popup';
 import LoginPage from '@/components/LoginPage';
 import SignupPage from '@/components/SignupPage';
+import { io, Socket } from 'socket.io-client';
+
+interface FriendRequestNotification {
+  id: string;
+  fromUserId: string;
+  profile: {
+    name: string;
+    username: string;
+    avatarUrl?: string;
+  };
+}
 
 export default function Home() {
   const [activeView, setActiveView] =
@@ -23,6 +35,11 @@ export default function Home() {
   const [authChecked, setAuthChecked] = useState(false);
   const [shortsModalOpen, setShortsModalOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [currentNotification, setCurrentNotification] = useState<FriendRequestNotification | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const notificationSoundRef = useRef<HTMLAudioElement | null>(null);
 
   // On first load, ask the server if the auth cookie is valid so the session
   // is maintained across refreshes.
@@ -33,8 +50,11 @@ export default function Home() {
           method: 'GET',
           credentials: 'include',
         });
-
+        const data = await res.json();
         setIsLoggedIn(res.ok);
+        if (res.ok && data.user?.sub) {
+          setCurrentUserId(String(data.user.sub));
+        }
       } catch {
         setIsLoggedIn(false);
       } finally {
@@ -44,6 +64,103 @@ export default function Home() {
 
     checkAuth();
   }, []);
+
+  // Load notification count
+  const loadNotificationCount = async () => {
+    try {
+      const res = await fetch('/api/friends/requests', { credentials: 'include' });
+      const data = await res.json();
+      if (res.ok) {
+        setNotificationCount(data.requests?.length || 0);
+      }
+    } catch (err) {
+      console.error('Failed to load notification count:', err);
+    }
+  };
+
+  // Setup socket connection and notification listener
+  useEffect(() => {
+    if (!currentUserId || !isLoggedIn) return;
+
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
+    const socket = io(socketUrl);
+    socketRef.current = socket;
+
+    // Join notification room
+    socket.emit('notification:join', { userId: currentUserId });
+
+    // Listen for friend request notifications
+    socket.on('friend:request', (data: FriendRequestNotification) => {
+      setCurrentNotification(data);
+      setNotificationCount((prev) => prev + 1);
+      
+      // Play notification sound
+      if (notificationSoundRef.current) {
+        notificationSoundRef.current.play().catch((err) => {
+          console.error('Failed to play notification sound:', err);
+        });
+      }
+    });
+
+    // Load initial notification count
+    loadNotificationCount();
+
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [currentUserId, isLoggedIn]);
+
+  // Initialize notification sound
+  useEffect(() => {
+    notificationSoundRef.current = new Audio('/water.mp3');
+    notificationSoundRef.current.volume = 0.5;
+    notificationSoundRef.current.preload = 'auto';
+  }, []);
+
+  // Mark notifications as read when viewing notifications page
+  useEffect(() => {
+    if (activeView === 'notifications' && notificationCount > 0) {
+      // Reload notifications to get fresh count
+      loadNotificationCount();
+    }
+  }, [activeView]);
+
+  const handleNotificationAccept = async (id: string) => {
+    try {
+      const res = await fetch(`/api/friends/requests/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'accept' }),
+      });
+      if (res.ok) {
+        setNotificationCount((prev) => Math.max(0, prev - 1));
+        setCurrentNotification(null);
+        loadNotificationCount();
+      }
+    } catch (err) {
+      console.error('Failed to accept notification:', err);
+    }
+  };
+
+  const handleNotificationDecline = async (id: string) => {
+    try {
+      const res = await fetch(`/api/friends/requests/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'decline' }),
+      });
+      if (res.ok) {
+        setNotificationCount((prev) => Math.max(0, prev - 1));
+        setCurrentNotification(null);
+        loadNotificationCount();
+      }
+    } catch (err) {
+      console.error('Failed to decline notification:', err);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -92,11 +209,11 @@ export default function Home() {
         activeView={activeView}
         onViewChange={(view) => {
           setActiveView(view);
+          if (view === 'notifications') {
+            loadNotificationCount();
+          }
         }}
-        onCreateShort={() => {
-          setActiveView('shorts');
-          setShortsModalOpen(true);
-        }}
+        notificationCount={notificationCount}
       />
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Top navbar */}
@@ -180,6 +297,14 @@ export default function Home() {
           )}
         </section>
       </main>
+
+      {/* Notification Popup */}
+      <NotificationPopup
+        notification={currentNotification}
+        onAccept={handleNotificationAccept}
+        onDecline={handleNotificationDecline}
+        onClose={() => setCurrentNotification(null)}
+      />
     </div>
   );
 }

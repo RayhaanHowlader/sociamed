@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   Search,
   Send,
@@ -9,11 +9,12 @@ import {
   Phone,
   Video,
   MoreVertical,
-  Check,
-  CheckCheck,
   PhoneOff,
   Mic,
   MicOff,
+  X,
+  AlertCircle,
+  ArrowLeft,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -23,6 +24,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { cn } from '@/lib/utils';
 import { io, Socket } from 'socket.io-client';
 import { useVoiceCall } from './use-voice-call';
+import { MessageBubble } from './message-bubble';
+import { FilePreview } from './file-preview';
+import { UploadProgress } from './upload-progress';
 
 interface FriendConversation {
   userId: string;
@@ -51,9 +55,16 @@ export function DirectMessages() {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [filePreview, setFilePreview] = useState<{ url: string; type: 'image' | 'video' | 'audio'; file: File } | null>(null);
+  const [error, setError] = useState('');
 
   // Voice call hook
   const {
@@ -78,8 +89,14 @@ export function DirectMessages() {
         const data = await res.json();
         if (!res.ok) return;
         setFriends(data.friends ?? []);
+        // Don't auto-select on mobile - let user choose
+        // Only auto-select on desktop (md breakpoint and above)
         if (data.friends?.length) {
-          setSelectedChat(data.friends[0]);
+          // Check if we're on desktop using a media query approach
+          const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
+          if (isDesktop) {
+            setSelectedChat(data.friends[0]);
+          }
         }
       } catch (err) {
         console.error(err);
@@ -113,6 +130,11 @@ export function DirectMessages() {
       // Ignore messages we already added locally
       if (payload.fromUserId === currentUserId) return;
       setMessages((prev) => [...prev, payload]);
+
+      // Scroll to bottom when receiving a new message
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
 
       // Immediately acknowledge as seen back to the sender
       socket.emit('chat:seen', {
@@ -148,12 +170,16 @@ export function DirectMessages() {
     });
   }, [currentUserId, selectedChat, friends]);
 
-  // Load history whenever a chat is selected
+  // Load initial messages (latest 5) whenever a chat is selected
   useEffect(() => {
     const loadHistory = async () => {
-      if (!currentUserId || !selectedChat) return;
+      if (!currentUserId || !selectedChat) {
+        setMessages([]);
+        setHasMoreMessages(false);
+        return;
+      }
       try {
-        const res = await fetch(`/api/chat/history?friendId=${selectedChat.userId}`, {
+        const res = await fetch(`/api/chat/history?friendId=${selectedChat.userId}&limit=5`, {
           credentials: 'include',
         });
         const data = await res.json();
@@ -162,6 +188,12 @@ export function DirectMessages() {
           return;
         }
         setMessages(data.messages ?? []);
+        setHasMoreMessages(data.hasMore ?? false);
+        
+        // Scroll to bottom after loading initial messages
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
       } catch (err) {
         console.error(err);
       }
@@ -169,6 +201,84 @@ export function DirectMessages() {
 
     loadHistory();
   }, [currentUserId, selectedChat]);
+
+  // Load more messages when scrolling up
+  const loadMoreMessages = useCallback(async () => {
+    if (!currentUserId || !selectedChat || loadingMore || !hasMoreMessages) return;
+
+    const oldestMessage = messages[0];
+    if (!oldestMessage) return;
+
+    setLoadingMore(true);
+    try {
+      const res = await fetch(
+        `/api/chat/history?friendId=${selectedChat.userId}&limit=5&before=${oldestMessage.createdAt}`,
+        {
+          credentials: 'include',
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        console.error(data.error || 'Unable to load more messages');
+        return;
+      }
+
+      // Prepend older messages to the beginning
+      setMessages((prev) => [...(data.messages ?? []), ...prev]);
+      setHasMoreMessages(data.hasMore ?? false);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [currentUserId, selectedChat, loadingMore, hasMoreMessages, messages]);
+
+  // Handle scroll to detect when user scrolls to top
+  useEffect(() => {
+    if (!selectedChat || !hasMoreMessages) return;
+
+    // Find the scroll container inside ScrollArea
+    const findScrollContainer = () => {
+      const scrollArea = messagesContainerRef.current;
+      if (!scrollArea) return null;
+      // ScrollArea from shadcn/ui wraps content in a div with data-radix-scroll-area-viewport
+      const viewport = scrollArea.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement;
+      return viewport || scrollArea;
+    };
+
+    let container: HTMLElement | null = null;
+    let cleanup: (() => void) | null = null;
+
+    // Wait for DOM to be ready
+    const timeoutId = setTimeout(() => {
+      container = findScrollContainer();
+      if (!container) return;
+
+      const handleScroll = () => {
+        // Check if scrolled near the top (within 100px)
+        if (container && container.scrollTop < 100 && hasMoreMessages && !loadingMore) {
+          const previousScrollHeight = container.scrollHeight;
+          loadMoreMessages().then(() => {
+            // Maintain scroll position after loading more messages
+            setTimeout(() => {
+              if (container) {
+                const newScrollHeight = container.scrollHeight;
+                container.scrollTop = newScrollHeight - previousScrollHeight;
+              }
+            }, 0);
+          });
+        }
+      };
+
+      container.addEventListener('scroll', handleScroll);
+      cleanup = () => container?.removeEventListener('scroll', handleScroll);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (cleanup) cleanup();
+    };
+  }, [hasMoreMessages, loadingMore, selectedChat, messages.length, loadMoreMessages]);
 
   const handleSend = (extra?: Partial<ChatMessage>) => {
     if (!selectedChat || !currentUserId || !socketRef.current) return;
@@ -208,39 +318,140 @@ export function DirectMessages() {
     setMessage('');
   };
 
-  const handleFileChange = async (file: File) => {
+  const handleFileChange = (file: File) => {
     if (!selectedChat || !currentUserId) return;
+    
+    // Show preview for images, videos, and audio
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setFilePreview({ url: e.target?.result as string, type: 'image', file });
+      };
+      reader.readAsDataURL(file);
+    } else if (file.type.startsWith('video/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setFilePreview({ url: e.target?.result as string, type: 'video', file });
+      };
+      reader.readAsDataURL(file);
+    } else if (file.type.startsWith('audio/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setFilePreview({ url: e.target?.result as string, type: 'audio', file });
+      };
+      reader.readAsDataURL(file);
+    } else {
+      // For other file types, upload immediately without preview
+      uploadFile(file);
+    }
+  };
+
+  const uploadFile = async (file: File) => {
+    if (!selectedChat || !currentUserId) return;
+    
+    setError(''); // Clear any previous errors
     setUploadingFile(true);
+    setUploadProgress(0);
+    
+    // Small delay to ensure UI updates before upload starts
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
     try {
       const form = new FormData();
       form.append('file', file);
-      const res = await fetch('/api/chat/upload', {
-        method: 'POST',
-        body: form,
-        credentials: 'include',
+      
+      // Use XMLHttpRequest for progress tracking
+      const xhr = new XMLHttpRequest();
+      
+      const uploadPromise = new Promise<{ url: string; fileName: string; mimeType: string; isImage: boolean }>((resolve, reject) => {
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percentComplete = (e.loaded / e.total) * 100;
+            setUploadProgress(percentComplete);
+          }
+        });
+        
+        xhr.addEventListener('load', () => {
+          if (xhr.status === 200) {
+            try {
+              const data = JSON.parse(xhr.responseText);
+              resolve(data);
+            } catch (err) {
+              console.error('Failed to parse upload response:', err);
+              reject(new Error('Invalid response from server'));
+            }
+          } else {
+            try {
+              const error = JSON.parse(xhr.responseText);
+              reject(new Error(error.error || `Upload failed with status ${xhr.status}`));
+            } catch {
+              reject(new Error(`Upload failed with status ${xhr.status}`));
+            }
+          }
+        });
+        
+        xhr.addEventListener('error', () => {
+          reject(new Error('Network error during upload'));
+        });
+        
+        xhr.addEventListener('abort', () => {
+          reject(new Error('Upload was cancelled'));
+        });
+        
+        xhr.open('POST', '/api/chat/upload');
+        xhr.withCredentials = true;
+        xhr.send(form);
       });
-      const data = await res.json();
-      if (!res.ok) {
-        console.error(data.error || 'File upload failed');
-        return;
-      }
+      
+      const data = await uploadPromise;
+      
+      // Ensure mimeType is set correctly
+      const mimeType = data.mimeType || file.type || '';
+      const isImage = data.isImage ?? mimeType.startsWith('image/');
+      
       handleSend({
         fileUrl: data.url,
-        fileName: data.fileName,
-        mimeType: data.mimeType,
-        isImage: data.isImage,
+        fileName: data.fileName || file.name,
+        mimeType: mimeType,
+        isImage: isImage,
       });
+      
+      // Clear preview and reset
+      setFilePreview(null);
+      setUploadProgress(0);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err) {
-      console.error(err);
+      console.error('Upload error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'File upload failed. Please try again.';
+      setError(errorMessage);
+      // Don't clear preview on error so user can retry
     } finally {
       setUploadingFile(false);
+      // Keep progress at 0 on error, or it will show 100% on success
     }
+  };
+
+  const handleSendPreview = () => {
+    if (filePreview) {
+      uploadFile(filePreview.file);
+    } else {
+      handleSend();
+    }
+  };
+
+  const cancelPreview = () => {
+    setFilePreview(null);
+    setUploadProgress(0);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   return (
     <div className="h-full flex flex-col md:flex-row bg-white">
-      <div className="w-full md:w-80 border-b md:border-b-0 md:border-r border-slate-200 flex flex-col max-h-[40vh] md:max-h-none">
+      {/* Friends List - Hidden on mobile when chat is selected */}
+      <div className={cn(
+        'w-full md:w-80 border-b md:border-b-0 md:border-r border-slate-200 flex flex-col max-h-[40vh] md:max-h-none',
+        selectedChat && 'hidden md:flex'
+      )}>
         <div className="p-3 md:p4 border-b border-slate-200">
           <h2 className="text-lg md:text-xl font-bold text-slate-900 mb-2 md:mb-4">Messages</h2>
           <div className="relative">
@@ -292,10 +503,23 @@ export function DirectMessages() {
         </ScrollArea>
       </div>
 
-      <div className="flex-1 flex flex-col min-h-0">
+      {/* Chat View - Full width on mobile when chat is selected */}
+      <div className={cn(
+        'flex-1 flex flex-col min-h-0',
+        !selectedChat && 'hidden md:flex'
+      )}>
         <div className="p-3 md:p-4 border-b border-slate-200 flex items-center justify-between bg-white">
           {selectedChat ? (
           <div className="flex items-center gap-3">
+            {/* Back button - only visible on mobile */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden text-slate-600 hover:text-slate-900"
+              onClick={() => setSelectedChat(null)}
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
             <Avatar>
                 <AvatarImage src={selectedChat.avatarUrl} />
               <AvatarFallback>{selectedChat.name[0]}</AvatarFallback>
@@ -340,79 +564,36 @@ export function DirectMessages() {
           </div>
         </div>
 
-        <ScrollArea className="flex-1 p-3 md:p-6 bg-slate-50">
+        <ScrollArea 
+          className="flex-1 p-3 md:p-6 bg-slate-50"
+          ref={messagesContainerRef}
+        >
           {selectedChat ? (
-          <div className="space-y-4 max-w-3xl mx-auto">
+            <div className="space-y-4 max-w-3xl mx-auto">
+              {/* Loading indicator when loading more messages */}
+              {loadingMore && (
+                <div className="flex justify-center py-2">
+                  <div className="text-sm text-slate-500">Loading older messages...</div>
+                </div>
+              )}
+              
               {messages
                 .filter(
                   (msg) =>
                     (msg.fromUserId === currentUserId && msg.toUserId === selectedChat.userId) ||
                     (msg.toUserId === currentUserId && msg.fromUserId === selectedChat.userId),
                 )
-                .map((msg) => {
-                  const isMine = msg.fromUserId === currentUserId;
-                  const time = new Date(msg.createdAt).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  });
-                  return (
-              <div
-                key={msg.id}
-                      className={cn('flex', isMine ? 'justify-end' : 'justify-start')}
-              >
-                <div
-                  className={cn(
-                    'max-w-md px-4 py-2 rounded-2xl',
-                          isMine
-                      ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-br-sm'
-                            : 'bg-white text-slate-900 rounded-bl-sm shadow-sm',
-                  )}
-                >
-                        {msg.isImage && msg.fileUrl ? (
-                          <div className="mb-2">
-                            <img
-                              src={msg.fileUrl}
-                              alt={msg.fileName || 'Attachment'}
-                              className="max-h-64 rounded-lg border border-white/10"
-                            />
-                          </div>
-                        ) : null}
-                        {msg.fileUrl && !msg.isImage && (
-                          <div className="mb-2">
-                            <a
-                              href={msg.fileUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-xs underline break-all"
-                            >
-                              {msg.fileName || 'Download file'}
-                            </a>
-                          </div>
-                        )}
-                        {msg.content && <p className="text-sm">{msg.content}</p>}
-                        <div className="flex items-center justify-end gap-1 mt-1">
-                  <p
-                    className={cn(
-                              'text-xs',
-                              isMine ? 'text-blue-100' : 'text-slate-500',
-                    )}
-                  >
-                            {time}
-                  </p>
-                          {isMine && (
-                            <span className="inline-flex items-center text-xs">
-                              {msg.status === 'seen' ? (
-                                <CheckCheck className="w-3 h-3" />
-                              ) : (
-                                <Check className="w-3 h-3" />
-                              )}
-                            </span>
-                          )}
-                        </div>
-                </div>
-              </div>
-                  );
-                })}
+                .map((msg) => (
+                  <MessageBubble
+                    key={msg.id}
+                    message={msg}
+                    isMine={msg.fromUserId === currentUserId}
+                    currentUserId={currentUserId || ''}
+                  />
+                ))}
+              
+              {/* Scroll anchor for auto-scroll to bottom */}
+              <div ref={messagesEndRef} />
             </div>
           ) : (
             <div className="h-full flex items-center justify-center text-slate-400 text-sm">
@@ -422,44 +603,86 @@ export function DirectMessages() {
         </ScrollArea>
 
         <div className="p-3 md:p-4 border-t border-slate-200 bg-white">
-          <div className="flex items-center gap-2 max-w-3xl mx-auto">
-            <div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleFileChange(file);
+          <div className="max-w-3xl mx-auto space-y-3">
+            {/* File Preview */}
+            {filePreview && (
+              <FilePreview preview={filePreview} onCancel={cancelPreview} />
+            )}
+
+            {/* Upload Progress Bar */}
+            <UploadProgress progress={uploadProgress} isUploading={uploadingFile} />
+
+            {/* Error Message */}
+            {error && (
+              <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 p-2 rounded">
+                <AlertCircle className="w-4 h-4" />
+                {error}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto h-auto p-1"
+                  onClick={() => setError('')}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFileChange(file);
+                  }}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-slate-600 hover:text-blue-600"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={!selectedChat || uploadingFile}
+                >
+                  <Paperclip className="w-5 h-5" />
+                </Button>
+              </div>
+              <Button variant="ghost" size="icon" className="text-slate-600 hover:text-blue-600">
+                <Smile className="w-5 h-5" />
+              </Button>
+              <Input
+                placeholder={selectedChat ? 'Type a message...' : 'Select a friend to start chatting'}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                className="flex-1 border-slate-200"
+                disabled={!selectedChat || uploadingFile}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (filePreview) {
+                      handleSendPreview();
+                    } else {
+                      handleSend();
+                    }
+                  }
                 }}
               />
               <Button
-                variant="ghost"
-                size="icon"
-                className="text-slate-600 hover:text-blue-600"
-                onClick={() => fileInputRef.current?.click()}
+                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
                 disabled={!selectedChat || uploadingFile}
+                onClick={() => {
+                  if (filePreview) {
+                    handleSendPreview();
+                  } else {
+                    handleSend();
+                  }
+                }}
               >
-              <Paperclip className="w-5 h-5" />
-            </Button>
+                <Send className="w-4 h-4" />
+              </Button>
             </div>
-            <Button variant="ghost" size="icon" className="text-slate-600 hover:text-blue-600">
-              <Smile className="w-5 h-5" />
-            </Button>
-            <Input
-              placeholder={selectedChat ? 'Type a message...' : 'Select a friend to start chatting'}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              className="flex-1 border-slate-200"
-              disabled={!selectedChat}
-            />
-            <Button
-              className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
-              disabled={!selectedChat}
-              onClick={() => handleSend()}
-            >
-              <Send className="w-4 h-4" />
-            </Button>
           </div>
         </div>
       </div>

@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
         email: user.email,
         fullName: user.fullName,
       },
-      JWT_SECRET,
+      JWT_SECRET as string,
       { expiresIn: "7d" },
     )
 

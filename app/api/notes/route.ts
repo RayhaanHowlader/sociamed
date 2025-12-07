@@ -10,15 +10,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  const { searchParams } = new URL(req.url)
+  const limit = parseInt(searchParams.get("limit") || "5", 10)
+  const after = searchParams.get("after") // ISO timestamp string
+
   const db = await getDb()
   const notes = db.collection("notes")
   const friends = db.collection("friends")
 
   // Get user's friends
+  // Friends are stored as: { userId: user.sub, friendUserId: friend.sub }
+  // We need to check both directions since friendship is bidirectional
   const friendDocs = await friends
     .find({
-      $or: [{ userId: user.sub }, { friendId: user.sub }],
-      status: "accepted",
+      $or: [{ userId: String(user.sub) }, { friendUserId: String(user.sub) }],
     })
     .toArray()
 
@@ -26,21 +31,38 @@ export async function GET(req: NextRequest) {
   friendIds.add(String(user.sub)) // Include current user's own notes
 
   friendDocs.forEach((doc) => {
-    if (String(doc.userId) === String(user.sub)) {
-      friendIds.add(String(doc.friendId))
-    } else {
-      friendIds.add(String(doc.userId))
+    const docUserId = String(doc.userId)
+    const docFriendUserId = String(doc.friendUserId)
+    const currentUserId = String(user.sub)
+
+    if (docUserId === currentUserId) {
+      // User is the requester, friend is friendUserId
+      friendIds.add(docFriendUserId)
+    } else if (docFriendUserId === currentUserId) {
+      // User is the friend, requester is userId
+      friendIds.add(docUserId)
     }
   })
 
+  // Build query - get notes after a certain timestamp if provided
+  const query: any = {
+    userId: { $in: Array.from(friendIds) },
+  }
+
+  // If after timestamp is provided, only get notes after that time
+  if (after) {
+    query.createdAt = { $lt: new Date(after) }
+  }
+
   // Get notes from friends and current user
   const items = await notes
-    .find({
-      userId: { $in: Array.from(friendIds) },
-    })
+    .find(query)
     .sort({ createdAt: -1 })
-    .limit(50) // Limit to recent 50 notes
+    .limit(limit)
     .toArray()
+
+  // Check if there are more notes to load
+  const hasMore = items.length === limit
 
   const result = items.map((note) => ({
     _id: String(note._id),
@@ -52,7 +74,7 @@ export async function GET(req: NextRequest) {
     createdAt: note.createdAt.toISOString(),
   }))
 
-  return NextResponse.json({ notes: result }, { status: 200 })
+  return NextResponse.json({ notes: result, hasMore }, { status: 200 })
 }
 
 export async function POST(req: NextRequest) {

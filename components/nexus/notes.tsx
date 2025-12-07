@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Plus, Music, X, Loader2, Play, Pause, Upload, Trash2, Edit2, MoreVertical } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,8 @@ interface Note {
 export function Notes() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasMoreNotes, setHasMoreNotes] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -44,11 +46,7 @@ export function Notes() {
   const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const editFileInputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    fetchNotes();
-    fetchCurrentUser();
-  }, []);
+  const notesContainerRef = useRef<HTMLDivElement | null>(null);
 
   const fetchCurrentUser = async () => {
     try {
@@ -65,16 +63,72 @@ export function Notes() {
   const fetchNotes = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/notes', { credentials: 'include' });
+      const res = await fetch('/api/notes?limit=5', { credentials: 'include' });
       if (!res.ok) return;
       const data = await res.json();
       setNotes(data.notes ?? []);
+      setHasMoreNotes(data.hasMore ?? false);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
   };
+
+  // Load more notes when scrolling down
+  const loadMoreNotes = useCallback(async () => {
+    if (loadingMore || !hasMoreNotes) return;
+
+    const oldestNote = notes[notes.length - 1];
+    if (!oldestNote) return;
+
+    setLoadingMore(true);
+    try {
+      const res = await fetch(
+        `/api/notes?limit=5&after=${oldestNote.createdAt}`,
+        { credentials: 'include' }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        console.error(data.error || 'Unable to load more notes');
+        return;
+      }
+
+      // Append newer notes to the end
+      setNotes((prev) => [...prev, ...(data.notes ?? [])]);
+      setHasMoreNotes(data.hasMore ?? false);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMoreNotes, notes]);
+
+  useEffect(() => {
+    fetchNotes();
+    fetchCurrentUser();
+  }, []);
+
+  // Handle scroll to detect when user scrolls near bottom
+  useEffect(() => {
+    if (!hasMoreNotes) return;
+
+    const handleScroll = () => {
+      if (loadingMore || !hasMoreNotes) return;
+
+      // Check if scrolled near the bottom (within 200px)
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      const windowHeight = window.innerHeight;
+      const documentHeight = document.documentElement.scrollHeight;
+
+      if (documentHeight - (scrollTop + windowHeight) < 200) {
+        loadMoreNotes();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [hasMoreNotes, loadingMore, loadMoreNotes]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, isEdit: boolean = false) => {
     const file = e.target.files?.[0];
@@ -323,13 +377,15 @@ export function Notes() {
         </div>
 
         {/* Notes List */}
-        {notes.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-slate-500">No notes yet. Create one to get started!</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {notes.map((note) => (
+        <div ref={notesContainerRef}>
+          {notes.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-slate-500">No notes yet. Create one to get started!</p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-4">
+                {notes.map((note) => (
               <Card key={note._id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
@@ -413,8 +469,29 @@ export function Notes() {
                 </CardContent>
               </Card>
             ))}
-          </div>
-        )}
+              </div>
+              
+              {/* Load more button or loading indicator */}
+              {hasMoreNotes && !loadingMore && (
+                <div className="flex justify-center py-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadMoreNotes()}
+                    className="text-xs"
+                  >
+                    Load more notes
+                  </Button>
+                </div>
+              )}
+              {loadingMore && (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Create Note Modal */}

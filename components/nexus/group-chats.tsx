@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Search, Send, UserPlus, Settings, Hash, Lock, Paperclip, Smile, Trash2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,10 @@ import {
 } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { io, Socket } from 'socket.io-client';
+import { GroupMessageBubble } from './group-message-bubble';
+import { FilePreview } from './file-preview';
+import { UploadProgress } from './upload-progress';
+import { X, AlertCircle } from 'lucide-react';
 
 interface Group {
   _id: string;
@@ -116,6 +120,10 @@ export function GroupChats() {
   const [deleteError, setDeleteError] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [messages, setMessages] = useState<GroupMessage[]>([]);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const [socketReady, setSocketReady] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -126,6 +134,9 @@ export function GroupChats() {
   const [savingSettings, setSavingSettings] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [filePreview, setFilePreview] = useState<{ url: string; type: 'image' | 'video' | 'audio'; file: File } | null>(null);
+  const [uploadError, setUploadError] = useState('');
 
   const ICON_OPTIONS = ['🎨', '🚀', '⚡', '☕', '💬', '📚', '🎮', '🎧'];
 
@@ -227,6 +238,11 @@ export function GroupChats() {
       // Ignore messages already added locally
       if (payload.fromUserId === currentUserId) return;
       setMessages((prev) => [...prev, payload]);
+      
+      // Scroll to bottom when receiving a new message
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
     });
 
     return () => {
@@ -236,10 +252,11 @@ export function GroupChats() {
     };
   }, [currentUserId]);
 
-  // Join group room and load history when socket is ready and selected group changes
+  // Join group room and load initial history (latest 5) when socket is ready and selected group changes
   useEffect(() => {
     if (!selectedGroup || !socketReady) {
       setMessages([]);
+      setHasMoreMessages(false);
       return;
     }
 
@@ -247,7 +264,7 @@ export function GroupChats() {
 
     const loadHistory = async () => {
       try {
-        const res = await fetch(`/api/groups/history?groupId=${selectedGroup._id}`, {
+        const res = await fetch(`/api/groups/history?groupId=${selectedGroup._id}&limit=5`, {
           credentials: 'include',
         });
         const data = await res.json();
@@ -256,6 +273,12 @@ export function GroupChats() {
           return;
         }
         setMessages(data.messages ?? []);
+        setHasMoreMessages(data.hasMore ?? false);
+        
+        // Scroll to bottom after loading initial messages
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
       } catch (err) {
         console.error(err);
       }
@@ -263,6 +286,103 @@ export function GroupChats() {
 
     void loadHistory();
   }, [selectedGroup, socketReady]);
+
+  // Load more messages when scrolling up
+  const loadMoreMessages = useCallback(async () => {
+    if (!selectedGroup || loadingMore || !hasMoreMessages) return;
+
+    const oldestMessage = messages[0];
+    if (!oldestMessage) return;
+
+    setLoadingMore(true);
+    try {
+      const res = await fetch(
+        `/api/groups/history?groupId=${selectedGroup._id}&limit=5&before=${oldestMessage.createdAt}`,
+        {
+          credentials: 'include',
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        console.error(data.error || 'Unable to load more messages');
+        return;
+      }
+
+      // Prepend older messages to the beginning
+      setMessages((prev) => [...(data.messages ?? []), ...prev]);
+      setHasMoreMessages(data.hasMore ?? false);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [selectedGroup, loadingMore, hasMoreMessages, messages]);
+
+  // Handle scroll to detect when user scrolls to top
+  useEffect(() => {
+    if (!selectedGroup) return;
+
+    // Find the scroll container inside ScrollArea
+    const findScrollContainer = () => {
+      const scrollArea = messagesContainerRef.current;
+      if (!scrollArea) return null;
+      // ScrollArea from shadcn/ui wraps content in a div with data-radix-scroll-area-viewport
+      const viewport = scrollArea.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement;
+      return viewport || scrollArea;
+    };
+
+    let container: HTMLElement | null = null;
+    let cleanup: (() => void) | null = null;
+
+    // Wait for DOM to be ready and messages to be rendered
+    const setupScrollListener = () => {
+      container = findScrollContainer();
+      if (!container) {
+        // Retry if container not found
+        setTimeout(setupScrollListener, 200);
+        return;
+      }
+
+      const handleScroll = () => {
+        if (!container || !hasMoreMessages || loadingMore) return;
+        
+        // Check if scrolled near the top (within 150px for better UX)
+        const scrollTop = container.scrollTop;
+        const scrollHeight = container.scrollHeight;
+        const clientHeight = container.clientHeight;
+        
+        // If user has scrolled up near the top
+        if (scrollTop < 150 && hasMoreMessages && !loadingMore) {
+          const previousScrollHeight = scrollHeight;
+          loadMoreMessages().then(() => {
+            // Maintain scroll position after loading more messages
+            requestAnimationFrame(() => {
+              if (container) {
+                const newScrollHeight = container.scrollHeight;
+                const scrollDiff = newScrollHeight - previousScrollHeight;
+                container.scrollTop = scrollTop + scrollDiff;
+              }
+            });
+          });
+        }
+      };
+
+      container.addEventListener('scroll', handleScroll, { passive: true });
+      cleanup = () => {
+        if (container) {
+          container.removeEventListener('scroll', handleScroll);
+        }
+      };
+    };
+
+    // Initial setup with delay to ensure DOM is ready
+    const timeoutId = setTimeout(setupScrollListener, 300);
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (cleanup) cleanup();
+    };
+  }, [hasMoreMessages, loadingMore, selectedGroup, messages.length, loadMoreMessages]);
 
   useEffect(() => {
     const loadMembers = async () => {
@@ -462,6 +582,11 @@ export function GroupChats() {
     // Optimistic UI update
     setMessages((prev) => [...prev, payload]);
     socketRef.current.emit('group:message', payload);
+    
+    // Scroll to bottom when sending a message
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
 
     // Persist to DB
     fetch('/api/groups/message', {
@@ -474,32 +599,104 @@ export function GroupChats() {
     setMessage('');
   };
 
-  const handleFileChange = async (file: File) => {
+  const handleFileChange = (file: File) => {
     if (!selectedGroup || !currentUserId) return;
+    
+    // Determine file type
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|ogg|mov|avi|mkv|flv|wmv|m4v|3gp|mpg|mpeg)$/i.test(file.name);
+    const isAudio = file.type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac|flac|wma|opus)$/i.test(file.name);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const url = e.target?.result as string;
+      if (isImage) {
+        setFilePreview({ url, type: 'image', file });
+      } else if (isVideo) {
+        setFilePreview({ url, type: 'video', file });
+      } else if (isAudio) {
+        setFilePreview({ url, type: 'audio', file });
+      } else {
+        // For other files, just upload directly
+        uploadFile(file);
+      }
+    };
+    reader.onerror = () => {
+      setUploadError('Failed to read file');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const uploadFile = async (file: File) => {
+    if (!selectedGroup || !currentUserId) return;
+    
     setUploadingFile(true);
+    setUploadProgress(0);
+    setUploadError('');
+    
     try {
       const form = new FormData();
       form.append('file', file);
-      const res = await fetch('/api/chat/upload', {
-        method: 'POST',
-        body: form,
-        credentials: 'include',
+      
+      const uploadPromise = new Promise<any>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percentComplete = Math.round((e.loaded / e.total) * 100);
+            setUploadProgress(percentComplete);
+          } else {
+            setUploadProgress(50); // Show indeterminate progress
+          }
+        });
+        
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const data = JSON.parse(xhr.responseText);
+              resolve(data);
+            } catch (err) {
+              reject(new Error('Invalid response from server'));
+            }
+          } else {
+            try {
+              const error = JSON.parse(xhr.responseText);
+              reject(new Error(error.error || 'Upload failed'));
+            } catch {
+              reject(new Error(`Upload failed with status ${xhr.status}`));
+            }
+          }
+        });
+        
+        xhr.addEventListener('error', () => {
+          reject(new Error('Network error during upload'));
+        });
+        
+        xhr.addEventListener('abort', () => {
+          reject(new Error('Upload was cancelled'));
+        });
+        
+        xhr.open('POST', '/api/chat/upload');
+        xhr.withCredentials = true;
+        xhr.send(form);
       });
-      const data = await res.json();
-      if (!res.ok) {
-        console.error(data.error || 'File upload failed');
-        return;
-      }
-
+      
+      const data = await uploadPromise;
+      
+      // Ensure mimeType is set correctly
+      const mimeType = data.mimeType || file.type || '';
+      const isImage = data.isImage ?? mimeType.startsWith('image/');
+      
       const payload: GroupMessage = {
         id: `${Date.now()}`,
         groupId: selectedGroup._id,
         fromUserId: currentUserId,
         content: '',
         fileUrl: data.url,
-        fileName: data.fileName,
-        mimeType: data.mimeType,
-        isImage: data.isImage,
+        fileName: data.fileName || file.name,
+        mimeType: mimeType,
+        isImage: isImage,
         createdAt: new Date().toISOString(),
       };
 
@@ -514,47 +711,67 @@ export function GroupChats() {
           groupId: selectedGroup._id,
           content: '',
           fileUrl: data.url,
-          fileName: data.fileName,
-          mimeType: data.mimeType,
-          isImage: data.isImage,
+          fileName: data.fileName || file.name,
+          mimeType: mimeType,
+          isImage: isImage,
         }),
       }).catch((err) => console.error('Failed to save group file message', err));
 
+      // Clear preview and reset
+      setFilePreview(null);
+      setUploadProgress(0);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err) {
-      console.error(err);
+      console.error('Upload error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'File upload failed. Please try again.';
+      setUploadError(errorMessage);
+      // Don't clear preview on error so user can retry
     } finally {
       setUploadingFile(false);
     }
   };
 
+  const handleSendPreview = () => {
+    if (filePreview) {
+      uploadFile(filePreview.file);
+    } else {
+      handleSendMessage();
+    }
+  };
+
+  const cancelPreview = () => {
+    setFilePreview(null);
+    setUploadProgress(0);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   return (
     <div className="h-full flex flex-col md:flex-row bg-white">
-      <div className="w-full md:w-80 border-b md:border-b-0 md:border-r border-slate-200 flex flex-col max-h-[40vh] md:max-h-none">
-        <div className="p-3 md:p-4 border-b border-slate-200">
+      <div className="w-full md:w-80 border-b md:border-b-0 md:border-r border-slate-200 flex flex-col max-h-[50vh] md:max-h-none">
+        <div className="p-2 md:p-3 lg:p-4 border-b border-slate-200 flex-shrink-0">
           <div className="flex items-center justify-between mb-2 md:mb-4">
-            <h2 className="text-lg md:text-xl font-bold text-slate-900">Groups</h2>
+            <h2 className="text-base md:text-lg lg:text-xl font-bold text-slate-900">Groups</h2>
             <Button
               size="sm"
-              className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+              className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 h-8 w-8 md:h-9 md:w-auto md:px-3"
               onClick={openCreateDialog}
             >
               <UserPlus className="w-4 h-4" />
             </Button>
           </div>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <Search className="absolute left-2 md:left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-3 h-3 md:w-4 md:h-4" />
             <Input
               placeholder="Search groups..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 border-slate-200"
+              className="pl-8 md:pl-10 border-slate-200 text-sm h-8 md:h-10"
             />
           </div>
         </div>
 
         <ScrollArea className="flex-1">
-          <div className="p-2">
+          <div className="p-1 md:p-2">
             {loadingGroups && (
               <p className="px-2 py-4 text-xs text-slate-500">Loading groups...</p>
             )}
@@ -568,22 +785,22 @@ export function GroupChats() {
                 key={group._id}
                 onClick={() => setSelectedGroup(group)}
                 className={cn(
-                  'w-full p-3 rounded-lg flex items-center gap-3 hover:bg-slate-50 transition-colors',
+                  'w-full p-2 md:p-3 rounded-lg flex items-center gap-2 md:gap-3 hover:bg-slate-50 transition-colors',
                   selectedGroup && selectedGroup._id === group._id && 'bg-blue-50'
                 )}
               >
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-2xl">
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-xl md:text-2xl flex-shrink-0">
                   {group.icon}
                 </div>
-                <div className="flex-1 text-left overflow-hidden">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="font-semibold text-slate-900 text-sm">{group.name}</p>
-                    {group.isPrivate && <Lock className="w-3 h-3 text-slate-400" />}
+                <div className="flex-1 text-left min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5 md:mb-1">
+                    <p className="font-semibold text-slate-900 text-xs md:text-sm truncate">{group.name}</p>
+                    {group.isPrivate && <Lock className="w-3 h-3 text-slate-400 flex-shrink-0" />}
                   </div>
-                  <p className="text-xs text-slate-500 mb-1">
+                  <p className="text-xs text-slate-500 mb-0.5 md:mb-1">
                     {group.memberIds?.length ?? 0} members
                   </p>
-                  <p className="text-sm text-slate-600 truncate">
+                  <p className="text-xs md:text-sm text-slate-600 truncate break-words">
                     {group.lastMessage || 'Start the conversation'}
                   </p>
                 </div>
@@ -639,77 +856,55 @@ export function GroupChats() {
           </div>
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
-          <ScrollArea className="flex-1 p-6 bg-slate-50">
-            <div className="space-y-4 max-w-3xl mx-auto">
-                  {messages.map((msg) => {
-                    const isMine = msg.fromUserId === currentUserId;
-                    const time = new Date(msg.createdAt).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    });
+        <div className="flex flex-1 overflow-hidden min-h-0">
+          <ScrollArea 
+            className="flex-1 p-3 md:p-6 bg-slate-50 h-full"
+            ref={messagesContainerRef}
+          >
+            <div className="space-y-3 md:space-y-4 max-w-3xl mx-auto">
+              {/* Load more button or loading indicator */}
+              {hasMoreMessages && !loadingMore && (
+                <div className="flex justify-center py-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadMoreMessages()}
+                    className="text-xs"
+                  >
+                    Load older messages
+                  </Button>
+                </div>
+              )}
+              {loadingMore && (
+                <div className="flex justify-center py-2">
+                  <div className="text-sm text-slate-500">Loading older messages...</div>
+                </div>
+              )}
+              
+              {messages.map((msg) => {
+                const isMine = msg.fromUserId === currentUserId;
+                const memberInfo =
+                  msg.fromUserId && !isMine
+                    ? groupMembers.find((m) => m.id === msg.fromUserId)
+                    : undefined;
+                const displayName = isMine
+                  ? 'You'
+                  : memberInfo?.name || 'Member';
+                const avatarUrl = isMine ? undefined : memberInfo?.avatarUrl;
 
-                    const memberInfo =
-                      msg.fromUserId && !isMine
-                        ? groupMembers.find((m) => m.id === msg.fromUserId)
-                        : undefined;
-
-                    const displayName = isMine
-                      ? 'You'
-                      : memberInfo?.name || 'Member';
-                    const avatarUrl = isMine ? undefined : memberInfo?.avatarUrl;
-
-                    return (
-                      <div
-                        key={msg.id}
-                        className={cn('flex gap-3', isMine ? 'flex-row-reverse' : 'flex-row')}
-                      >
-                  <Avatar className="w-8 h-8">
-                          <AvatarImage src={avatarUrl} />
-                          <AvatarFallback>{displayName[0]}</AvatarFallback>
-                  </Avatar>
-                        <div className={cn('flex flex-col', isMine && 'items-end')}>
-                    <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-semibold text-slate-700">
-                              {displayName}
-                            </span>
-                            <span className="text-xs text-slate-500">{time}</span>
-                    </div>
-                    <div
-                      className={cn(
-                        'max-w-md px-4 py-2 rounded-2xl',
-                              isMine
-                          ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-tr-sm'
-                                : 'bg-white text-slate-900 rounded-tl-sm shadow-sm',
-                      )}
-                    >
-                            {msg.isImage && msg.fileUrl && (
-                              <div className="mb-2">
-                                <img
-                                  src={msg.fileUrl}
-                                  alt={msg.fileName || 'Attachment'}
-                                  className="max-h-64 rounded-lg border border-white/10"
-                                />
-                              </div>
-                            )}
-                            {msg.fileUrl && !msg.isImage && (
-                              <div className="mb-2">
-                                <a
-                                  href={msg.fileUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-xs underline break-all"
-                                >
-                                  {msg.fileName || 'Download file'}
-                                </a>
-                              </div>
-                            )}
-                            {msg.content && <p className="text-sm">{msg.content}</p>}
-                          </div>
-                    </div>
-                  </div>
-                    );
-                  })}
+                return (
+                  <GroupMessageBubble
+                    key={msg.id}
+                    message={msg}
+                    isMine={isMine}
+                    displayName={displayName}
+                    avatarUrl={avatarUrl}
+                  />
+                );
+              })}
+              
+              {/* Scroll anchor for auto-scroll to bottom */}
+              <div ref={messagesEndRef} />
             </div>
           </ScrollArea>
 
@@ -758,45 +953,87 @@ export function GroupChats() {
           )}
         </div>
 
-        <div className="p-4 border-t border-slate-200 bg-white">
-          <div className="flex items-center gap-2 max-w-3xl mx-auto">
-                <div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleFileChange(file);
-                    }}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-slate-600 hover:text-blue-600"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={!selectedGroup || uploadingFile}
-                  >
-              <Paperclip className="w-5 h-5" />
-            </Button>
-                </div>
-            <Button variant="ghost" size="icon" className="text-slate-600 hover:text-blue-600">
-              <Smile className="w-5 h-5" />
-            </Button>
-            <Input
-                  placeholder={selectedGroup ? 'Type a message...' : 'Select a group to start chatting'}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              className="flex-1 border-slate-200"
-                  disabled={!selectedGroup}
-            />
+        <div className="p-2 md:p-4 border-t border-slate-200 bg-white flex-shrink-0">
+          <div className="max-w-3xl mx-auto space-y-2 md:space-y-3">
+            {/* File Preview */}
+            {filePreview && (
+              <FilePreview preview={filePreview} onCancel={cancelPreview} />
+            )}
+
+            {/* Upload Progress Bar */}
+            <UploadProgress progress={uploadProgress} isUploading={uploadingFile} />
+
+            {/* Error Message */}
+            {uploadError && (
+              <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 p-2 rounded">
+                <AlertCircle className="w-4 h-4" />
+                {uploadError}
                 <Button
-                  className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
-                  disabled={!selectedGroup}
-                  onClick={handleSendMessage}
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto h-auto p-1"
+                  onClick={() => setUploadError('')}
                 >
-              <Send className="w-4 h-4" />
-            </Button>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+
+            <div className="flex items-center gap-1 md:gap-2">
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFileChange(file);
+                  }}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-slate-600 hover:text-blue-600 h-8 w-8 md:h-10 md:w-10"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={!selectedGroup || uploadingFile}
+                >
+                  <Paperclip className="w-4 h-4 md:w-5 md:h-5" />
+                </Button>
+              </div>
+              <Button variant="ghost" size="icon" className="text-slate-600 hover:text-blue-600 h-8 w-8 md:h-10 md:w-10">
+                <Smile className="w-4 h-4 md:w-5 md:h-5" />
+              </Button>
+              <Input
+                placeholder={selectedGroup ? 'Type a message...' : 'Select a group to start chatting'}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                className="flex-1 border-slate-200 text-sm h-8 md:h-10"
+                disabled={!selectedGroup || uploadingFile}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (filePreview) {
+                      handleSendPreview();
+                    } else {
+                      handleSendMessage();
+                    }
+                  }
+                }}
+              />
+              <Button
+                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 h-8 w-8 md:h-10 md:w-10 md:px-4"
+                disabled={!selectedGroup || uploadingFile}
+                onClick={() => {
+                  if (filePreview) {
+                    handleSendPreview();
+                  } else {
+                    handleSendMessage();
+                  }
+                }}
+              >
+                <Send className="w-3 h-3 md:w-4 md:h-4" />
+              </Button>
+            </div>
           </div>
         </div>
           </>

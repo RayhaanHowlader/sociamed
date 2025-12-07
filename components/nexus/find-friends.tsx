@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { UserPlus, Check, MapPin, AlertCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { io, Socket } from 'socket.io-client';
 
 type FriendStatus = 'none' | 'friends' | 'outgoing' | 'incoming';
 
@@ -21,6 +22,27 @@ export function FindFriends() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [profileComplete, setProfileComplete] = useState<boolean | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+
+  const checkProfile = async () => {
+    try {
+      const res = await fetch('/api/profile', { credentials: 'include' });
+      if (!res.ok) {
+        setProfileComplete(false);
+        return;
+      }
+      const data = await res.json();
+      const profile = data.profile;
+      // Check if required fields (name and username) are present
+      const isComplete = profile && profile.name && profile.username;
+      setProfileComplete(isComplete);
+    } catch (err) {
+      console.error(err);
+      setProfileComplete(false);
+    }
+  };
 
   const loadSuggestions = async () => {
     try {
@@ -41,8 +63,37 @@ export function FindFriends() {
   };
 
   useEffect(() => {
+    checkProfile();
     loadSuggestions();
+    
+    // Get current user ID
+    const loadCurrentUser = async () => {
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        const data = await res.json();
+        if (res.ok && data.user?.sub) {
+          setCurrentUserId(String(data.user.sub));
+        }
+      } catch (err) {
+        console.error('Failed to load current user:', err);
+      }
+    };
+    loadCurrentUser();
   }, []);
+
+  // Setup socket connection
+  useEffect(() => {
+    if (!currentUserId) return;
+    
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
+    const socket = io(socketUrl);
+    socketRef.current = socket;
+
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [currentUserId]);
 
   const sendRequest = async (userId: string) => {
     try {
@@ -61,6 +112,22 @@ export function FindFriends() {
       setSuggestions((prev) =>
         prev.map((s) => (s.userId === userId ? { ...s, status: 'outgoing' as FriendStatus } : s)),
       );
+
+      // Emit notification to target user via socket
+      // Get the suggestion before updating state
+      const suggestion = suggestions.find((s) => s.userId === userId);
+      if (socketRef.current && suggestion && data.requestId && currentUserId) {
+        socketRef.current.emit('friend:request:notify', {
+          toUserId: userId,
+          requestId: String(data.requestId),
+          fromUserId: currentUserId,
+          profile: {
+            name: suggestion.name,
+            username: suggestion.username,
+            avatarUrl: suggestion.avatarUrl,
+          },
+        });
+      }
     } catch (err) {
       console.error(err);
       setError('Unable to send friend request.');
@@ -87,8 +154,26 @@ export function FindFriends() {
           </div>
         )}
 
+        {profileComplete === false && (
+          <Card className="border-amber-200 bg-amber-50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                <div>
+                  <p className="font-semibold text-amber-900">Profile Incomplete</p>
+                  <p className="text-sm text-amber-700">
+                    Please complete your profile to continue finding friends and sending friend requests.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {loading ? (
           <p className="text-slate-500 text-sm">Loading suggestions...</p>
+        ) : !profileComplete ? (
+          <p className="text-slate-500 text-sm">Complete your profile to see friend suggestions.</p>
         ) : suggestions.length === 0 ? (
           <p className="text-slate-500 text-sm">No suggestions right now. Try again later.</p>
         ) : (
@@ -118,6 +203,7 @@ export function FindFriends() {
                         size="sm"
                         className="bg-gradient-to-r from-blue-600 to-cyan-600"
                         onClick={() => sendRequest(s.userId)}
+                        disabled={!profileComplete}
                       >
                         <UserPlus className="w-4 h-4 mr-2" />
                         Add friend

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   Heart,
   MessageCircle,
@@ -79,6 +79,8 @@ export function Feed() {
   const [postImageUrl, setPostImageUrl] = useState('');
   const [postImagePublicId, setPostImagePublicId] = useState('');
   const [loadingPosts, setLoadingPosts] = useState(true);
+  const [hasMorePosts, setHasMorePosts] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [posting, setPosting] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [error, setError] = useState('');
@@ -87,9 +89,13 @@ export function Feed() {
   const [editingContent, setEditingContent] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Post | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const postsContainerRef = useRef<HTMLDivElement | null>(null);
   const [postComments, setPostComments] = useState<Record<string, PostComment[]>>({});
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
+  const [hasMoreComments, setHasMoreComments] = useState<Record<string, boolean>>({});
+  const [loadingMoreComments, setLoadingMoreComments] = useState<Record<string, boolean>>({});
+  const commentsContainerRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const fetchProfile = async () => {
     try {
@@ -108,15 +114,44 @@ export function Feed() {
   const fetchPosts = async () => {
     try {
       setLoadingPosts(true);
-      const res = await fetch('/api/posts');
+      const res = await fetch('/api/posts?limit=5');
       const data = await res.json();
       setPosts(data.posts ?? []);
+      setHasMorePosts(data.hasMore ?? false);
     } catch (err) {
       console.error(err);
     } finally {
       setLoadingPosts(false);
     }
   };
+
+  // Load more posts when scrolling down
+  const loadMorePosts = useCallback(async () => {
+    if (loadingMore || !hasMorePosts) return;
+
+    const oldestPost = posts[posts.length - 1];
+    if (!oldestPost) return;
+
+    setLoadingMore(true);
+    try {
+      const res = await fetch(
+        `/api/posts?limit=5&after=${oldestPost.createdAt}`,
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        console.error(data.error || 'Unable to load more posts');
+        return;
+      }
+
+      // Append newer posts to the end
+      setPosts((prev) => [...prev, ...(data.posts ?? [])]);
+      setHasMorePosts(data.hasMore ?? false);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMorePosts, posts]);
   const fetchCurrentUser = async () => {
     try {
       const res = await fetch('/api/auth/me', { credentials: 'include' });
@@ -136,6 +171,27 @@ export function Feed() {
     fetchPosts();
     fetchCurrentUser();
   }, []);
+
+  // Handle scroll to detect when user scrolls near bottom
+  useEffect(() => {
+    if (!hasMorePosts) return;
+
+    const handleScroll = () => {
+      if (loadingMore || !hasMorePosts) return;
+
+      // Check if scrolled near the bottom (within 200px)
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      const windowHeight = window.innerHeight;
+      const documentHeight = document.documentElement.scrollHeight;
+
+      if (documentHeight - (scrollTop + windowHeight) < 200) {
+        loadMorePosts();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [hasMorePosts, loadingMore, loadMorePosts]);
 
   const handleImageUpload = async (file: File) => {
     setUploadingImage(true);
@@ -310,10 +366,10 @@ export function Feed() {
       return;
     }
 
-    // Ensure comments are loaded at least once
+    // Load initial 5 comments if not already loaded
     if (!postComments[postId]) {
       try {
-        const res = await fetch(`/api/posts/comments?postId=${postId}`, {
+        const res = await fetch(`/api/posts/comments?postId=${postId}&limit=5`, {
           credentials: 'include',
         });
         const data = await res.json();
@@ -322,6 +378,7 @@ export function Feed() {
           return;
         }
         setPostComments((prev) => ({ ...prev, [postId]: data.comments ?? [] }));
+        setHasMoreComments((prev) => ({ ...prev, [postId]: data.hasMore ?? false }));
       } catch (err) {
         console.error(err);
       }
@@ -329,6 +386,42 @@ export function Feed() {
 
     setOpenComments((prev) => ({ ...prev, [postId]: true }));
   };
+
+  // Load more comments for a specific post
+  const loadMoreComments = useCallback(async (postId: string) => {
+    if (loadingMoreComments[postId] || !hasMoreComments[postId]) return;
+
+    const currentComments = postComments[postId] || [];
+    if (currentComments.length === 0) return;
+
+    // Get the latest comment's timestamp
+    const latestComment = currentComments[currentComments.length - 1];
+    if (!latestComment) return;
+
+    setLoadingMoreComments((prev) => ({ ...prev, [postId]: true }));
+    try {
+      const res = await fetch(
+        `/api/posts/comments?postId=${postId}&limit=5&after=${latestComment.createdAt}`,
+        { credentials: 'include' }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        console.error(data.error || 'Unable to load more comments');
+        return;
+      }
+
+      // Append newer comments to the end
+      setPostComments((prev) => ({
+        ...prev,
+        [postId]: [...(prev[postId] ?? []), ...(data.comments ?? [])],
+      }));
+      setHasMoreComments((prev) => ({ ...prev, [postId]: data.hasMore ?? false }));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingMoreComments((prev) => ({ ...prev, [postId]: false }));
+    }
+  }, [loadingMoreComments, hasMoreComments, postComments]);
 
   const addComment = async (postId: string) => {
     const text = (commentInputs[postId] || '').trim();
@@ -448,18 +541,20 @@ export function Feed() {
           </CardContent>
         </Card>
 
-        {loadingPosts ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-          </div>
-        ) : posts.length === 0 ? (
-          <Card className="border-slate-200 shadow-sm">
-            <CardContent className="py-12 text-center text-slate-500">
-              No posts yet. Be the first to share something!
-            </CardContent>
-          </Card>
-        ) : (
-          posts.map((post) => {
+        <div ref={postsContainerRef}>
+          {loadingPosts ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+            </div>
+          ) : posts.length === 0 ? (
+            <Card className="border-slate-200 shadow-sm">
+              <CardContent className="py-12 text-center text-slate-500">
+                No posts yet. Be the first to share something!
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {posts.map((post) => {
             const commentsForPost = postComments[post._id] ?? [];
             const commentValue = commentInputs[post._id] ?? '';
             return (
@@ -566,14 +661,51 @@ export function Feed() {
                 </Button>
               </div>
               {openComments[post._id] && commentsForPost.length > 0 && (
-                <div className="mt-3 space-y-2 border-t border-slate-100 pt-3 text-sm">
-                  {commentsForPost.map((c) => (
-                    <div key={c.id} className="text-slate-700">
-                      <span className="font-semibold">{c.author.name}</span>{' '}
-                      <span className="text-slate-500 text-xs">{c.author.username}</span>
-                      <div>{c.content}</div>
-                    </div>
-                  ))}
+                <div className="mt-3 border-t border-slate-100 pt-3">
+                  <div
+                    ref={(el) => {
+                      commentsContainerRefs.current[post._id] = el;
+                    }}
+                    className="max-h-[300px] overflow-y-auto space-y-2 text-sm pr-2"
+                    onScroll={(e) => {
+                      const container = e.currentTarget;
+                      const { scrollTop, scrollHeight, clientHeight } = container;
+                      // Load more when scrolled near bottom (within 50px)
+                      if (
+                        scrollHeight - (scrollTop + clientHeight) < 50 &&
+                        hasMoreComments[post._id] &&
+                        !loadingMoreComments[post._id]
+                      ) {
+                        loadMoreComments(post._id);
+                      }
+                    }}
+                  >
+                    {commentsForPost.map((c) => (
+                      <div key={c.id} className="text-slate-700">
+                        <span className="font-semibold">{c.author.name}</span>{' '}
+                        <span className="text-slate-500 text-xs">{c.author.username}</span>
+                        <div>{c.content}</div>
+                      </div>
+                    ))}
+                    {/* Load more button or loading indicator */}
+                    {hasMoreComments[post._id] && !loadingMoreComments[post._id] && (
+                      <div className="flex justify-center py-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => loadMoreComments(post._id)}
+                          className="text-xs"
+                        >
+                          Load more comments
+                        </Button>
+                      </div>
+                    )}
+                    {loadingMoreComments[post._id] && (
+                      <div className="flex justify-center py-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
               {openComments[post._id] && (
@@ -601,8 +733,29 @@ export function Feed() {
               )}
             </CardContent>
           </Card>
-          )})
+          )})}
+          
+          {/* Load more button or loading indicator */}
+          {hasMorePosts && !loadingMore && (
+            <div className="flex justify-center py-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => loadMorePosts()}
+                className="text-xs"
+              >
+                Load more posts
+              </Button>
+            </div>
+          )}
+          {loadingMore && (
+            <div className="flex justify-center py-4">
+              <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+            </div>
+          )}
+        </>
         )}
+        </div>
       </div>
 
       <Dialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)}>

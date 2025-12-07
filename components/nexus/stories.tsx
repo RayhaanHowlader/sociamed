@@ -1,13 +1,19 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Plus, X, Image as ImageIcon, Video, Type, Loader2, ChevronLeft, ChevronRight, Clock, AlertCircle } from 'lucide-react';
+import { Plus, X, Image as ImageIcon, Video, Type, Loader2, ChevronLeft, ChevronRight, Clock, AlertCircle, Pencil, Trash2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
+
+interface MediaItem {
+  url: string;
+  publicId: string;
+  type: 'image' | 'video';
+}
 
 interface Story {
   _id: string;
@@ -16,6 +22,7 @@ interface Story {
   content: string;
   mediaUrl: string;
   mediaPublicId: string;
+  mediaItems?: MediaItem[];
   author: {
     name: string;
     username: string;
@@ -40,13 +47,16 @@ export function Stories() {
   const [storyGroups, setStoryGroups] = useState<StoryGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingStory, setEditingStory] = useState<Story | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [activeStoryGroup, setActiveStoryGroup] = useState<StoryGroup | null>(null);
   const [activeStoryIndex, setActiveStoryIndex] = useState(0);
+  const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [storyType, setStoryType] = useState<'text' | 'image' | 'video'>('text');
   const [textContent, setTextContent] = useState('');
-  const [mediaFile, setMediaFile] = useState<File | null>(null);
-  const [mediaPreview, setMediaPreview] = useState<string>('');
+  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
+  const [mediaPreviews, setMediaPreviews] = useState<Array<{ url: string; type: 'image' | 'video'; file: File }>>([]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -54,6 +64,8 @@ export function Stories() {
   const [progress, setProgress] = useState(0);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [rateLimitError, setRateLimitError] = useState<{ message: string; hoursRemaining: number } | null>(null);
+  const videoElementRef = useRef<HTMLVideoElement | null>(null);
+  const [mediaDuration, setMediaDuration] = useState(5); // Default 5 seconds for images
 
   useEffect(() => {
     fetchStories();
@@ -62,28 +74,55 @@ export function Stories() {
 
   useEffect(() => {
     if (viewerOpen && activeStoryGroup) {
-      // Auto-advance stories every 5 seconds
-      const interval = setInterval(() => {
-        setActiveStoryIndex((prev) => {
-          if (prev < activeStoryGroup.stories.length - 1) {
-            return prev + 1;
-          } else {
-            // Close viewer when all stories are viewed
-            setViewerOpen(false);
-            return prev;
-          }
-        });
-      }, 5000);
+      const currentStory = activeStoryGroup.stories[activeStoryIndex];
+      const mediaItems = currentStory?.mediaItems || (currentStory?.mediaUrl ? [{
+        url: currentStory.mediaUrl,
+        publicId: currentStory.mediaPublicId,
+        type: currentStory.type as 'image' | 'video'
+      }] : []);
 
-      // Progress bar
-      progressIntervalRef.current = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 100) {
-            return 0;
-          }
-          return prev + 2; // Increment by 2% every 100ms (5 seconds total)
-        });
-      }, 100);
+      const currentMedia = mediaItems[activeMediaIndex];
+      const isVideo = currentMedia?.type === 'video';
+      const duration = isVideo ? mediaDuration : 5; // 5 seconds for images, actual duration for videos
+      const intervalMs = duration * 1000; // Convert to milliseconds
+
+      // Auto-advance media items or stories based on duration
+      const interval = setInterval(() => {
+        // If current story has multiple media, advance within it
+        if (mediaItems.length > 1 && activeMediaIndex < mediaItems.length - 1) {
+          setActiveMediaIndex((prev) => prev + 1);
+        } else {
+          // Move to next story
+          setActiveStoryIndex((prev) => {
+            if (prev < activeStoryGroup.stories.length - 1) {
+              setActiveMediaIndex(0);
+              return prev + 1;
+            } else {
+              // Close viewer when all stories are viewed
+              setViewerOpen(false);
+              return prev;
+            }
+          });
+        }
+      }, intervalMs);
+
+      // Progress bar - only update for images (videos use onTimeUpdate)
+      if (!isVideo) {
+        const progressUpdateInterval = 50; // Update every 50ms for smooth animation
+        const progressIncrement = (100 / duration) * (progressUpdateInterval / 1000); // Calculate increment per update
+
+        progressIntervalRef.current = setInterval(() => {
+          setProgress((prev) => {
+            if (prev >= 100) {
+              return 0;
+            }
+            return Math.min(prev + progressIncrement, 100);
+          });
+        }, progressUpdateInterval);
+      } else {
+        // For videos, progress is updated via onTimeUpdate event
+        progressIntervalRef.current = null;
+      }
 
       return () => {
         clearInterval(interval);
@@ -93,8 +132,10 @@ export function Stories() {
       };
     } else {
       setProgress(0);
+      setActiveMediaIndex(0);
+      setMediaDuration(5);
     }
-  }, [viewerOpen, activeStoryGroup, activeStoryIndex]);
+  }, [viewerOpen, activeStoryGroup, activeStoryIndex, activeMediaIndex, mediaDuration]);
 
   const fetchCurrentUser = async () => {
     try {
@@ -123,25 +164,62 @@ export function Stories() {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
-    if (file.type.startsWith('image/')) {
-      setStoryType('image');
-      setMediaFile(file);
+    const validFiles = files.filter(
+      (file) => file.type.startsWith('image/') || file.type.startsWith('video/')
+    );
+
+    if (validFiles.length === 0) return;
+
+    // Determine story type based on first file
+    const firstFile = validFiles[0];
+    if (firstFile.type.startsWith('image/')) {
+      if (storyType === 'text') setStoryType('image');
+    } else if (firstFile.type.startsWith('video/')) {
+      if (storyType === 'text') setStoryType('video');
+    }
+
+    // Add files to state
+    setMediaFiles((prev) => [...prev, ...validFiles]);
+
+    // Create previews for all files
+    validFiles.forEach((file) => {
       const reader = new FileReader();
       reader.onload = (e) => {
-        setMediaPreview(e.target?.result as string);
+        const preview = {
+          url: e.target?.result as string,
+          type: (file.type.startsWith('image/') ? 'image' : 'video') as 'image' | 'video',
+          file,
+        };
+        setMediaPreviews((prev) => [...prev, preview]);
       };
       reader.readAsDataURL(file);
-    } else if (file.type.startsWith('video/')) {
-      setStoryType('video');
-      setMediaFile(file);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setMediaPreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeMedia = (index: number) => {
+    const preview = mediaPreviews[index];
+    
+    // If it's a new file (has file property), remove from mediaFiles
+    if (preview.file) {
+      // Find the index in mediaFiles by counting how many files come before this preview
+      let fileIndex = 0;
+      for (let i = 0; i < index; i++) {
+        if (mediaPreviews[i].file) {
+          fileIndex++;
+        }
+      }
+      setMediaFiles((prev) => prev.filter((_, i) => i !== fileIndex));
+    }
+    
+    // Remove from previews
+    setMediaPreviews((prev) => prev.filter((_, i) => i !== index));
+    
+    // If no media left, reset to text type
+    if (mediaPreviews.length === 1) {
+      setStoryType('text');
     }
   };
 
@@ -151,69 +229,106 @@ export function Stories() {
       return;
     }
 
-    if ((storyType === 'image' || storyType === 'video') && !mediaFile) {
-      alert('Please select an image or video');
+    if ((storyType === 'image' || storyType === 'video') && mediaFiles.length === 0) {
+      alert('Please select at least one image or video');
       return;
     }
 
     try {
       setUploading(true);
-      let mediaUrl = '';
-      let mediaPublicId = '';
 
-      if (mediaFile) {
-        const formData = new FormData();
-        formData.append('file', mediaFile);
-        formData.append('type', storyType);
-
-        const uploadRes = await fetch('/api/stories/upload', {
+      // Handle text story
+      if (storyType === 'text') {
+        const res = await fetch('/api/stories', {
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: formData,
+          body: JSON.stringify({
+            type: 'text',
+            content: textContent,
+            mediaUrl: '',
+            mediaPublicId: '',
+          }),
         });
 
-        if (!uploadRes.ok) {
-          throw new Error('Upload failed');
+        if (!res.ok) {
+          const errorData = await res.json();
+          if (res.status === 429) {
+            const hoursRemaining = errorData.hoursRemaining || 0;
+            setRateLimitError({
+              message: errorData.error || 'You can only create one story every 24 hours',
+              hoursRemaining,
+            });
+            setCreateModalOpen(false);
+          } else {
+            throw new Error(errorData.error || 'Failed to create story');
+          }
+          return;
         }
+      } else {
+        // Handle multiple media files - create a SINGLE story with multiple media items
+        // First, upload all files
+        const uploadPromises = mediaFiles.map(async (file) => {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('type', file.type.startsWith('image/') ? 'image' : 'video');
 
-        const uploadData = await uploadRes.json();
-        mediaUrl = uploadData.url;
-        mediaPublicId = uploadData.publicId;
-      }
-
-      const res = await fetch('/api/stories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          type: storyType,
-          content: textContent,
-          mediaUrl,
-          mediaPublicId,
-        }),
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        if (res.status === 429) {
-          // Rate limit error - user already created a story in last 24 hours
-          const hoursRemaining = errorData.hoursRemaining || 0;
-          setRateLimitError({
-            message: errorData.error || 'You can only create one story every 24 hours',
-            hoursRemaining,
+          const uploadRes = await fetch('/api/stories/upload', {
+            method: 'POST',
+            credentials: 'include',
+            body: formData,
           });
-          setCreateModalOpen(false);
-        } else {
-          throw new Error(errorData.error || 'Failed to create story');
+
+          if (!uploadRes.ok) {
+            throw new Error('Upload failed');
+          }
+
+          const uploadData = await uploadRes.json();
+          return {
+            url: uploadData.url,
+            publicId: uploadData.publicId,
+            type: file.type.startsWith('image/') ? 'image' : 'video' as 'image' | 'video',
+          };
+        });
+
+        const uploadResults = await Promise.all(uploadPromises);
+
+        // Determine story type based on first media item
+        const firstMediaType = uploadResults[0]?.type || 'image';
+        
+        // Create a SINGLE story with all media items
+        const res = await fetch('/api/stories', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            type: firstMediaType,
+            content: textContent.trim(),
+            mediaItems: uploadResults,
+          }),
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          if (res.status === 429) {
+            const hoursRemaining = errorData.hoursRemaining || 0;
+            setRateLimitError({
+              message: errorData.error || 'You can only create one story every 24 hours',
+              hoursRemaining,
+            });
+            setCreateModalOpen(false);
+            return;
+          } else {
+            throw new Error(errorData.error || 'Failed to create story');
+          }
         }
-        return;
       }
 
       // Reset form
       setCreateModalOpen(false);
       setTextContent('');
-      setMediaFile(null);
-      setMediaPreview('');
+      setMediaFiles([]);
+      setMediaPreviews([]);
       setStoryType('text');
       if (fileInputRef.current) fileInputRef.current.value = '';
 
@@ -232,21 +347,210 @@ export function Stories() {
   const openStoryViewer = (group: StoryGroup, index: number = 0) => {
     setActiveStoryGroup(group);
     setActiveStoryIndex(index);
+    setActiveMediaIndex(0);
     setViewerOpen(true);
     setProgress(0);
   };
 
+  const openEditModal = (story: Story) => {
+    setEditingStory(story);
+    setStoryType(story.type);
+    setTextContent(story.content);
+    
+    // Load existing media items
+    const existingMedia = story.mediaItems || (story.mediaUrl ? [{
+      url: story.mediaUrl,
+      publicId: story.mediaPublicId,
+      type: story.type as 'image' | 'video'
+    }] : []);
+    
+    setMediaPreviews(existingMedia.map((item, idx) => ({
+      url: item.url,
+      type: item.type,
+      file: null as any, // We don't have the original file for existing media
+    })));
+    
+    setEditModalOpen(true);
+  };
+
+  const handleEditStory = async () => {
+    if (!editingStory) return;
+
+    if (storyType === 'text' && !textContent.trim()) {
+      alert('Please enter text for your story');
+      return;
+    }
+
+    if ((storyType === 'image' || storyType === 'video') && mediaPreviews.length === 0) {
+      alert('Please select at least one image or video');
+      return;
+    }
+
+    try {
+      setUploading(true);
+
+      let mediaItems: Array<{ url: string; publicId: string; type: 'image' | 'video' }> = [];
+
+      // Get original media items
+      const originalMedia = editingStory.mediaItems || (editingStory.mediaUrl ? [{
+        url: editingStory.mediaUrl,
+        publicId: editingStory.mediaPublicId,
+        type: editingStory.type as 'image' | 'video'
+      }] : []);
+
+      // Upload new files first
+      const newFiles = mediaPreviews.filter((p) => p.file);
+      let uploadedNewFiles: Array<{ url: string; publicId: string; type: 'image' | 'video' }> = [];
+      
+      if (newFiles.length > 0) {
+        const uploadPromises = mediaFiles.map(async (file) => {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('type', file.type.startsWith('image/') ? 'image' : 'video');
+
+          const uploadRes = await fetch('/api/stories/upload', {
+            method: 'POST',
+            credentials: 'include',
+            body: formData,
+          });
+
+          if (!uploadRes.ok) {
+            throw new Error('Upload failed');
+          }
+
+          const uploadData = await uploadRes.json();
+          return {
+            url: uploadData.url,
+            publicId: uploadData.publicId,
+            type: file.type.startsWith('image/') ? 'image' : 'video' as 'image' | 'video',
+          };
+        });
+
+        uploadedNewFiles = await Promise.all(uploadPromises);
+      }
+
+      // Build mediaItems array in the order of previews
+      let newFileIndex = 0;
+      mediaItems = mediaPreviews.map((preview) => {
+        if (preview.file) {
+          // New file - use uploaded result
+          const result = uploadedNewFiles[newFileIndex];
+          newFileIndex++;
+          return result;
+        } else {
+          // Existing media - find in original media
+          return originalMedia.find((item) => item.url === preview.url) || {
+            url: preview.url,
+            publicId: editingStory.mediaPublicId,
+            type: preview.type
+          };
+        }
+      });
+
+      // Update story
+      const res = await fetch(`/api/stories/${editingStory._id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          type: storyType,
+          content: textContent.trim(),
+          mediaItems: mediaItems,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to update story');
+      }
+
+      // Reset form
+      setEditModalOpen(false);
+      setEditingStory(null);
+      setTextContent('');
+      setMediaFiles([]);
+      setMediaPreviews([]);
+      setStoryType('text');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+
+      // Refresh stories
+      fetchStories();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Failed to update story. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeleteStory = async (storyId: string) => {
+    if (!confirm('Are you sure you want to delete this story?')) return;
+
+    try {
+      const res = await fetch(`/api/stories/${storyId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to delete story');
+      }
+
+      fetchStories();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Failed to delete story. Please try again.');
+    }
+  };
+
   const nextStory = () => {
-    if (activeStoryGroup && activeStoryIndex < activeStoryGroup.stories.length - 1) {
-      setActiveStoryIndex(activeStoryIndex + 1);
-      setProgress(0);
+    if (activeStoryGroup) {
+      const currentStory = activeStoryGroup.stories[activeStoryIndex];
+      const mediaItems = currentStory.mediaItems || (currentStory.mediaUrl ? [{
+        url: currentStory.mediaUrl,
+        publicId: currentStory.mediaPublicId,
+        type: currentStory.type as 'image' | 'video'
+      }] : []);
+
+      // If current story has multiple media, navigate within it
+      if (mediaItems.length > 1 && activeMediaIndex < mediaItems.length - 1) {
+        setActiveMediaIndex(activeMediaIndex + 1);
+        setProgress(0);
+      } else if (activeStoryIndex < activeStoryGroup.stories.length - 1) {
+        // Move to next story
+        setActiveStoryIndex(activeStoryIndex + 1);
+        setActiveMediaIndex(0);
+        setProgress(0);
+      }
     }
   };
 
   const prevStory = () => {
-    if (activeStoryIndex > 0) {
-      setActiveStoryIndex(activeStoryIndex - 1);
-      setProgress(0);
+    if (activeStoryGroup) {
+      const currentStory = activeStoryGroup.stories[activeStoryIndex];
+      const mediaItems = currentStory.mediaItems || (currentStory.mediaUrl ? [{
+        url: currentStory.mediaUrl,
+        publicId: currentStory.mediaPublicId,
+        type: currentStory.type as 'image' | 'video'
+      }] : []);
+
+      // If current story has multiple media, navigate within it
+      if (mediaItems.length > 1 && activeMediaIndex > 0) {
+        setActiveMediaIndex(activeMediaIndex - 1);
+        setProgress(0);
+      } else if (activeStoryIndex > 0) {
+        // Move to previous story
+        const prevStory = activeStoryGroup.stories[activeStoryIndex - 1];
+        const prevMediaItems = prevStory.mediaItems || (prevStory.mediaUrl ? [{
+          url: prevStory.mediaUrl,
+          publicId: prevStory.mediaPublicId,
+          type: prevStory.type as 'image' | 'video'
+        }] : []);
+        setActiveStoryIndex(activeStoryIndex - 1);
+        setActiveMediaIndex(prevMediaItems.length - 1);
+        setProgress(0);
+      }
     }
   };
 
@@ -355,8 +659,8 @@ export function Stories() {
                 className="flex-1"
                 onClick={() => {
                   setStoryType('text');
-                  setMediaFile(null);
-                  setMediaPreview('');
+                  setMediaFiles([]);
+                  setMediaPreviews([]);
                 }}
               >
                 <Type className="w-4 h-4 mr-2" />
@@ -371,7 +675,7 @@ export function Stories() {
                 }}
               >
                 <ImageIcon className="w-4 h-4 mr-2" />
-                Image
+                Image{mediaFiles.length > 0 && ` (${mediaFiles.length})`}
               </Button>
               <Button
                 variant={storyType === 'video' ? 'default' : 'outline'}
@@ -382,7 +686,7 @@ export function Stories() {
                 }}
               >
                 <Video className="w-4 h-4 mr-2" />
-                Video
+                Video{mediaFiles.length > 0 && ` (${mediaFiles.length})`}
               </Button>
             </div>
 
@@ -397,47 +701,64 @@ export function Stories() {
               />
             )}
 
-            {/* Media Preview */}
-            {mediaPreview && (
-              <div className="relative">
-                {storyType === 'image' ? (
-                  <img src={mediaPreview} alt="Preview" className="w-full rounded-lg" />
-                ) : (
-                  <video src={mediaPreview} controls className="w-full rounded-lg" ref={videoRef} />
-                )}
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  className="absolute top-2 right-2"
-                  onClick={() => {
-                    setMediaFile(null);
-                    setMediaPreview('');
-                    if (fileInputRef.current) fileInputRef.current.value = '';
-                  }}
-                >
-                  <X className="w-4 h-4" />
-                </Button>
+            {/* Media Previews - Multiple */}
+            {mediaPreviews.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-sm text-slate-600">
+                  {mediaPreviews.length} {mediaPreviews.length === 1 ? 'file' : 'files'} selected
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {mediaPreviews.map((preview, index) => (
+                    <div key={index} className="relative group">
+                      {preview.type === 'image' ? (
+                        <img
+                          src={preview.url}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-32 md:h-40 object-cover rounded-lg border border-slate-200"
+                        />
+                      ) : (
+                        <video
+                          src={preview.url}
+                          className="w-full h-32 md:h-40 object-cover rounded-lg border border-slate-200"
+                          controls
+                        />
+                      )}
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => removeMedia(index)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                      <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
+                        {index + 1}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
-            {/* File Input */}
+            {/* File Input - Multiple */}
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*,video/*"
+              multiple
               onChange={handleFileChange}
               className="hidden"
             />
 
             <Button
               onClick={handleCreateStory}
-              disabled={uploading || (storyType === 'text' && !textContent.trim()) || (storyType !== 'text' && !mediaFile)}
+              disabled={uploading || (storyType === 'text' && !textContent.trim()) || (storyType !== 'text' && mediaPreviews.length === 0)}
               className="w-full bg-gradient-to-r from-blue-600 to-cyan-600"
             >
               {uploading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Uploading...
+                  Uploading story...
                 </>
               ) : (
                 'Create Story'
@@ -497,61 +818,169 @@ export function Stories() {
               {/* Progress Bar */}
               <div className="absolute top-0 left-0 right-0 z-10 p-2">
                 <div className="flex gap-1">
-                  {activeStoryGroup.stories.map((_, idx) => (
-                    <div
-                      key={idx}
-                      className="flex-1 h-1 bg-white/30 rounded-full overflow-hidden"
-                      onClick={() => {
-                        setActiveStoryIndex(idx);
-                        setProgress(0);
-                      }}
-                    >
-                      <div
-                        className="h-full bg-white transition-all duration-100"
-                        style={{
-                          width: idx < activeStoryIndex ? '100%' : idx === activeStoryIndex ? `${progress}%` : '0%',
-                        }}
-                      />
-                    </div>
-                  ))}
+                  {activeStoryGroup.stories.map((story, idx) => {
+                    const mediaItems = story.mediaItems || (story.mediaUrl ? [{
+                      url: story.mediaUrl,
+                      publicId: story.mediaPublicId,
+                      type: story.type as 'image' | 'video'
+                    }] : []);
+                    const mediaCount = Math.max(mediaItems.length, 1);
+                    
+                    return (
+                      <div key={idx} className="flex gap-1 flex-1">
+                        {Array.from({ length: mediaCount }).map((_, mediaIdx) => {
+                          const isActive = idx === activeStoryIndex && mediaIdx === activeMediaIndex;
+                          const isPast = idx < activeStoryIndex || (idx === activeStoryIndex && mediaIdx < activeMediaIndex);
+                          
+                          return (
+                            <div
+                              key={mediaIdx}
+                              className="flex-1 h-1 bg-white/30 rounded-full overflow-hidden cursor-pointer"
+                              onClick={() => {
+                                setActiveStoryIndex(idx);
+                                setActiveMediaIndex(mediaIdx);
+                                setProgress(0);
+                              }}
+                            >
+                              <div
+                                className="h-full bg-white transition-all duration-100"
+                                style={{
+                                  width: isPast ? '100%' : isActive ? `${progress}%` : '0%',
+                                }}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
               {/* Story Content */}
-              <div className="h-full flex items-center justify-center">
-                {activeStoryGroup.stories[activeStoryIndex].type === 'text' ? (
-                  <div className="text-white text-center p-8">
-                    <p className="text-2xl md:text-4xl font-bold whitespace-pre-wrap">
-                      {activeStoryGroup.stories[activeStoryIndex].content}
-                    </p>
-                  </div>
-                ) : activeStoryGroup.stories[activeStoryIndex].type === 'image' ? (
-                  <img
-                    src={activeStoryGroup.stories[activeStoryIndex].mediaUrl}
-                    alt="Story"
-                    className="max-w-full max-h-full object-contain"
-                  />
-                ) : (
-                  <video
-                    src={activeStoryGroup.stories[activeStoryIndex].mediaUrl}
-                    className="max-w-full max-h-full"
-                    controls
-                    autoPlay
-                  />
-                )}
+              <div className="h-full w-full flex items-center justify-center overflow-hidden">
+                {(() => {
+                  const currentStory = activeStoryGroup.stories[activeStoryIndex];
+                  const mediaItems = currentStory.mediaItems || (currentStory.mediaUrl ? [{
+                    url: currentStory.mediaUrl,
+                    publicId: currentStory.mediaPublicId,
+                    type: currentStory.type as 'image' | 'video'
+                  }] : []);
+
+                  if (currentStory.type === 'text') {
+                    return (
+                      <div className="text-white text-center p-8">
+                        <p className="text-2xl md:text-4xl font-bold whitespace-pre-wrap">
+                          {currentStory.content}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  // Show current media item from the array
+                  const currentMedia = mediaItems[activeMediaIndex];
+                  if (!currentMedia) return null;
+
+                  if (currentMedia.type === 'image') {
+                    return (
+                      <img
+                        src={currentMedia.url}
+                        alt="Story"
+                        className="w-full h-full object-cover"
+                      />
+                    );
+                  } else {
+                    return (
+                      <video
+                        key={`${activeStoryIndex}-${activeMediaIndex}-${currentMedia.url}`}
+                        ref={videoElementRef}
+                        src={currentMedia.url}
+                        className="w-full h-full object-cover"
+                        controls
+                        autoPlay
+                        playsInline
+                        muted={false}
+                        onLoadedMetadata={(e) => {
+                          const video = e.currentTarget;
+                          const duration = video.duration || 5;
+                          setMediaDuration(duration);
+                          setProgress(0); // Reset progress when new video loads
+                        }}
+                        onTimeUpdate={(e) => {
+                          // Sync progress with video playback
+                          const video = e.currentTarget;
+                          if (video.duration) {
+                            const currentProgress = (video.currentTime / video.duration) * 100;
+                            setProgress(currentProgress);
+                          }
+                        }}
+                        onEnded={() => {
+                          // Auto-advance when video ends
+                          const currentStory = activeStoryGroup.stories[activeStoryIndex];
+                          const mediaItems = currentStory.mediaItems || (currentStory.mediaUrl ? [{
+                            url: currentStory.mediaUrl,
+                            publicId: currentStory.mediaPublicId,
+                            type: currentStory.type as 'image' | 'video'
+                          }] : []);
+
+                          if (mediaItems.length > 1 && activeMediaIndex < mediaItems.length - 1) {
+                            setActiveMediaIndex(activeMediaIndex + 1);
+                            setProgress(0);
+                          } else if (activeStoryIndex < activeStoryGroup.stories.length - 1) {
+                            setActiveStoryIndex(activeStoryIndex + 1);
+                            setActiveMediaIndex(0);
+                            setProgress(0);
+                          } else {
+                            setViewerOpen(false);
+                          }
+                        }}
+                      />
+                    );
+                  }
+                })()}
               </div>
 
               {/* Author Info */}
               <div className="absolute top-12 left-0 right-0 z-10 p-4">
-                <div className="flex items-center gap-3">
-                  <Avatar>
-                    <AvatarImage src={activeStoryGroup.author.avatarUrl} />
-                    <AvatarFallback>{activeStoryGroup.author.name[0]}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="text-white font-semibold">{activeStoryGroup.author.name}</p>
-                    <p className="text-white/70 text-sm">@{activeStoryGroup.author.username}</p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar>
+                      <AvatarImage src={activeStoryGroup.author.avatarUrl} />
+                      <AvatarFallback>{activeStoryGroup.author.name[0]}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-white font-semibold">{activeStoryGroup.author.name}</p>
+                      <p className="text-white/70 text-sm">@{activeStoryGroup.author.username}</p>
+                    </div>
                   </div>
+                  {currentUserId === activeStoryGroup.userId && (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-white hover:bg-white/20"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEditModal(activeStoryGroup.stories[activeStoryIndex]);
+                          setViewerOpen(false);
+                        }}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-white hover:bg-white/20"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteStory(activeStoryGroup.stories[activeStoryIndex]._id);
+                          setViewerOpen(false);
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -561,7 +990,17 @@ export function Stories() {
                 size="icon"
                 className="absolute left-4 top-1/2 -translate-y-1/2 z-10 text-white hover:bg-white/20"
                 onClick={prevStory}
-                disabled={activeStoryIndex === 0}
+                disabled={(() => {
+                  const currentStory = activeStoryGroup.stories[activeStoryIndex];
+                  const mediaItems = currentStory.mediaItems || (currentStory.mediaUrl ? [{
+                    url: currentStory.mediaUrl,
+                    publicId: currentStory.mediaPublicId,
+                    type: currentStory.type as 'image' | 'video'
+                  }] : []);
+                  const isFirstMedia = activeMediaIndex === 0;
+                  const isFirstStory = activeStoryIndex === 0;
+                  return isFirstMedia && isFirstStory;
+                })()}
               >
                 <ChevronLeft className="w-6 h-6" />
               </Button>
@@ -570,7 +1009,17 @@ export function Stories() {
                 size="icon"
                 className="absolute right-4 top-1/2 -translate-y-1/2 z-10 text-white hover:bg-white/20"
                 onClick={nextStory}
-                disabled={activeStoryIndex === activeStoryGroup.stories.length - 1}
+                disabled={(() => {
+                  const currentStory = activeStoryGroup.stories[activeStoryIndex];
+                  const mediaItems = currentStory.mediaItems || (currentStory.mediaUrl ? [{
+                    url: currentStory.mediaUrl,
+                    publicId: currentStory.mediaPublicId,
+                    type: currentStory.type as 'image' | 'video'
+                  }] : []);
+                  const isLastMedia = activeMediaIndex >= mediaItems.length - 1;
+                  const isLastStory = activeStoryIndex >= activeStoryGroup.stories.length - 1;
+                  return isLastMedia && isLastStory;
+                })()}
               >
                 <ChevronRight className="w-6 h-6" />
               </Button>
@@ -586,6 +1035,143 @@ export function Stories() {
               </Button>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Story Modal */}
+      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Story</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Story Type Selection */}
+            <div className="flex gap-2">
+              <Button
+                variant={storyType === 'text' ? 'default' : 'outline'}
+                className="flex-1"
+                onClick={() => {
+                  setStoryType('text');
+                }}
+              >
+                <Type className="w-4 h-4 mr-2" />
+                Text
+              </Button>
+              <Button
+                variant={storyType === 'image' ? 'default' : 'outline'}
+                className="flex-1"
+                onClick={() => {
+                  setStoryType('image');
+                  fileInputRef.current?.click();
+                }}
+              >
+                <ImageIcon className="w-4 h-4 mr-2" />
+                Image{mediaFiles.length > 0 && ` (${mediaFiles.length})`}
+              </Button>
+              <Button
+                variant={storyType === 'video' ? 'default' : 'outline'}
+                className="flex-1"
+                onClick={() => {
+                  setStoryType('video');
+                  fileInputRef.current?.click();
+                }}
+              >
+                <Video className="w-4 h-4 mr-2" />
+                Video{mediaFiles.length > 0 && ` (${mediaFiles.length})`}
+              </Button>
+            </div>
+
+            {/* Text Story */}
+            {storyType === 'text' && (
+              <Textarea
+                placeholder="What's on your mind?"
+                value={textContent}
+                onChange={(e) => setTextContent(e.target.value)}
+                className="min-h-[200px]"
+                maxLength={500}
+              />
+            )}
+
+            {/* Media Previews - Multiple */}
+            {mediaPreviews.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-sm text-slate-600">
+                  {mediaPreviews.length} {mediaPreviews.length === 1 ? 'file' : 'files'} selected
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {mediaPreviews.map((preview, index) => (
+                    <div key={index} className="relative group">
+                      {preview.type === 'image' ? (
+                        <img
+                          src={preview.url}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-32 md:h-40 object-cover rounded-lg border border-slate-200"
+                        />
+                      ) : (
+                        <video
+                          src={preview.url}
+                          className="w-full h-32 md:h-40 object-cover rounded-lg border border-slate-200"
+                          controls
+                        />
+                      )}
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => removeMedia(index)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                      <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
+                        {index + 1}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* File Input - Multiple */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,video/*"
+              multiple
+              onChange={handleFileChange}
+              className="hidden"
+            />
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEditModalOpen(false);
+                  setEditingStory(null);
+                  setTextContent('');
+                  setMediaFiles([]);
+                  setMediaPreviews([]);
+                  setStoryType('text');
+                }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleEditStory}
+                disabled={uploading || (storyType === 'text' && !textContent.trim()) || (storyType !== 'text' && mediaPreviews.length === 0)}
+                className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600"
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  'Update Story'
+                )}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

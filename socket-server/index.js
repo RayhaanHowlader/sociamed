@@ -90,6 +90,22 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('call:reject', { fromUserId, toUserId, callId })
   })
 
+  // Notification events
+  socket.on('notification:join', ({ userId }) => {
+    if (!userId) return
+    socket.join(`user:${userId}`)
+  })
+
+  // Friend request notification
+  socket.on('friend:request:notify', ({ toUserId, requestId, fromUserId, profile }) => {
+    if (!toUserId || !requestId || !fromUserId || !profile) return
+    io.to(`user:${toUserId}`).emit('friend:request', {
+      id: requestId,
+      fromUserId,
+      profile,
+    })
+  })
+
   socket.on('disconnect', () => {
     console.log('Socket disconnected:', socket.id)
   })

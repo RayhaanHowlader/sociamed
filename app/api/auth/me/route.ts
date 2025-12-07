@@ -19,7 +19,7 @@ export async function GET() {
       return NextResponse.json({ authenticated: false }, { status: 401 })
     }
 
-    const payload = jwt.verify(token, JWT_SECRET)
+    const payload = jwt.verify(token, JWT_SECRET as string)
 
     return NextResponse.json(
       {

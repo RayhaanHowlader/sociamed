@@ -12,6 +12,8 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const groupId = searchParams.get("groupId")
+  const limit = parseInt(searchParams.get("limit") || "5", 10)
+  const before = searchParams.get("before") // ISO timestamp string
 
   if (!groupId) {
     return NextResponse.json({ error: "groupId is required" }, { status: 400 })
@@ -20,25 +22,40 @@ export async function GET(req: NextRequest) {
   const db = await getDb()
   const messages = db.collection("groupMessages")
 
+  // Build query - get messages before a certain timestamp if provided
+  const query: any = { groupId }
+
+  // If before timestamp is provided, only get messages before that time
+  if (before) {
+    query.createdAt = { $lt: new Date(before) }
+  }
+
+  // Get latest messages first (newest to oldest), then we'll reverse for display
   const docs = await messages
-    .find({ groupId })
-    .sort({ createdAt: 1 })
-    .limit(200)
+    .find(query)
+    .sort({ createdAt: -1 }) // newest first for pagination
+    .limit(limit)
     .toArray()
 
-  const items = docs.map((m) => ({
-    id: String(m._id),
-    groupId: m.groupId,
-    fromUserId: m.fromUserId,
-    content: m.content,
-    fileUrl: m.fileUrl || "",
-    fileName: m.fileName || "",
-    mimeType: m.mimeType || "",
-    isImage: !!m.isImage,
-    createdAt: m.createdAt instanceof Date ? m.createdAt.toISOString() : m.createdAt,
-  }))
+  // Reverse to show oldest first in UI (chronological order)
+  const items = docs
+    .reverse()
+    .map((m) => ({
+      id: String(m._id),
+      groupId: m.groupId,
+      fromUserId: m.fromUserId,
+      content: m.content,
+      fileUrl: m.fileUrl || "",
+      fileName: m.fileName || "",
+      mimeType: m.mimeType || "",
+      isImage: !!m.isImage,
+      createdAt: m.createdAt instanceof Date ? m.createdAt.toISOString() : m.createdAt,
+    }))
 
-  return NextResponse.json({ messages: items }, { status: 200 })
+  // Check if there are more messages to load
+  const hasMore = docs.length === limit
+
+  return NextResponse.json({ messages: items, hasMore }, { status: 200 })
 }
 
 

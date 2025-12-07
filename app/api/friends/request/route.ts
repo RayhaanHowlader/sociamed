@@ -21,6 +21,12 @@ export async function POST(req: NextRequest) {
   const friendRequests = db.collection("friendRequests")
   const friends = db.collection("friends")
 
+  // Check if user's profile is complete
+  const userProfile = await profiles.findOne({ userId: user.sub })
+  if (!userProfile || !userProfile.name || !userProfile.username) {
+    return NextResponse.json({ error: "Please complete your profile to continue" }, { status: 403 })
+  }
+
   const targetProfile = await profiles.findOne({ userId: toUserId })
   if (!targetProfile) {
     return NextResponse.json({ error: "User not found" }, { status: 404 })

@@ -1,16 +1,15 @@
 'use client';
 
-import { Home, MessageCircle, Users, User, Plus, Video, UserPlus, Bell, CircleDot, StickyNote } from 'lucide-react';
+import { Home, MessageCircle, Users, User, Video, UserPlus, Bell, CircleDot, StickyNote } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 
 interface SidebarProps {
   activeView: 'feed' | 'messages' | 'groups' | 'profile' | 'shorts' | 'friends' | 'notifications' | 'stories' | 'notes';
   onViewChange: (view: 'feed' | 'messages' | 'groups' | 'profile' | 'shorts' | 'friends' | 'notifications' | 'stories' | 'notes') => void;
-  onCreateShort: () => void;
+  notificationCount?: number;
 }
 
-export function Sidebar({ activeView, onViewChange, onCreateShort }: SidebarProps) {
+export function Sidebar({ activeView, onViewChange, notificationCount = 0 }: SidebarProps) {
   const navItems = [
     { id: 'feed' as const, icon: Home, label: 'Feed' },
     { id: 'stories' as const, icon: CircleDot, label: 'Stories' },
@@ -37,19 +36,27 @@ export function Sidebar({ activeView, onViewChange, onCreateShort }: SidebarProp
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeView === item.id;
+          const showBadge = item.id === 'notifications' && notificationCount > 0;
 
           return (
             <button
               key={item.id}
               onClick={() => onViewChange(item.id)}
               className={cn(
-                'w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all',
+                'w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all relative',
                 isActive
                   ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-blue-200'
                   : 'text-slate-600 hover:bg-slate-100'
               )}
             >
-              <Icon className="w-5 h-5" />
+              <div className="relative">
+                <Icon className="w-5 h-5" />
+                {showBadge && (
+                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">
+                    {notificationCount > 99 ? '99+' : notificationCount}
+                  </span>
+                )}
+              </div>
               <span className="font-medium text-sm md:text-base">{item.label}</span>
             </button>
           );
@@ -64,15 +71,6 @@ export function Sidebar({ activeView, onViewChange, onCreateShort }: SidebarProp
 
       
 
-      <div className="p-3 md:p-4 border-t border-slate-200">
-        <Button
-          className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
-          onClick={onCreateShort}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Create Short
-        </Button>
-      </div>
     </aside>
   );
 }

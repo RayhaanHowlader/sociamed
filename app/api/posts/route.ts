@@ -4,17 +4,33 @@ import { getUserFromRequest } from "@/lib/auth"
 
 export const dynamic = "force-dynamic"
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url)
+  const limit = parseInt(searchParams.get("limit") || "5", 10)
+  const after = searchParams.get("after") // ISO timestamp string
+
   const db = await getDb()
   const posts = db.collection("posts")
 
+  // Build query - get posts after a certain timestamp if provided
+  const query: any = {}
+
+  // If after timestamp is provided, only get posts after that time
+  if (after) {
+    query.createdAt = { $lt: new Date(after) }
+  }
+
+  // Get latest posts first (newest to oldest)
   const items = await posts
-    .find({})
+    .find(query)
     .sort({ createdAt: -1 })
-    .limit(50)
+    .limit(limit)
     .toArray()
 
-  return NextResponse.json({ posts: items }, { status: 200 })
+  // Check if there are more posts to load
+  const hasMore = items.length === limit
+
+  return NextResponse.json({ posts: items, hasMore }, { status: 200 })
 }
 
 export async function POST(req: NextRequest) {

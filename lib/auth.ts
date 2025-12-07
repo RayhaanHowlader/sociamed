@@ -18,7 +18,7 @@ export function getUserFromRequest(req: NextRequest): AuthPayload | null {
   if (!token) return null
 
   try {
-    return jwt.verify(token, JWT_SECRET) as AuthPayload
+    return jwt.verify(token, JWT_SECRET as string) as unknown as AuthPayload
   } catch (error) {
     console.error("Invalid auth token:", error)
     return null

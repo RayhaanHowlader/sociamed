@@ -16,6 +16,12 @@ export async function GET(request: Request) {
   const friends = db.collection("friends")
   const friendRequests = db.collection("friendRequests")
 
+  // Check if user's profile is complete
+  const userProfile = await profiles.findOne({ userId: user.sub })
+  if (!userProfile || !userProfile.name || !userProfile.username) {
+    return NextResponse.json({ error: "Please complete your profile to continue", suggestions: [] }, { status: 403 })
+  }
+
   // All registered users except the current one
   const userDocs = await users
     .find({ email: { $exists: true } })

@@ -13,6 +13,8 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const postId = searchParams.get("postId")
+  const limit = parseInt(searchParams.get("limit") || "5", 10)
+  const after = searchParams.get("after") // ISO timestamp string
 
   if (!postId) {
     return NextResponse.json({ error: "postId is required" }, { status: 400 })
@@ -22,10 +24,23 @@ export async function GET(req: NextRequest) {
   const commentsCol = db.collection("postComments")
   const profiles = db.collection("profiles")
 
+  // Build query - get comments after a certain timestamp if provided
+  const query: any = { postId }
+
+  // If after timestamp is provided, only get comments after that time
+  if (after) {
+    query.createdAt = { $gt: new Date(after) }
+  }
+
+  // Get comments sorted by creation time (oldest first)
   const comments = await commentsCol
-    .find({ postId })
+    .find(query)
     .sort({ createdAt: 1 })
+    .limit(limit)
     .toArray()
+
+  // Check if there are more comments to load
+  const hasMore = comments.length === limit
 
   const authorIds = Array.from(new Set(comments.map((c) => c.userId)))
   const authorProfiles = await profiles
@@ -51,7 +66,7 @@ export async function GET(req: NextRequest) {
     }
   })
 
-  return NextResponse.json({ comments: items }, { status: 200 })
+  return NextResponse.json({ comments: items, hasMore }, { status: 200 })
 }
 
 export async function POST(req: NextRequest) {

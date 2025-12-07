@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     { upsert: true, returnDocument: "after" },
   )
 
-  return NextResponse.json({ profile: updateResult.value ?? payload }, { status: 200 })
+  return NextResponse.json({ profile: updateResult?.value ?? payload }, { status: 200 })
 }
 
 

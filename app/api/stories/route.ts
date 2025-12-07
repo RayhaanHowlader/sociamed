@@ -49,10 +49,11 @@ export async function GET(req: NextRequest) {
   const friends = db.collection("friends")
 
   // Get user's friends
+  // Friends are stored as: { userId: user.sub, friendUserId: friend.sub }
+  // We need to check both directions since friendship is bidirectional
   const friendDocs = await friends
     .find({
-      $or: [{ userId: user.sub }, { friendId: user.sub }],
-      status: "accepted",
+      $or: [{ userId: String(user.sub) }, { friendUserId: String(user.sub) }],
     })
     .toArray()
 
@@ -60,10 +61,16 @@ export async function GET(req: NextRequest) {
   friendIds.add(String(user.sub)) // Include current user's own stories
 
   friendDocs.forEach((doc) => {
-    if (String(doc.userId) === String(user.sub)) {
-      friendIds.add(String(doc.friendId))
-    } else {
-      friendIds.add(String(doc.userId))
+    const docUserId = String(doc.userId)
+    const docFriendUserId = String(doc.friendUserId)
+    const currentUserId = String(user.sub)
+
+    if (docUserId === currentUserId) {
+      // User is the requester, friend is friendUserId
+      friendIds.add(docFriendUserId)
+    } else if (docFriendUserId === currentUserId) {
+      // User is the friend, requester is userId
+      friendIds.add(docUserId)
     }
   })
 
@@ -85,6 +92,13 @@ export async function GET(req: NextRequest) {
     if (!storiesByUser.has(userId)) {
       storiesByUser.set(userId, [])
     }
+    // Convert old format to new format if needed
+    const mediaItems = story.mediaItems || (story.mediaUrl ? [{
+      url: story.mediaUrl,
+      publicId: story.mediaPublicId || "",
+      type: story.type as "image" | "video"
+    }] : [])
+
     storiesByUser.get(userId)!.push({
       _id: String(story._id),
       userId: String(story.userId),
@@ -92,6 +106,7 @@ export async function GET(req: NextRequest) {
       content: story.content || "",
       mediaUrl: story.mediaUrl || "",
       mediaPublicId: story.mediaPublicId || "",
+      mediaItems: mediaItems,
       author: story.author,
       createdAt: story.createdAt.toISOString(),
       expiresAt: story.expiresAt.toISOString(),
@@ -117,11 +132,12 @@ export async function POST(req: NextRequest) {
 
   await ensureTTLIndex()
 
-  const { type, content, mediaUrl, mediaPublicId } = (await req.json()) as {
+  const { type, content, mediaUrl, mediaPublicId, mediaItems } = (await req.json()) as {
     type?: "text" | "image" | "video"
     content?: string
     mediaUrl?: string
     mediaPublicId?: string
+    mediaItems?: Array<{ url: string; publicId: string; type: "image" | "video" }>
   }
 
   if (!type || !["text", "image", "video"].includes(type)) {
@@ -132,8 +148,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Text content is required for text stories" }, { status: 400 })
   }
 
-  if ((type === "image" || type === "video") && !mediaUrl) {
-    return NextResponse.json({ error: "Media URL is required for image/video stories" }, { status: 400 })
+  // Support both old format (single media) and new format (multiple media)
+  const hasMedia = mediaItems && mediaItems.length > 0
+  const hasSingleMedia = mediaUrl && mediaPublicId
+
+  if ((type === "image" || type === "video") && !hasMedia && !hasSingleMedia) {
+    return NextResponse.json({ error: "Media is required for image/video stories" }, { status: 400 })
   }
 
   const db = await getDb()
@@ -173,12 +193,22 @@ export async function POST(req: NextRequest) {
 
   const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000) // 24 hours from now
 
+  // Convert single media to array format for consistency
+  const mediaItemsArray = hasMedia 
+    ? mediaItems 
+    : hasSingleMedia 
+      ? [{ url: mediaUrl, publicId: mediaPublicId, type: type as "image" | "video" }]
+      : []
+
   const doc = {
     userId: user.sub,
     type,
     content: content?.trim() || "",
-    mediaUrl: mediaUrl || "",
-    mediaPublicId: mediaPublicId || "",
+    // Keep old fields for backward compatibility
+    mediaUrl: mediaItemsArray[0]?.url || mediaUrl || "",
+    mediaPublicId: mediaItemsArray[0]?.publicId || mediaPublicId || "",
+    // New field for multiple media
+    mediaItems: mediaItemsArray,
     author: {
       name: profile.name,
       username: profile.username,
