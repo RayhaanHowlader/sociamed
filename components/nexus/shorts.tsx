@@ -121,9 +121,25 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
   const handleFileChange = (file: File) => {
     setError('');
 
+    // Validate file type
+    if (!file.type.startsWith('video/')) {
+      setError('Please select a video file.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    // Validate file size (100MB limit)
+    const maxSize = 100 * 1024 * 1024; // 100MB
+    if (file.size > maxSize) {
+      setError('Video file is too large. Maximum size is 100MB.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
     const url = URL.createObjectURL(file);
     const video = document.createElement('video');
     video.preload = 'metadata';
+    
     video.onloadedmetadata = () => {
       const duration = video.duration || 0;
 
@@ -141,6 +157,16 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
       setVideoPreview(url);
       setVideoDuration(duration);
     };
+
+    video.onerror = () => {
+      setError('Failed to load video. Please select a valid video file.');
+      setVideoFile(null);
+      setVideoPreview('');
+      setVideoDuration(0);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      URL.revokeObjectURL(url);
+    };
+
     video.src = url;
   };
 
@@ -174,10 +200,26 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
         body: form,
         credentials: 'include',
       });
-      const uploadData = await uploadRes.json();
+
+      let uploadData;
+      try {
+        uploadData = await uploadRes.json();
+      } catch (parseError) {
+        console.error('Failed to parse upload response:', parseError);
+        setError('Failed to upload video. Please try again.');
+        setUploading(false);
+        return;
+      }
 
       if (!uploadRes.ok) {
-        setError(uploadData.error || 'Failed to upload video.');
+        const errorMessage = uploadData.details || uploadData.error || 'Failed to upload video.';
+        setError(errorMessage);
+        setUploading(false);
+        return;
+      }
+
+      if (!uploadData.url || !uploadData.publicId) {
+        setError('Invalid response from server. Please try again.');
         setUploading(false);
         return;
       }
@@ -193,7 +235,16 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
           duration: videoDuration,
         }),
       });
-      const data = await res.json();
+
+      let data;
+      try {
+        data = await res.json();
+      } catch (parseError) {
+        console.error('Failed to parse create short response:', parseError);
+        setError('Failed to create short. Please try again.');
+        setUploading(false);
+        return;
+      }
 
       if (!res.ok) {
         setError(data.error || 'Unable to create short.');
@@ -204,8 +255,8 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
       setShorts((prev) => [data.short, ...prev]);
       closeModal();
     } catch (err) {
-      console.error(err);
-      setError('Unable to create short.');
+      console.error('Error creating short:', err);
+      setError(err instanceof Error ? err.message : 'Unable to create short. Please try again.');
     } finally {
       setUploading(false);
     }
