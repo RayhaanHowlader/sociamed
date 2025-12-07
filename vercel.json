@@ -1,0 +1,23 @@
+{
+  "functions": {
+    "app/api/profile/upload/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/posts/upload/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/stories/upload/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/shorts/upload/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/chat/upload/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/notes/upload/route.ts": {
+      "maxDuration": 30
+    }
+  }
+}
+
