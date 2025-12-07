@@ -236,7 +236,7 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
         }),
       });
 
-      let data;
+      let data: { short?: ShortItem; error?: string };
       try {
         data = await res.json();
       } catch (parseError) {
@@ -252,7 +252,13 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
         return;
       }
 
-      setShorts((prev) => [data.short, ...prev]);
+      if (!data.short) {
+        setError('Invalid response from server. Please try again.');
+        setUploading(false);
+        return;
+      }
+
+      setShorts((prev) => [data.short!, ...prev]);
       closeModal();
     } catch (err) {
       console.error('Error creating short:', err);
