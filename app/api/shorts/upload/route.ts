@@ -3,11 +3,31 @@ import cloudinary from "@/lib/cloudinary"
 import { getUserFromRequest } from "@/lib/auth"
 
 export const dynamic = "force-dynamic"
+// Increase timeout for Vercel (videos take longer, max 60s for Pro, 10s for Hobby)
+export const maxDuration = 60
 
 export async function POST(req: NextRequest) {
   const user = getUserFromRequest(req)
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  // Check Cloudinary configuration before processing
+  const cloudinaryConfig = cloudinary.config()
+  if (!cloudinaryConfig.cloud_name || !cloudinaryConfig.api_key || !cloudinaryConfig.api_secret) {
+    console.error("Cloudinary configuration missing:", {
+      hasCloudName: !!cloudinaryConfig.cloud_name,
+      hasApiKey: !!cloudinaryConfig.api_key,
+      hasApiSecret: !!cloudinaryConfig.api_secret,
+      env: process.env.NODE_ENV,
+    })
+    return NextResponse.json(
+      { 
+        error: "Cloudinary is not configured",
+        details: "Missing environment variables. Please check CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in Vercel settings."
+      },
+      { status: 500 }
+    )
   }
 
   const formData = await req.formData()
@@ -17,40 +37,89 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No video provided" }, { status: 400 })
   }
 
-  if (!cloudinary.config().cloud_name) {
-    return NextResponse.json({ error: "Cloudinary is not configured" }, { status: 500 })
+  // Check file size (limit to 100MB for short videos)
+  const maxSize = 100 * 1024 * 1024 // 100MB
+  if (file.size > maxSize) {
+    return NextResponse.json(
+      { error: "File too large. Maximum size is 100MB." },
+      { status: 400 }
+    )
   }
 
   const arrayBuffer = await file.arrayBuffer()
   const buffer = Buffer.from(arrayBuffer)
 
   try {
-    const result = await new Promise<{
-      secure_url: string
-      public_id: string
-    }>((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          folder: "nexus/shorts",
-          public_id: `${user.sub}-short-${Date.now()}`,
-          resource_type: "video",
+    // Use uploader.upload with buffer for better error handling
+    // Convert buffer to data URI format that Cloudinary accepts
+    const dataUri = `data:${file.type || "video/mp4"};base64,${buffer.toString("base64")}`
+    
+    const uploadResult = await cloudinary.uploader.upload(
+      dataUri,
+      {
+        folder: "nexus/shorts",
+        public_id: `${user.sub}-short-${Date.now()}`,
+        resource_type: "video",
+        overwrite: false,
+        invalidate: true,
+        eager: [{ quality: "auto", fetch_format: "auto" }],
+      }
+    )
+
+    if (!uploadResult || !uploadResult.secure_url) {
+      console.error("Cloudinary upload returned invalid result:", uploadResult)
+      return NextResponse.json(
+        { 
+          error: "Video upload failed",
+          details: "Invalid response from Cloudinary",
         },
-        (error, uploadResult) => {
-          if (error || !uploadResult) {
-            reject(error ?? new Error("Cloudinary upload failed"))
-            return
-          }
-          resolve(uploadResult as { secure_url: string; public_id: string })
-        },
+        { status: 500 }
       )
+    }
 
-      stream.end(buffer)
+    return NextResponse.json({ url: uploadResult.secure_url, publicId: uploadResult.public_id }, { status: 200 })
+  } catch (error: any) {
+    // Enhanced error logging for Cloudinary errors
+    console.error("Short video upload failed:", {
+      error: error?.message || String(error),
+      http_code: error?.http_code,
+      name: error?.name,
+      stack: error?.stack,
+      fileSize: file.size,
+      fileName: file.name,
+      fileType: file.type,
+      cloudName: cloudinaryConfig.cloud_name,
+      hasApiKey: !!cloudinaryConfig.api_key,
+      hasApiSecret: !!cloudinaryConfig.api_secret,
     })
+    
+    // Provide more specific error messages
+    let errorMessage = "Video upload failed"
+    let statusCode = 500
 
-    return NextResponse.json({ url: result.secure_url, publicId: result.public_id }, { status: 200 })
-  } catch (error) {
-    console.error("Cloudinary upload failed:", error)
-    return NextResponse.json({ error: "Video upload failed" }, { status: 500 })
+    if (error?.http_code === 401 || error?.message?.includes("401")) {
+      errorMessage = "Invalid Cloudinary credentials. Please check your API key and secret."
+      statusCode = 500
+    } else if (error?.http_code === 400 || error?.message?.includes("400")) {
+      errorMessage = "Invalid upload request. Please check the file format and size."
+      statusCode = 400
+    } else if (error?.message) {
+      errorMessage = error.message
+    }
+
+    return NextResponse.json(
+      { 
+        error: "Video upload failed",
+        details: errorMessage,
+        ...(process.env.NODE_ENV === "development" && {
+          debug: {
+            http_code: error?.http_code,
+            name: error?.name,
+          }
+        })
+      },
+      { status: statusCode }
+    )
   }
 }
 
