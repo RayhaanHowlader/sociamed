@@ -1,7 +1,7 @@
 const http = require('http')
 const { Server } = require('socket.io')
 
-const PORT = process.env.PORT || 4000
+const PORT = process.env.PORT || 10000
 
 const server = http.createServer()
 
