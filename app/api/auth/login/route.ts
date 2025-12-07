@@ -32,9 +32,9 @@ export async function POST(req: NextRequest) {
     console.log("[LOGIN] Database connection established")
 
     console.log("[LOGIN] Searching for user with email:", email ? `${email.substring(0, 3)}***` : "missing")
-    const user = await users.findOne<{ _id: unknown; email: string; fullName?: string; passwordHash?: string }>({
+    const user = await users.findOne({
       email,
-    })
+    }) as { _id: unknown; email: string; fullName?: string; passwordHash?: string } | null
 
     if (!user || !user.passwordHash) {
       console.log("[LOGIN] User not found or missing password hash")
