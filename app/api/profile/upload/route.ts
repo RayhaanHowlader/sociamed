@@ -51,58 +51,74 @@ export async function POST(req: NextRequest) {
   const buffer = Buffer.from(arrayBuffer)
 
   try {
-    const result = await new Promise<{
-      secure_url: string
-    }>((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          folder: "nexus/profiles",
-          public_id: `${user.sub}-${imageType || "image"}-${Date.now()}`,
-          resource_type: "image",
+    // Use uploader.upload with buffer for better error handling
+    // Convert buffer to data URI format that Cloudinary accepts
+    const dataUri = `data:${file.type};base64,${buffer.toString("base64")}`
+    
+    const uploadResult = await cloudinary.uploader.upload(
+      dataUri,
+      {
+        folder: "nexus/profiles",
+        public_id: `${user.sub}-${imageType || "image"}-${Date.now()}`,
+        resource_type: "image",
+        overwrite: false,
+        invalidate: true,
+      }
+    )
+
+    if (!uploadResult || !uploadResult.secure_url) {
+      console.error("Cloudinary upload returned invalid result:", uploadResult)
+      return NextResponse.json(
+        { 
+          error: "Image upload failed",
+          details: "Invalid response from Cloudinary",
         },
-        (error, uploadResult) => {
-          if (error) {
-            console.error("Cloudinary upload error:", {
-              message: error.message,
-              http_code: error.http_code,
-              name: error.name,
-            })
-            reject(error)
-            return
-          }
-          if (!uploadResult) {
-            reject(new Error("Cloudinary upload failed: No result returned"))
-            return
-          }
-          resolve(uploadResult as { secure_url: string })
-        },
+        { status: 500 }
       )
+    }
 
-      stream.on("error", (streamError) => {
-        console.error("Cloudinary stream error:", streamError)
-        reject(streamError)
-      })
-
-      stream.end(buffer)
-    })
-
-    return NextResponse.json({ url: result.secure_url }, { status: 200 })
-  } catch (error) {
+    return NextResponse.json({ url: uploadResult.secure_url }, { status: 200 })
+  } catch (error: any) {
+    // Enhanced error logging for Cloudinary errors
     console.error("Cloudinary upload failed:", {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
+      error: error?.message || String(error),
+      http_code: error?.http_code,
+      name: error?.name,
+      stack: error?.stack,
       fileSize: file.size,
       fileName: file.name,
       fileType: file.type,
+      cloudName: cloudinaryConfig.cloud_name,
+      hasApiKey: !!cloudinaryConfig.api_key,
+      hasApiSecret: !!cloudinaryConfig.api_secret,
     })
     
-    const errorMessage = error instanceof Error ? error.message : "Image upload failed"
+    // Provide more specific error messages
+    let errorMessage = "Image upload failed"
+    let statusCode = 500
+
+    if (error?.http_code === 401 || error?.message?.includes("401")) {
+      errorMessage = "Invalid Cloudinary credentials. Please check your API key and secret."
+      statusCode = 500
+    } else if (error?.http_code === 400 || error?.message?.includes("400")) {
+      errorMessage = "Invalid upload request. Please check the file format and size."
+      statusCode = 400
+    } else if (error?.message) {
+      errorMessage = error.message
+    }
+
     return NextResponse.json(
       { 
         error: "Image upload failed",
         details: errorMessage,
+        ...(process.env.NODE_ENV === "development" && {
+          debug: {
+            http_code: error?.http_code,
+            name: error?.name,
+          }
+        })
       },
-      { status: 500 }
+      { status: statusCode }
     )
   }
 }
