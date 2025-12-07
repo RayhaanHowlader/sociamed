@@ -37,21 +37,14 @@ export async function POST(req: NextRequest) {
     // Mark OTP as used
     await otps.updateOne({ _id: otpDoc._id }, { $set: { used: true, usedAt: new Date() } })
 
-    const user = await users.findOne({ email }) as { _id: unknown; email: string; fullName?: string } | null
+    const user = await users.findOne<{ _id: unknown; email: string; fullName?: string }>({ email })
     if (!user) {
       return NextResponse.json({ error: "No account found for this email" }, { status: 404 })
     }
 
-    // Convert _id to string to ensure proper serialization in production
-    const userId = user._id ? String(user._id) : null
-    if (!userId) {
-      console.error("[LOGIN-OTP] ERROR: User ID is missing after conversion")
-      return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-    }
-
     const token = jwt.sign(
       {
-        sub: userId,
+        sub: user._id,
         email: user.email,
         fullName: user.fullName,
       },
@@ -71,21 +64,7 @@ export async function POST(req: NextRequest) {
 
     return response
   } catch (error) {
-    // Log detailed error for debugging in production
-    console.error("[LOGIN-OTP] ERROR occurred")
-    console.error("[LOGIN-OTP] Error type:", error instanceof Error ? error.constructor.name : typeof error)
-    console.error("[LOGIN-OTP] Error message:", error instanceof Error ? error.message : String(error))
-    
-    const errorMessage = error instanceof Error ? error.message : "Unknown error"
-    const errorStack = error instanceof Error ? error.stack : undefined
-    
-    // In production, log more details but don't expose them to client
-    console.error("[LOGIN-OTP] Full error details:", {
-      message: errorMessage,
-      stack: errorStack,
-      timestamp: new Date().toISOString(),
-    })
-    
+    console.error("OTP login error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
