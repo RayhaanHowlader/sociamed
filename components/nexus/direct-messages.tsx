@@ -27,6 +27,7 @@ import { useVoiceCall } from './use-voice-call';
 import { MessageBubble } from './message-bubble';
 import { FilePreview } from './file-preview';
 import { UploadProgress } from './upload-progress';
+import { ImageViewerModal } from './image-viewer-modal';
 
 interface FriendConversation {
   userId: string;
@@ -43,9 +44,23 @@ interface ChatMessage {
   fileUrl?: string;
   fileName?: string;
   mimeType?: string;
+  filePublicId?: string;
   isImage?: boolean;
   createdAt: string;
   status?: 'sent' | 'seen';
+  deleted?: boolean;
+  sharedPostId?: string;
+  sharedPostData?: {
+    content: string;
+    imageUrl?: string;
+    author: {
+      userId: string;
+      name: string;
+      username: string;
+      avatarUrl?: string;
+    };
+    createdAt: string;
+  };
 }
 
 export function DirectMessages() {
@@ -65,6 +80,18 @@ export function DirectMessages() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [filePreview, setFilePreview] = useState<{ url: string; type: 'image' | 'video' | 'audio'; file: File } | null>(null);
   const [error, setError] = useState('');
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
+  const [imageViewerOpen, setImageViewerOpen] = useState(false);
+  const [imageViewerData, setImageViewerData] = useState<{
+    url: string;
+    senderName?: string;
+    senderAvatar?: string;
+    senderUsername?: string;
+    timestamp?: string;
+    caption?: string;
+    fileName?: string;
+  } | null>(null);
 
   // Voice call hook
   const {
@@ -122,14 +149,22 @@ export function DirectMessages() {
   useEffect(() => {
     if (!currentUserId) return;
 
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://sociamed.onrender.com';
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
     const socket = io(socketUrl);
     socketRef.current = socket;
+    console.log('[socket] connect', socketUrl);
 
     socket.on('chat:message', (payload: ChatMessage) => {
       // Ignore messages we already added locally
       if (payload.fromUserId === currentUserId) return;
-      setMessages((prev) => [...prev, payload]);
+      console.log('[socket] chat:message received', payload.id, payload.sharedPostData ? 'with shared post' : 'regular message');
+      
+      // Avoid duplicates by checking if message already exists
+      setMessages((prev) => {
+        const exists = prev.some(m => m.id === payload.id);
+        if (exists) return prev;
+        return [...prev, payload];
+      });
 
       // Scroll to bottom when receiving a new message
       setTimeout(() => {
@@ -145,12 +180,47 @@ export function DirectMessages() {
     });
 
     socket.on('chat:seen', ({ messageId }: { messageId: string }) => {
+      console.log('[socket] chat:seen received', messageId);
       setMessages((prev) =>
         prev.map((m) => (m.id === messageId ? { ...m, status: 'seen' as const } : m)),
       );
     });
 
+    socket.on('chat:message:id', ({ tempId, newId, filePublicId }: { tempId: string; newId: string; filePublicId?: string }) => {
+      console.log('[socket] chat:message:id received', { tempId, newId });
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === tempId
+            ? { ...m, id: newId, filePublicId: filePublicId ?? m.filePublicId }
+            : m,
+        ),
+      );
+    });
+
+    socket.on('chat:delete', ({ messageIds }: { messageIds: string[] }) => {
+      if (!Array.isArray(messageIds) || messageIds.length === 0) return;
+      console.log('[socket] chat:delete received', messageIds);
+      setMessages((prev) =>
+        prev.map((m) =>
+          messageIds.includes(m.id)
+            ? {
+                ...m,
+                deleted: true,
+                content: '',
+                fileUrl: '',
+                fileName: '',
+                mimeType: '',
+                isImage: false,
+              }
+            : m,
+        ),
+      );
+      // Fallback refresh to ensure IDs match latest history
+      refreshCurrentChat();
+    });
+
     return () => {
+      console.log('[socket] disconnect');
       socket.disconnect();
       socketRef.current = null;
     };
@@ -170,6 +240,24 @@ export function DirectMessages() {
     });
   }, [currentUserId, selectedChat, friends]);
 
+  const refreshCurrentChat = useCallback(async () => {
+    if (!currentUserId || !selectedChat) return;
+    try {
+      const res = await fetch(`/api/chat/history?friendId=${selectedChat.userId}&limit=20`, {
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        console.error(data.error || 'Unable to refresh chat history');
+        return;
+      }
+      setMessages(data.messages ?? []);
+      setHasMoreMessages(data.hasMore ?? false);
+    } catch (err) {
+      console.error(err);
+    }
+  }, [currentUserId, selectedChat]);
+
   // Load initial messages (latest 5) whenever a chat is selected
   useEffect(() => {
     const loadHistory = async () => {
@@ -187,6 +275,7 @@ export function DirectMessages() {
           console.error(data.error || 'Unable to load chat history');
           return;
         }
+        clearSelection();
         setMessages(data.messages ?? []);
         setHasMoreMessages(data.hasMore ?? false);
         
@@ -209,6 +298,10 @@ export function DirectMessages() {
     const oldestMessage = messages[0];
     if (!oldestMessage) return;
 
+    console.log('[scroll] loadMoreMessages start', {
+      friendId: selectedChat.userId,
+      before: oldestMessage.createdAt,
+    });
     setLoadingMore(true);
     try {
       const res = await fetch(
@@ -226,6 +319,10 @@ export function DirectMessages() {
       // Prepend older messages to the beginning
       setMessages((prev) => [...(data.messages ?? []), ...prev]);
       setHasMoreMessages(data.hasMore ?? false);
+      console.log('[scroll] loadMoreMessages success', {
+        received: data.messages?.length ?? 0,
+        hasMore: data.hasMore,
+      });
     } catch (err) {
       console.error(err);
     } finally {
@@ -235,7 +332,7 @@ export function DirectMessages() {
 
   // Handle scroll to detect when user scrolls to top
   useEffect(() => {
-    if (!selectedChat || !hasMoreMessages) return;
+    if (!selectedChat) return;
 
     // Find the scroll container inside ScrollArea
     const findScrollContainer = () => {
@@ -253,11 +350,17 @@ export function DirectMessages() {
     const timeoutId = setTimeout(() => {
       container = findScrollContainer();
       if (!container) return;
+      console.log('[scroll] container ready');
 
       const handleScroll = () => {
         // Check if scrolled near the top (within 100px)
         if (container && container.scrollTop < 100 && hasMoreMessages && !loadingMore) {
           const previousScrollHeight = container.scrollHeight;
+          console.log('[scroll] near top -> loadMore', {
+            scrollTop: container.scrollTop,
+            hasMoreMessages,
+            loadingMore,
+          });
           loadMoreMessages().then(() => {
             // Maintain scroll position after loading more messages
             setTimeout(() => {
@@ -284,14 +387,16 @@ export function DirectMessages() {
     if (!selectedChat || !currentUserId || !socketRef.current) return;
     if (!message.trim() && !extra?.fileUrl) return;
 
+    const tempId = `${Date.now()}`;
     const payload: ChatMessage = {
-      id: `${Date.now()}`,
+      id: tempId,
       fromUserId: currentUserId,
       toUserId: selectedChat.userId,
       content: message.trim(),
       fileUrl: extra?.fileUrl,
       fileName: extra?.fileName,
       mimeType: extra?.mimeType,
+      filePublicId: extra?.filePublicId,
       isImage: extra?.isImage,
       createdAt: new Date().toISOString(),
       status: 'sent',
@@ -311,11 +416,102 @@ export function DirectMessages() {
         fileUrl: payload.fileUrl,
         fileName: payload.fileName,
         mimeType: payload.mimeType,
+        filePublicId: payload.filePublicId,
         isImage: payload.isImage,
       }),
-    }).catch((err) => console.error('Failed to save chat message', err));
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.message?._id) return;
+        const newId = String(data.message._id || data.message.id);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === tempId
+              ? {
+                  ...m,
+                  id: newId,
+                  filePublicId: data.message.filePublicId ?? m.filePublicId,
+                }
+              : m,
+          ),
+        );
+        socketRef.current?.emit('chat:message:id', {
+          fromUserId: currentUserId,
+          toUserId: selectedChat.userId,
+          tempId,
+          newId,
+          filePublicId: data.message.filePublicId,
+        });
+      })
+      .catch((err) => console.error('Failed to save chat message', err));
 
     setMessage('');
+  };
+
+  const isObjectId = (val: string) => /^[a-f\d]{24}$/i.test(val);
+
+  const toggleMessageSelection = (id: string, isMine: boolean) => {
+    if (!isMine) return;
+    if (!isObjectId(id)) {
+      // skip selecting messages that don't yet have a persisted id
+      return;
+    }
+    setSelectMode(true);
+    setSelectedMessageIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedMessageIds(new Set());
+    setSelectMode(false);
+  };
+
+  const deleteSelectedMessages = async () => {
+    if (!selectedChat || !currentUserId) return;
+    const ids = Array.from(selectedMessageIds).filter(isObjectId);
+    if (ids.length === 0) {
+      await refreshCurrentChat();
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/chat/message', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ messageIds: ids }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Failed to delete messages');
+        return;
+      }
+
+      setMessages((prev) =>
+        prev.map((m) =>
+          ids.includes(m.id)
+            ? { ...m, deleted: true, content: '', fileUrl: '', fileName: '', mimeType: '', isImage: false, filePublicId: '' }
+            : m,
+        ),
+      );
+
+      socketRef.current?.emit('chat:delete', {
+        fromUserId: currentUserId,
+        toUserId: selectedChat.userId,
+        messageIds: ids,
+      });
+
+      await refreshCurrentChat();
+      clearSelection();
+    } catch (err) {
+      console.error(err);
+      setError('Failed to delete messages');
+    }
   };
 
   const handleFileChange = (file: File) => {
@@ -363,7 +559,7 @@ export function DirectMessages() {
       // Use XMLHttpRequest for progress tracking
       const xhr = new XMLHttpRequest();
       
-      const uploadPromise = new Promise<{ url: string; fileName: string; mimeType: string; isImage: boolean }>((resolve, reject) => {
+      const uploadPromise = new Promise<{ url: string; fileName: string; mimeType: string; isImage: boolean; publicId?: string }>((resolve, reject) => {
         xhr.upload.addEventListener('progress', (e) => {
           if (e.lengthComputable) {
             const percentComplete = (e.loaded / e.total) * 100;
@@ -413,6 +609,7 @@ export function DirectMessages() {
         fileUrl: data.url,
         fileName: data.fileName || file.name,
         mimeType: mimeType,
+        filePublicId: data.publicId,
         isImage: isImage,
       });
       
@@ -444,6 +641,31 @@ export function DirectMessages() {
     setUploadProgress(0);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
+
+  const handleImageClick = useCallback(
+    (payload: { url: string; message: ChatMessage }) => {
+      const sender = friends.find((f) => f.userId === payload.message.fromUserId);
+      setImageViewerData({
+        url: payload.url,
+        senderName: sender?.name,
+        senderAvatar: sender?.avatarUrl,
+        senderUsername: sender?.username,
+        timestamp: payload.message.createdAt,
+        caption: payload.message.content,
+        fileName: payload.message.fileName,
+      });
+      setImageViewerOpen(true);
+    },
+    [friends],
+  );
+
+  const handleSharedPostClick = useCallback((postId: string) => {
+    // Navigate to the feed and highlight the post
+    // For now, we'll dispatch a custom event to switch to feed and scroll to the post
+    window.dispatchEvent(new CustomEvent('navigate-to-post', { 
+      detail: { postId } 
+    }));
+  }, []);
 
   return (
     <div className="h-full flex flex-col md:flex-row bg-white">
@@ -477,26 +699,37 @@ export function DirectMessages() {
                   `${f.name} ${f.username}`.toLowerCase().includes(searchQuery.toLowerCase()),
                 )
                 .map((conv) => (
-              <button
+              <div
                     key={conv.userId}
-                onClick={() => setSelectedChat(conv)}
                 className={cn(
                   'w-full p-3 rounded-lg flex items-center gap-3 hover:bg-slate-50 transition-colors',
                       selectedChat?.userId === conv.userId && 'bg-blue-50',
                 )}
               >
-                  <Avatar>
+                  <Avatar 
+                    className="cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Navigate to the friend's profile
+                      window.dispatchEvent(new CustomEvent('view-profile', { 
+                        detail: { userId: conv.userId } 
+                      }));
+                    }}
+                  >
                       <AvatarImage src={conv.avatarUrl} />
                     <AvatarFallback>{conv.name[0]}</AvatarFallback>
                   </Avatar>
-                <div className="flex-1 text-left overflow-hidden">
+                <div 
+                  className="flex-1 text-left overflow-hidden cursor-pointer"
+                  onClick={() => setSelectedChat(conv)}
+                >
                     <p className="font-semibold text-slate-900 text-sm">{conv.name}</p>
                       <p className="text-xs text-slate-500">{conv.username}</p>
                       <p className="text-sm text-slate-600 truncate">
                         Start a conversation with {conv.name}
                       </p>
                   </div>
-              </button>
+              </div>
                 ))
             )}
           </div>
@@ -520,11 +753,27 @@ export function DirectMessages() {
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <Avatar>
+            <Avatar 
+              className="cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all"
+              onClick={() => {
+                // Navigate to the selected chat friend's profile
+                window.dispatchEvent(new CustomEvent('view-profile', { 
+                  detail: { userId: selectedChat.userId } 
+                }));
+              }}
+            >
                 <AvatarImage src={selectedChat.avatarUrl} />
               <AvatarFallback>{selectedChat.name[0]}</AvatarFallback>
             </Avatar>
-            <div>
+            <div 
+              className="cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => {
+                // Navigate to the selected chat friend's profile
+                window.dispatchEvent(new CustomEvent('view-profile', { 
+                  detail: { userId: selectedChat.userId } 
+                }));
+              }}
+            >
               <p className="font-semibold text-slate-900">{selectedChat.name}</p>
                 <p className="text-sm text-slate-500">Say hi to your new friend.</p>
               </div>
@@ -532,7 +781,7 @@ export function DirectMessages() {
           ) : (
             <p className="text-sm text-slate-500">Select a friend to start chatting.</p>
           )}
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center flex-wrap justify-end sticky top-0 bg-white z-10 py-2">
             <Button
               variant="ghost"
               size="icon"
@@ -558,18 +807,54 @@ export function DirectMessages() {
             <Button variant="ghost" size="icon" className="text-slate-600 hover:text-blue-600">
               <Video className="w-5 h-5" />
             </Button>
+
             <Button variant="ghost" size="icon" className="text-slate-600 hover:text-slate-900">
               <MoreVertical className="w-5 h-5" />
             </Button>
+            <Button
+              variant={selectMode ? 'secondary' : 'outline'}
+              size="sm"
+              disabled={!selectedChat}
+              onClick={() => (selectMode ? clearSelection() : setSelectMode(true))}
+              className="min-w-[92px]"
+            >
+              {selectMode ? 'Cancel' : 'Select'}
+            </Button>
+            {selectedMessageIds.size > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={deleteSelectedMessages}
+                className="min-w-[110px]"
+              >
+                Delete ({selectedMessageIds.size})
+              </Button>
+            )}
           </div>
         </div>
 
         <ScrollArea 
-          className="flex-1 p-3 md:p-6 bg-slate-50"
+          className="flex-1 p-3 md:p-6 bg-slate-50 h-[calc(100vh-220px)]"
           ref={messagesContainerRef}
         >
           {selectedChat ? (
             <div className="space-y-4 max-w-3xl mx-auto">
+              {hasMoreMessages && (
+                <div className="flex justify-center py-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      console.log('[scroll] load more button click');
+                      loadMoreMessages();
+                    }}
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? 'Loading…' : 'Load older messages'}
+                  </Button>
+                </div>
+              )}
+
               {/* Loading indicator when loading more messages */}
               {loadingMore && (
                 <div className="flex justify-center py-2">
@@ -583,14 +868,23 @@ export function DirectMessages() {
                     (msg.fromUserId === currentUserId && msg.toUserId === selectedChat.userId) ||
                     (msg.toUserId === currentUserId && msg.fromUserId === selectedChat.userId),
                 )
-                .map((msg) => (
-                  <MessageBubble
-                    key={msg.id}
-                    message={msg}
-                    isMine={msg.fromUserId === currentUserId}
-                    currentUserId={currentUserId || ''}
-                  />
-                ))}
+                .map((msg) => {
+                  const isMine = msg.fromUserId === currentUserId;
+                  const selectable = selectMode && isMine && !msg.deleted;
+                  return (
+                    <MessageBubble
+                      key={msg.id}
+                      message={msg}
+                      isMine={isMine}
+                      currentUserId={currentUserId || ''}
+                      selectable={selectable}
+                      selected={selectedMessageIds.has(msg.id)}
+                      onSelectToggle={() => toggleMessageSelection(msg.id, isMine)}
+                      onImageClick={(url) => handleImageClick({ url, message: msg })}
+                      onSharedPostClick={handleSharedPostClick}
+                    />
+                  );
+                })}
               
               {/* Scroll anchor for auto-scroll to bottom */}
               <div ref={messagesEndRef} />
@@ -688,6 +982,17 @@ export function DirectMessages() {
       </div>
 
       {/* Incoming Call Dialog */}
+      <ImageViewerModal
+        open={imageViewerOpen}
+        onOpenChange={(open) => {
+          setImageViewerOpen(open);
+          if (!open) {
+            setImageViewerData(null);
+          }
+        }}
+        image={imageViewerData}
+      />
+
       <Dialog open={callState.isReceivingCall && !callState.isInCall} onOpenChange={(open) => !open && !callState.isInCall && rejectCall()}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

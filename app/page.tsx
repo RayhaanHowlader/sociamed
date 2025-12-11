@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { LogOut, Menu, X } from 'lucide-react';
+import { LogOut, Menu, X, Home as HomeIcon, BookOpen, MessageSquare, Users, User, UserPlus, Bell, Video, FileText } from 'lucide-react';
 import { Sidebar } from '@/components/nexus/sidebar';
 import { Feed } from '@/components/nexus/feed';
 import { DirectMessages } from '@/components/nexus/direct-messages';
@@ -38,6 +38,7 @@ export default function Home() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [notificationCount, setNotificationCount] = useState(0);
   const [currentNotification, setCurrentNotification] = useState<FriendRequestNotification | null>(null);
+  const [viewingUserId, setViewingUserId] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const notificationSoundRef = useRef<HTMLAudioElement | null>(null);
 
@@ -65,13 +66,48 @@ export default function Home() {
     checkAuth();
   }, []);
 
+  // Listen for profile view events
+  useEffect(() => {
+    const handleViewProfile = (e: CustomEvent<{ userId: string }>) => {
+      setViewingUserId(e.detail.userId);
+      setActiveView('profile');
+    };
+
+    const handleNavigateToPost = (e: CustomEvent<{ postId: string }>) => {
+      // Switch to feed view and let the Feed component handle highlighting the post
+      setActiveView('feed');
+      // Dispatch another event that the Feed component can listen to
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('highlight-post', { 
+          detail: { postId: e.detail.postId } 
+        }));
+      }, 100);
+    };
+
+    window.addEventListener('view-profile' as any, handleViewProfile as EventListener);
+    window.addEventListener('navigate-to-post' as any, handleNavigateToPost as EventListener);
+    
+    return () => {
+      window.removeEventListener('view-profile' as any, handleViewProfile as EventListener);
+      window.removeEventListener('navigate-to-post' as any, handleNavigateToPost as EventListener);
+    };
+  }, []);
+
   // Load notification count
   const loadNotificationCount = async () => {
     try {
-      const res = await fetch('/api/friends/requests', { credentials: 'include' });
-      const data = await res.json();
-      if (res.ok) {
-        setNotificationCount(data.requests?.length || 0);
+      // Load friend requests
+      const friendRes = await fetch('/api/friends/requests', { credentials: 'include' });
+      const friendData = await friendRes.json();
+      
+      // Load other notifications
+      const notifRes = await fetch('/api/notifications', { credentials: 'include' });
+      const notifData = await notifRes.json();
+      
+      if (friendRes.ok && notifRes.ok) {
+        const friendCount = friendData.requests?.length || 0;
+        const otherCount = notifData.notifications?.length || 0;
+        setNotificationCount(friendCount + otherCount);
       }
     } catch (err) {
       console.error('Failed to load notification count:', err);
@@ -82,7 +118,7 @@ export default function Home() {
   useEffect(() => {
     if (!currentUserId || !isLoggedIn) return;
 
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://sociamed.onrender.com';
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
     const socket = io(socketUrl);
     socketRef.current = socket;
 
@@ -102,12 +138,31 @@ export default function Home() {
       }
     });
 
+    // Listen for group removal notifications
+    socket.on('group:member:removed', () => {
+      setNotificationCount((prev) => prev + 1);
+      
+      // Play notification sound
+      if (notificationSoundRef.current) {
+        notificationSoundRef.current.play().catch((err) => {
+          console.error('Failed to play notification sound:', err);
+        });
+      }
+    });
+
     // Load initial notification count
     loadNotificationCount();
+
+    // Listen for notifications being marked as read
+    const handleNotificationsRead = () => {
+      loadNotificationCount();
+    };
+    window.addEventListener('notifications:read', handleNotificationsRead);
 
     return () => {
       socket.disconnect();
       socketRef.current = null;
+      window.removeEventListener('notifications:read', handleNotificationsRead);
     };
   }, [currentUserId, isLoggedIn]);
 
@@ -118,11 +173,14 @@ export default function Home() {
     notificationSoundRef.current.preload = 'auto';
   }, []);
 
-  // Mark notifications as read when viewing notifications page
+  // Reload notification count when viewing notifications page
   useEffect(() => {
-    if (activeView === 'notifications' && notificationCount > 0) {
-      // Reload notifications to get fresh count
+    if (activeView === 'notifications') {
+      // Reload notifications to get fresh count after marking as read
+      const timer = setTimeout(() => {
       loadNotificationCount();
+      }, 1000); // Wait a bit for notifications to be marked as read
+      return () => clearTimeout(timer);
     }
   }, [activeView]);
 
@@ -212,6 +270,9 @@ export default function Home() {
           if (view === 'notifications') {
             loadNotificationCount();
           }
+          if (view === 'profile') {
+            setViewingUserId(null); // Reset to own profile
+          }
         }}
         notificationCount={notificationCount}
       />
@@ -247,37 +308,98 @@ export default function Home() {
           </button>
         </header>
 
-        {/* Mobile nav drawer */}
+        {/* Mobile nav drawer overlay */}
         {mobileNavOpen && (
-          <div className="md:hidden border-b border-slate-200 bg-white">
-            <nav className="flex flex-col py-2">
+          <div
+            className="md:hidden fixed inset-0 bg-black/50 z-40 transition-opacity"
+            onClick={() => setMobileNavOpen(false)}
+          />
+        )}
+
+        {/* Mobile nav drawer - slides in from left */}
+        <div
+          className={`md:hidden fixed top-0 left-0 h-full w-64 bg-white shadow-xl z-50 transform transition-transform duration-300 ease-in-out ${
+            mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          <div className="flex flex-col h-full">
+            {/* Drawer Header */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-200">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center shadow-sm">
+                  <span className="text-white font-bold text-lg tracking-tight">N</span>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                    Nexus
+                  </p>
+                  <p className="text-xs text-slate-500">Connect & Share</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setMobileNavOpen(false)}
+                className="inline-flex items-center justify-center rounded-md p-1 text-slate-700 hover:bg-slate-100"
+                aria-label="Close navigation"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Navigation Items */}
+            <nav className="flex-1 overflow-y-auto py-2">
               {[
-                { id: 'feed', label: 'Feed' },
-                { id: 'stories', label: 'Stories' },
-                { id: 'notes', label: 'Notes' },
-                { id: 'messages', label: 'Messages' },
-                { id: 'groups', label: 'Groups' },
-                { id: 'profile', label: 'Profile' },
-                { id: 'friends', label: 'Find friends' },
-                { id: 'notifications', label: 'Notifications' },
-                { id: 'shorts', label: 'Shorts' },
-              ].map((item) => (
+                { id: 'feed', label: 'Feed', icon: HomeIcon },
+                { id: 'stories', label: 'Stories', icon: BookOpen },
+                { id: 'notes', label: 'Notes', icon: FileText },
+                { id: 'messages', label: 'Messages', icon: MessageSquare },
+                { id: 'groups', label: 'Groups', icon: Users },
+                { id: 'profile', label: 'Profile', icon: User },
+                { id: 'friends', label: 'Find friends', icon: UserPlus },
+                { id: 'notifications', label: 'Notifications', icon: Bell, badge: notificationCount > 0 ? notificationCount : undefined },
+                { id: 'shorts', label: 'Shorts', icon: Video },
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
                 <button
                   key={item.id}
                   onClick={() => {
                     setActiveView(item.id as typeof activeView);
                     setMobileNavOpen(false);
+                    if (item.id === 'notifications') {
+                      loadNotificationCount();
+                    }
+                    if (item.id === 'profile') {
+                      setViewingUserId(null); // Reset to own profile
+                    }
                   }}
-                  className={`flex items-center justify-start px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 ${
-                    activeView === item.id ? 'bg-slate-100 font-medium' : ''
+                    className={`flex items-center justify-start gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-slate-100 transition-colors w-full ${
+                      activeView === item.id ? 'bg-blue-50 text-blue-700 font-medium border-r-2 border-blue-600' : ''
                   }`}
                 >
-                  {item.label}
+                    <Icon className={`w-5 h-5 ${activeView === item.id ? 'text-blue-600' : 'text-slate-500'}`} />
+                    <span className="flex-1 text-left">{item.label}</span>
+                    {item.badge && item.badge > 0 && (
+                      <span className="bg-red-500 text-white text-xs font-semibold rounded-full px-2 py-0.5 min-w-[20px] text-center">
+                        {item.badge}
+                      </span>
+                    )}
                 </button>
-              ))}
+                );
+              })}
             </nav>
+
+            {/* Drawer Footer */}
+            <div className="p-4 border-t border-slate-200">
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <LogOut className="w-5 h-5 text-slate-500" />
+                <span>Log out</span>
+              </button>
+            </div>
           </div>
-        )}
+        </div>
 
         {/* Main content */}
         <section className="flex-1 overflow-hidden">
@@ -286,7 +408,7 @@ export default function Home() {
         {activeView === 'notes' && <Notes />}
         {activeView === 'messages' && <DirectMessages />}
         {activeView === 'groups' && <GroupChats />}
-        {activeView === 'profile' && <Profile />}
+        {activeView === 'profile' && <Profile userId={viewingUserId || undefined} />}
           {activeView === 'friends' && <FindFriends />}
           {activeView === 'notifications' && <Notifications />}
           {activeView === 'shorts' && (

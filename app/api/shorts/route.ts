@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDb } from "@/lib/mongodb"
 import { getUserFromRequest } from "@/lib/auth"
+import { ObjectId } from "mongodb"
+import cloudinary from "@/lib/cloudinary"
 
 export const dynamic = "force-dynamic"
 
@@ -73,4 +75,54 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ short: { ...doc, _id: result.insertedId } }, { status: 201 })
 }
 
+export async function DELETE(req: NextRequest) {
+  const user = getUserFromRequest(req)
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const { shortId } = (await req.json()) as { shortId?: string }
+
+  if (!shortId) {
+    return NextResponse.json({ error: "shortId is required" }, { status: 400 })
+  }
+
+  const db = await getDb()
+  const shorts = db.collection("shorts")
+  const commentsCol = db.collection("shortComments")
+
+  let _id: ObjectId
+  try {
+    _id = new ObjectId(shortId)
+  } catch {
+    return NextResponse.json({ error: "Invalid short id" }, { status: 400 })
+  }
+
+  const short = await shorts.findOne<{ userId: string; videoPublicId?: string }>({ _id })
+
+  if (!short) {
+    return NextResponse.json({ error: "Short not found" }, { status: 404 })
+  }
+
+  if (short.userId !== user.sub) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+
+  // Delete video from Cloudinary
+  if (short.videoPublicId && cloudinary.config().cloud_name) {
+    try {
+      await cloudinary.uploader.destroy(short.videoPublicId, { resource_type: "video" })
+    } catch (error) {
+      console.error("Error deleting Cloudinary video:", error)
+    }
+  }
+
+  // Delete associated comments
+  await commentsCol.deleteMany({ shortId: shortId })
+
+  // Delete the short
+  await shorts.deleteOne({ _id })
+
+  return NextResponse.json({ success: true }, { status: 200 })
+}
 

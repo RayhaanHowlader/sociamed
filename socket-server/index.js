@@ -1,7 +1,7 @@
 const http = require('http')
 const { Server } = require('socket.io')
 
-const PORT = process.env.PORT || 10000
+const PORT = process.env.PORT || 4000
 
 const server = http.createServer()
 
@@ -22,6 +22,7 @@ io.on('connection', (socket) => {
   socket.on('chat:join', ({ userId, friendId }) => {
     const roomId = getRoomId(userId, friendId)
     socket.join(roomId)
+    console.log('chat:join', { socketId: socket.id, roomId })
   })
 
   socket.on('chat:message', (payload) => {
@@ -43,10 +44,27 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('chat:seen', payload)
   })
 
+  socket.on('chat:delete', (payload) => {
+    const { fromUserId, toUserId, messageIds } = payload || {}
+    if (!fromUserId || !toUserId || !Array.isArray(messageIds) || messageIds.length === 0) return
+    const roomId = getRoomId(fromUserId, toUserId)
+    console.log('chat:delete broadcast', { roomId, messageIds })
+    io.to(roomId).emit('chat:delete', { fromUserId, toUserId, messageIds })
+  })
+
+  socket.on('chat:message:id', (payload) => {
+    const { fromUserId, toUserId, tempId, newId, filePublicId } = payload || {}
+    if (!fromUserId || !toUserId || !tempId || !newId) return
+    const roomId = getRoomId(fromUserId, toUserId)
+    console.log('chat:message:id broadcast', { roomId, tempId, newId })
+    io.to(roomId).emit('chat:message:id', { tempId, newId, filePublicId })
+  })
+
   // Group chat events
   socket.on('group:join', ({ groupId }) => {
     if (!groupId) return
     socket.join(`group:${groupId}`)
+    console.log('group:join', { socketId: socket.id, groupId })
   })
 
   socket.on('group:message', (payload) => {
@@ -57,6 +75,27 @@ io.on('connection', (socket) => {
       ...payload,
       createdAt: payload.createdAt || new Date().toISOString(),
     })
+  })
+
+  socket.on('group:delete', (payload) => {
+    const { groupId, messageIds, by } = payload || {}
+    if (!groupId || !Array.isArray(messageIds) || messageIds.length === 0) return
+    console.log('group:delete broadcast', { groupId, messageIds, by })
+    io.to(`group:${groupId}`).emit('group:delete', { groupId, messageIds, by })
+  })
+
+  socket.on('group:message:id', (payload) => {
+    const { groupId, tempId, newId, filePublicId } = payload || {}
+    if (!groupId || !tempId || !newId) return
+    console.log('group:message:id broadcast', { groupId, tempId, newId })
+    io.to(`group:${groupId}`).emit('group:message:id', { tempId, newId, filePublicId })
+  })
+
+  socket.on('group:pin', (payload) => {
+    const { groupId, messageId, pin, pinnedBy } = payload || {}
+    if (!groupId || !messageId || typeof pin !== 'boolean') return
+    console.log('group:pin broadcast', { groupId, messageId, pin, pinnedBy })
+    io.to(`group:${groupId}`).emit('group:pin', { messageId, pin, pinnedBy })
   })
 
   // Voice call events
@@ -103,6 +142,18 @@ io.on('connection', (socket) => {
       id: requestId,
       fromUserId,
       profile,
+    })
+  })
+
+  // Group member removed notification
+  socket.on('group:member:removed:notify', ({ userId, groupId, groupName, removedBy, removedByProfile }) => {
+    if (!userId || !groupId || !removedBy || !removedByProfile) return
+    io.to(`user:${userId}`).emit('group:member:removed', {
+      userId,
+      groupId,
+      groupName,
+      removedBy,
+      removedByProfile,
     })
   })
 

@@ -12,12 +12,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  const { searchParams } = new URL(req.url)
+  const userId = searchParams.get("userId")
+
   const db = await getDb()
   const profiles = db.collection("profiles")
 
-  const profile = await profiles.findOne({ userId: user.sub })
+  // If userId is provided, fetch that user's profile, otherwise fetch current user's profile
+  const targetUserId = userId || user.sub
+  const profile = await profiles.findOne({ userId: targetUserId })
 
-  return NextResponse.json({ profile }, { status: 200 })
+  if (!profile) {
+    return NextResponse.json({ error: "Profile not found" }, { status: 404 })
+  }
+
+  return NextResponse.json({ profile, isOwnProfile: targetUserId === user.sub }, { status: 200 })
 }
 
 export async function POST(req: NextRequest) {

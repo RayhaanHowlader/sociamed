@@ -1,6 +1,7 @@
 'use client';
 
-import { Check, CheckCheck } from 'lucide-react';
+import { Check, CheckCheck, ExternalLink } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 
 interface ChatMessage {
@@ -14,15 +15,34 @@ interface ChatMessage {
   isImage?: boolean;
   createdAt: string;
   status?: 'sent' | 'seen';
+  deleted?: boolean;
+  sharedPostId?: string;
+  sharedPostData?: {
+    content: string;
+    imageUrl?: string;
+    author: {
+      userId: string;
+      name: string;
+      username: string;
+      avatarUrl?: string;
+    };
+    createdAt: string;
+  };
 }
 
 interface MessageBubbleProps {
   message: ChatMessage;
   isMine: boolean;
   currentUserId: string;
+  selected?: boolean;
+  selectable?: boolean;
+  onSelectToggle?: (id: string) => void;
+  onImageClick?: (url: string) => void;
+  onSharedPostClick?: (postId: string) => void;
+  onProfileClick?: (userId: string) => void;
 }
 
-export function MessageBubble({ message, isMine, currentUserId }: MessageBubbleProps) {
+export function MessageBubble({ message, isMine, currentUserId, selected, selectable, onSelectToggle, onImageClick, onSharedPostClick, onProfileClick }: MessageBubbleProps) {
   const time = new Date(message.createdAt).toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
@@ -54,29 +74,55 @@ export function MessageBubble({ message, isMine, currentUserId }: MessageBubbleP
 
   const fileType = getFileType();
 
+  const handleSelect = () => {
+    if (selectable && !message.deleted && onSelectToggle) {
+      onSelectToggle(message.id);
+    }
+  };
+
   return (
-    <div className={cn('flex', isMine ? 'justify-end' : 'justify-start')}>
+    <div
+      className={cn('flex', isMine ? 'justify-end' : 'justify-start', selectable && !message.deleted && 'cursor-pointer')}
+      onClick={selectable ? handleSelect : undefined}
+    >
       <div
         className={cn(
           'max-w-md px-4 py-2 rounded-2xl',
           isMine
             ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-br-sm'
             : 'bg-white text-slate-900 rounded-bl-sm shadow-sm',
+          selectable && !message.deleted && 'ring-1 ring-offset-2 ring-blue-200',
+          selectable && !message.deleted && selected && 'ring-blue-500',
         )}
       >
+        {selectable && !message.deleted && (
+          <div className="flex items-center gap-2 text-xs mb-1">
+            <input type="checkbox" checked={!!selected} readOnly className="h-3 w-3" />
+            <span className="opacity-80">Select</span>
+          </div>
+        )}
+
+        {message.deleted && (
+          <div className="italic text-sm opacity-80">Message deleted</div>
+        )}
+
         {/* Image Display */}
-        {message.isImage && message.fileUrl && (
+        {!message.deleted && message.isImage && message.fileUrl && (
           <div className="mb-2">
             <img
               src={message.fileUrl}
               alt={message.fileName || 'Attachment'}
-              className="max-h-64 rounded-lg border border-white/10"
+              className="max-h-64 rounded-lg border border-white/10 cursor-pointer transition-transform hover:scale-[1.015]"
+              onClick={(event) => {
+                event.stopPropagation();
+                onImageClick?.(message.fileUrl!);
+              }}
             />
           </div>
         )}
 
         {/* Video Display */}
-        {fileType === 'video' && message.fileUrl && (
+        {!message.deleted && fileType === 'video' && message.fileUrl && (
           <div className="mb-2">
             <video
               src={message.fileUrl}
@@ -100,7 +146,7 @@ export function MessageBubble({ message, isMine, currentUserId }: MessageBubbleP
         )}
 
         {/* Audio Display */}
-        {fileType === 'audio' && message.fileUrl && (
+        {!message.deleted && fileType === 'audio' && message.fileUrl && (
           <div className="mb-2 p-3 rounded-lg bg-black/10">
             <div className="flex items-center gap-3">
               <audio
@@ -121,7 +167,7 @@ export function MessageBubble({ message, isMine, currentUserId }: MessageBubbleP
         )}
 
         {/* Other File Types */}
-        {fileType === 'file' && message.fileUrl && (
+        {!message.deleted && fileType === 'file' && message.fileUrl && (
           <div className="mb-2">
             <a
               href={message.fileUrl}
@@ -134,8 +180,116 @@ export function MessageBubble({ message, isMine, currentUserId }: MessageBubbleP
           </div>
         )}
 
+        {/* Shared Post Display */}
+        {!message.deleted && message.sharedPostData && (
+          <div className="mb-2">
+            <div 
+              className={cn(
+                'border rounded-lg p-3 bg-opacity-50 cursor-pointer transition-all hover:shadow-md',
+                isMine ? 'border-white/20 bg-white/10 hover:bg-white/20' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+              )}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (message.sharedPostId && onSharedPostClick) {
+                  onSharedPostClick(message.sharedPostId);
+                }
+              }}
+            >
+              <div className="flex items-start gap-2 mb-2">
+                <div 
+                  className="flex items-start gap-2 cursor-pointer hover:opacity-80 transition-opacity flex-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Navigate to the original post author's profile
+                    if (message.sharedPostData?.author.userId) {
+                      window.dispatchEvent(new CustomEvent('view-profile', { 
+                        detail: { userId: message.sharedPostData.author.userId } 
+                      }));
+                    }
+                  }}
+                >
+                  <Avatar className="w-6 h-6">
+                    <AvatarImage src={message.sharedPostData.author.avatarUrl} />
+                    <AvatarFallback className="text-xs">{message.sharedPostData.author.name?.[0]}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className={cn(
+                      'text-xs font-semibold',
+                      isMine ? 'text-white hover:text-blue-100' : 'text-slate-900 hover:text-blue-600'
+                    )}>
+                      {message.sharedPostData.author.name}
+                    </p>
+                    <p className={cn(
+                      'text-xs',
+                      isMine ? 'text-blue-100' : 'text-slate-500'
+                    )}>
+                      @{message.sharedPostData.author.username}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className={cn(
+                    'text-xs',
+                    isMine ? 'text-blue-100' : 'text-slate-500'
+                  )}>
+                    View post
+                  </span>
+                  <ExternalLink className={cn(
+                    'w-3 h-3',
+                    isMine ? 'text-blue-100' : 'text-slate-400'
+                  )} />
+                </div>
+              </div>
+              
+              {message.sharedPostData.content && (
+                <p className={cn(
+                  'text-xs mb-2',
+                  isMine ? 'text-blue-50' : 'text-slate-700'
+                )}
+                style={{
+                  display: '-webkit-box',
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden'
+                }}>
+                  {message.sharedPostData.content}
+                </p>
+              )}
+              
+              {message.sharedPostData.imageUrl && (
+                <div className="rounded-md overflow-hidden">
+                  <img 
+                    src={message.sharedPostData.imageUrl} 
+                    alt="Shared post content" 
+                    className="w-full h-20 object-cover"
+                  />
+                </div>
+              )}
+              
+              <div className={cn(
+                'text-xs mt-2 pt-2 border-t opacity-75',
+                isMine ? 'border-white/20 text-blue-100' : 'border-slate-200 text-slate-500'
+              )}>
+                Click to view original post
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Text Content */}
-        {message.content && <p className="text-sm">{message.content}</p>}
+        {!message.deleted && message.content && !message.sharedPostData && <p className="text-sm">{message.content}</p>}
+        
+        {/* Text Content for shared posts (user's message) */}
+        {!message.deleted && message.content && message.sharedPostData && (
+          <div className="mb-2">
+            {/* Extract user's message from the shared content */}
+            {(() => {
+              const lines = message.content.split('\n');
+              const userMessage = lines.find(line => !line.includes('📎 Shared a post') && !line.startsWith('http') && line.trim());
+              return userMessage ? <p className="text-sm mb-2">{userMessage}</p> : null;
+            })()}
+          </div>
+        )}
 
         {/* Timestamp and Status */}
         <div className="flex items-center justify-end gap-1 mt-1">

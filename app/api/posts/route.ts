@@ -5,15 +5,45 @@ import { getUserFromRequest } from "@/lib/auth"
 export const dynamic = "force-dynamic"
 
 export async function GET(req: NextRequest) {
+  const user = getUserFromRequest(req)
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   const { searchParams } = new URL(req.url)
   const limit = parseInt(searchParams.get("limit") || "5", 10)
   const after = searchParams.get("after") // ISO timestamp string
 
   const db = await getDb()
   const posts = db.collection("posts")
+  const friends = db.collection("friends")
 
-  // Build query - get posts after a certain timestamp if provided
-  const query: any = {}
+  // Get user's friends
+  const friendDocs = await friends
+    .find({
+      $or: [{ userId: String(user.sub) }, { friendUserId: String(user.sub) }],
+    })
+    .toArray()
+
+  const friendIds = new Set<string>()
+  friendIds.add(String(user.sub)) // Include current user's own posts
+
+  friendDocs.forEach((doc) => {
+    const docUserId = String(doc.userId)
+    const docFriendUserId = String(doc.friendUserId)
+    const currentUserId = String(user.sub)
+
+    if (docUserId === currentUserId) {
+      friendIds.add(docFriendUserId)
+    } else if (docFriendUserId === currentUserId) {
+      friendIds.add(docUserId)
+    }
+  })
+
+  // Build query - only get posts from friends and current user
+  const query: any = {
+    userId: { $in: Array.from(friendIds) },
+  }
 
   // If after timestamp is provided, only get posts after that time
   if (after) {

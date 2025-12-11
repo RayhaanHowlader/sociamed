@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from 'react';
-import { Loader2, Video, UploadCloud, AlertCircle, Play, XCircle, Heart, MessageCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Loader2, Video, UploadCloud } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
+import { CreateShortModal } from './create-short-modal';
+import { ShortCard } from './short-card';
+import { ShortViewerModal } from './short-viewer-modal';
+import { DeleteShortModal } from './delete-short-modal';
 
 interface ShortItem {
   _id: string;
@@ -14,6 +15,7 @@ interface ShortItem {
   videoUrl: string;
   createdAt: string;
   duration: number;
+  userId?: string;
   author: {
     name: string;
     username: string;
@@ -26,17 +28,6 @@ interface ShortItem {
   liked?: boolean;
 }
 
-interface ShortComment {
-  id: string;
-  userId: string;
-  content: string;
-  createdAt: string;
-  author: {
-    name: string;
-    username: string;
-  };
-}
-
 interface ShortsProps {
   createModalOpen: boolean;
   onCloseCreateModal: () => void;
@@ -46,34 +37,17 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
   const [shorts, setShorts] = useState<ShortItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [profile, setProfile] = useState<{ name: string; username: string; avatarUrl?: string } | null>(null);
+  const [profile, setProfile] = useState<{ name: string; username: string; avatarUrl?: string; userId?: string } | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [caption, setCaption] = useState('');
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [videoPreview, setVideoPreview] = useState<string>('');
-  const [videoDuration, setVideoDuration] = useState(0);
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [activeShort, setActiveShort] = useState<ShortItem | null>(null);
-  const [shortComments, setShortComments] = useState<ShortComment[]>([]);
-  const [commentsLoading, setCommentsLoading] = useState(false);
-  const [commentInput, setCommentInput] = useState('');
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [shortPendingDelete, setShortPendingDelete] = useState<ShortItem | null>(null);
+  const [deletingShort, setDeletingShort] = useState(false);
 
   useEffect(() => {
     setModalOpen(createModalOpen);
   }, [createModalOpen]);
-
-  const closeModal = () => {
-    setModalOpen(false);
-    setCaption('');
-    setVideoFile(null);
-    setVideoPreview('');
-    setVideoDuration(0);
-    setError('');
-    onCloseCreateModal();
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
 
   const fetchShorts = async () => {
     try {
@@ -97,7 +71,20 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
         return;
       }
       const data = await res.json();
-      setProfile(data.profile);
+      
+      // Get current user ID from auth endpoint
+      let userId: string | undefined;
+      try {
+        const authRes = await fetch('/api/auth/me', { credentials: 'include' });
+        if (authRes.ok) {
+          const authData = await authRes.json();
+          userId = authData.user?.sub;
+        }
+      } catch (err) {
+        console.error('Failed to get user ID:', err);
+      }
+      
+      setProfile({ ...data.profile, userId });
     } catch (err) {
       console.error(err);
       setProfile(null);
@@ -109,163 +96,15 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
     fetchProfile();
   }, []);
 
-  useEffect(() => {
-    if (viewerOpen && activeShort?._id) {
-      void loadComments(activeShort._id);
-    } else {
-      setShortComments([]);
-      setCommentInput('');
-    }
-  }, [viewerOpen, activeShort]);
-
-  const handleFileChange = (file: File) => {
-    setError('');
-
-    // Validate file type
-    if (!file.type.startsWith('video/')) {
-      setError('Please select a video file.');
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-
-    // Validate file size (100MB limit)
-    const maxSize = 100 * 1024 * 1024; // 100MB
-    if (file.size > maxSize) {
-      setError('Video file is too large. Maximum size is 100MB.');
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-
-    const url = URL.createObjectURL(file);
-    const video = document.createElement('video');
-    video.preload = 'metadata';
-    
-    video.onloadedmetadata = () => {
-      const duration = video.duration || 0;
-
-      if (duration > 60) {
-        setError('Video must be 60 seconds or shorter.');
-        setVideoFile(null);
-        setVideoPreview('');
-        setVideoDuration(0);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-        URL.revokeObjectURL(url);
-        return;
-      }
-
-      setVideoFile(file);
-      setVideoPreview(url);
-      setVideoDuration(duration);
-    };
-
-    video.onerror = () => {
-      setError('Failed to load video. Please select a valid video file.');
-      setVideoFile(null);
-      setVideoPreview('');
-      setVideoDuration(0);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      URL.revokeObjectURL(url);
-    };
-
-    video.src = url;
+  const handleShortCreated = () => {
+    fetchShorts();
   };
 
-  const clearSelectedVideo = () => {
-    setVideoFile(null);
-    setVideoPreview('');
-    setVideoDuration(0);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const handleCreateShort = async () => {
-    if (!profile) {
-      setError('Complete your profile before creating shorts.');
-      return;
-    }
-
-    if (!videoFile) {
-      setError('Select a short video to upload.');
-      return;
-    }
-
-    setUploading(true);
-    setError('');
-
-    try {
-      const form = new FormData();
-      form.append('file', videoFile);
-
-      const uploadRes = await fetch('/api/shorts/upload', {
-        method: 'POST',
-        body: form,
-        credentials: 'include',
-      });
-
-      let uploadData;
-      try {
-        uploadData = await uploadRes.json();
-      } catch (parseError) {
-        console.error('Failed to parse upload response:', parseError);
-        setError('Failed to upload video. Please try again.');
-        setUploading(false);
-        return;
-      }
-
-      if (!uploadRes.ok) {
-        const errorMessage = uploadData.details || uploadData.error || 'Failed to upload video.';
-        setError(errorMessage);
-        setUploading(false);
-        return;
-      }
-
-      if (!uploadData.url || !uploadData.publicId) {
-        setError('Invalid response from server. Please try again.');
-        setUploading(false);
-        return;
-      }
-
-      const res = await fetch('/api/shorts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          caption,
-          videoUrl: uploadData.url,
-          videoPublicId: uploadData.publicId,
-          duration: videoDuration,
-        }),
-      });
-
-      let data: { short?: ShortItem; error?: string };
-      try {
-        data = await res.json();
-      } catch (parseError) {
-        console.error('Failed to parse create short response:', parseError);
-        setError('Failed to create short. Please try again.');
-        setUploading(false);
-        return;
-      }
-
-      if (!res.ok) {
-        setError(data.error || 'Unable to create short.');
-        setUploading(false);
-        return;
-      }
-
-      if (!data.short) {
-        setError('Invalid response from server. Please try again.');
-        setUploading(false);
-        return;
-      }
-
-      setShorts((prev) => [data.short!, ...prev]);
-      closeModal();
-    } catch (err) {
-      console.error('Error creating short:', err);
-      setError(err instanceof Error ? err.message : 'Unable to create short. Please try again.');
-    } finally {
-      setUploading(false);
-    }
+  const handleShortUpdated = (updatedShort: ShortItem) => {
+    setShorts((prev) =>
+      prev.map((s) => (s._id === updatedShort._id ? updatedShort : s))
+    );
+    setActiveShort(updatedShort);
   };
 
   const toggleLike = async (shortId: string) => {
@@ -314,74 +153,64 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
     }
   };
 
-  const loadComments = async (shortId: string) => {
-    try {
-      setCommentsLoading(true);
-      const res = await fetch(`/api/shorts/comments?shortId=${shortId}`, {
-        credentials: 'include',
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        console.error(data.error || 'Unable to load comments');
-        return;
-      }
-      setShortComments(data.comments ?? []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setCommentsLoading(false);
+  const promptDeleteShort = (shortId: string) => {
+    const target =
+      shorts.find((s) => s._id === shortId) ||
+      (activeShort && activeShort._id === shortId ? activeShort : null);
+
+    if (!target) {
+      return;
+    }
+
+    if (activeShort?._id === shortId) {
+      setViewerOpen(false);
+    }
+
+    setShortPendingDelete(target);
+    setDeleteModalOpen(true);
+  };
+
+  const handleDeleteModalToggle = (open: boolean) => {
+    setDeleteModalOpen(open);
+    if (!open) {
+      setShortPendingDelete(null);
     }
   };
 
-  const addComment = async () => {
-    if (!activeShort?._id) return;
-
-    const text = commentInput.trim();
-    if (!text) return;
+  const handleConfirmDeleteShort = async () => {
+    if (!shortPendingDelete) {
+      return;
+    }
 
     try {
-      const res = await fetch('/api/shorts/comments', {
-        method: 'POST',
+      setDeletingShort(true);
+      const res = await fetch('/api/shorts', {
+        method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ shortId: activeShort._id, content: text }),
+        body: JSON.stringify({ shortId: shortPendingDelete._id }),
       });
+
       const data = await res.json();
       if (!res.ok) {
-        console.error(data.error || 'Unable to add comment');
+        console.error(data.error || 'Unable to delete short');
+        alert(data.error || 'Failed to delete short');
         return;
       }
 
-      setShortComments((prev) => [...prev, data.comment]);
-      setCommentInput('');
+      setShorts((prev) => prev.filter((s) => s._id !== shortPendingDelete._id));
 
-      setShorts((prev) =>
-        prev.map((s) =>
-          s._id === activeShort._id
-            ? {
-                ...s,
-                stats: {
-                  likes: s.stats?.likes ?? 0,
-                  comments: (s.stats?.comments ?? 0) + 1,
-                },
-              }
-            : s,
-        ),
-      );
-
-      setActiveShort((current) =>
-        current
-          ? {
-              ...current,
-              stats: {
-                likes: current.stats?.likes ?? 0,
-                comments: (current.stats?.comments ?? 0) + 1,
-              },
-            }
-          : current,
-      );
+      if (activeShort?._id === shortPendingDelete._id) {
+        setViewerOpen(false);
+        setActiveShort(null);
+      }
     } catch (err) {
       console.error(err);
+      alert('Failed to delete short. Please try again.');
+    } finally {
+      setDeletingShort(false);
+      setDeleteModalOpen(false);
+      setShortPendingDelete(null);
     }
   };
 
@@ -419,245 +248,50 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
         ) : (
           <div className="grid gap-4 md:grid-cols-3">
             {shorts.map((short) => (
-              <Card
+              <ShortCard
                 key={short._id}
-                className="border-slate-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden group"
-              >
-                <button
-                  type="button"
-                  className="relative h-56 bg-black w-full"
-                  onClick={() => {
-                    setActiveShort(short);
-                    setViewerOpen(true);
-                  }}
-                >
-                  <video
-                    src={short.videoUrl}
-                    muted
-                    playsInline
-                    className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="h-12 w-12 rounded-full bg-black/60 flex items-center justify-center">
-                      <Play className="w-6 h-6 text-white" />
-                    </div>
-                  </div>
-                </button>
-                <CardContent className="p-3 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={short.author.avatarUrl} />
-                      <AvatarFallback>{short.author.name?.[0]}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900 line-clamp-1">
-                        {short.author.name}
-                      </p>
-                      <p className="text-[11px] text-slate-500">
-                        {short.author.username} · {new Date(short.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                  {short.caption && (
-                    <p className="text-xs text-slate-700 line-clamp-2">{short.caption}</p>
-                  )}
-                  <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-                    <button
-                      type="button"
-                      onClick={() => toggleLike(short._id)}
-                      className="inline-flex items-center gap-1 hover:text-red-500 transition-colors"
-                    >
-                      <Heart
-                        className={`w-4 h-4 ${short.liked ? 'fill-red-500 text-red-500' : ''}`}
-                      />
-                      <span>{short.stats?.likes ?? 0}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveShort(short);
-                        setViewerOpen(true);
-                      }}
-                      className="inline-flex items-center gap-1 hover:text-blue-600 transition-colors"
-                    >
-                      <MessageCircle className="w-4 h-4" />
-                      <span>{short.stats?.comments ?? 0}</span>
-                    </button>
-                  </div>
-                </CardContent>
-              </Card>
+                short={short}
+                currentUserId={profile?.userId}
+                onView={(s) => {
+                  setActiveShort(s);
+                  setViewerOpen(true);
+                }}
+                onLike={toggleLike}
+                onDelete={promptDeleteShort}
+              />
             ))}
           </div>
         )}
       </div>
 
-      <Dialog open={modalOpen} onOpenChange={(open) => (open ? setModalOpen(true) : closeModal())}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Upload a short</DialogTitle>
-            <DialogDescription>Share a quick video update up to 60 seconds long.</DialogDescription>
-          </DialogHeader>
+      <CreateShortModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          onCloseCreateModal();
+        }}
+        profile={profile}
+        onShortCreated={handleShortCreated}
+      />
 
-          <div className="space-y-4 py-2">
-            <div>
-              <label className="text-sm font-medium text-slate-600">Video file</label>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="video/*"
-                className="mt-2 block w-full text-sm"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleFileChange(file);
-                }}
-              />
-              <p className="text-xs text-slate-500 mt-1">MP4 / MOV up to 60 seconds.</p>
-              {videoPreview && (
-                <div className="mt-3 h-56 rounded-lg overflow-hidden border border-slate-200 relative">
-                  <video src={videoPreview} controls className="w-full h-full object-contain bg-black" />
-                  <button
-                    type="button"
-                    onClick={clearSelectedVideo}
-                    className="absolute top-2 right-2 rounded-full bg-white/80 hover:bg-white text-red-600 shadow p-0.5"
-                    aria-label="Remove selected video"
-                  >
-                    <XCircle className="w-5 h-5" />
-                  </button>
-                </div>
-              )}
-            </div>
+      <ShortViewerModal
+        open={viewerOpen}
+        onOpenChange={setViewerOpen}
+        short={activeShort}
+        currentUserId={profile?.userId}
+        onLike={toggleLike}
+        onDelete={promptDeleteShort}
+        onShortUpdated={handleShortUpdated}
+      />
 
-            <div>
-              <label className="text-sm font-medium text-slate-600">Caption</label>
-              <Textarea
-                rows={3}
-                value={caption}
-                onChange={(e) => setCaption(e.target.value)}
-                placeholder="Add a short description…"
-              />
-            </div>
-
-            {error && (
-              <div className="flex items-center gap-2 text-sm text-red-600">
-                <AlertCircle className="w-4 h-4" />
-                {error}
-              </div>
-            )}
-          </div>
-
-          <DialogFooter className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={closeModal}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              className="bg-gradient-to-r from-blue-600 to-cyan-600"
-              onClick={handleCreateShort}
-              disabled={uploading}
-            >
-              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Share short'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={viewerOpen} onOpenChange={(open) => (open ? setViewerOpen(true) : setViewerOpen(false))}>
-        <DialogContent className="sm:max-w-3xl">
-          {activeShort && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={activeShort.author.avatarUrl} />
-                    <AvatarFallback>{activeShort.author.name?.[0]}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="text-sm font-semibold">{activeShort.author.name}</p>
-                    <p className="text-xs text-slate-500">{activeShort.author.username}</p>
-                  </div>
-                </DialogTitle>
-              </DialogHeader>
-              <div className="mt-2 grid gap-4 md:grid-cols-[minmax(0,2fr),minmax(0,1fr)] items-start">
-                <div className="bg-black rounded-xl overflow-hidden">
-                  <video
-                    src={activeShort.videoUrl}
-                    controls
-                    autoPlay
-                    className="w-full h-full max-h-[70vh] object-contain"
-                  />
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-4 text-sm text-slate-600">
-                    <button
-                      type="button"
-                      onClick={() => toggleLike(activeShort._id)}
-                      className="inline-flex items-center gap-1 hover:text-red-500 transition-colors"
-                    >
-                      <Heart
-                        className={`w-4 h-4 ${activeShort.liked ? 'fill-red-500 text-red-500' : ''}`}
-                      />
-                      <span>{activeShort.stats?.likes ?? 0}</span>
-                    </button>
-                    <div className="inline-flex items-center gap-1">
-                      <MessageCircle className="w-4 h-4" />
-                      <span>{activeShort.stats?.comments ?? 0}</span>
-                    </div>
-                  </div>
-                  {activeShort.caption && (
-                    <p className="text-sm text-slate-800">{activeShort.caption}</p>
-                  )}
-                  <p className="text-xs text-slate-500">
-                    Shared {new Date(activeShort.createdAt).toLocaleString()}
-                  </p>
-                  <div className="pt-2 border-t border-slate-200 space-y-3 max-h-[40vh] overflow-y-auto">
-                    {commentsLoading ? (
-                      <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        Loading comments...
-                      </div>
-                    ) : shortComments.length === 0 ? (
-                      <p className="text-xs text-slate-400">No comments yet. Be the first to comment!</p>
-                    ) : (
-                      shortComments.map((comment) => (
-                        <div key={comment.id} className="text-xs space-y-0.5">
-                          <p className="font-semibold text-slate-700">
-                            {comment.author.name}{' '}
-                            <span className="text-slate-400">@{comment.author.username}</span>
-                          </p>
-                          <p className="text-slate-700">{comment.content}</p>
-                          <p className="text-[10px] text-slate-400">
-                            {new Date(comment.createdAt).toLocaleString()}
-                          </p>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                  <div className="pt-2 border-t border-slate-200 space-y-2">
-                    <label className="text-xs font-medium text-slate-600">Add a comment</label>
-                    <Textarea
-                      rows={2}
-                      value={commentInput}
-                      onChange={(e) => setCommentInput(e.target.value)}
-                      placeholder="Share your thoughts…"
-                    />
-                    <div className="flex justify-end">
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="bg-gradient-to-r from-blue-600 to-cyan-600"
-                        onClick={addComment}
-                      >
-                        Comment
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      <DeleteShortModal
+        open={deleteModalOpen}
+        onOpenChange={handleDeleteModalToggle}
+        short={shortPendingDelete}
+        onConfirm={handleConfirmDeleteShort}
+        deleting={deletingShort}
+      />
     </div>
   );
 }
-
-

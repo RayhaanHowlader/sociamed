@@ -12,7 +12,10 @@ import {
   PlusCircle,
   Heart,
   MessageCircle,
+  UserMinus,
+  UserPlus,
 } from 'lucide-react';
+import { UnfriendModal } from './unfriend-modal';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -75,10 +78,16 @@ const DEFAULT_PROFILE: ProfileRecord = {
   coverUrl: '',
 };
 
-export function Profile() {
+interface ProfileProps {
+  userId?: string;
+}
+
+export function Profile({ userId }: ProfileProps = {}) {
   const [activeTab, setActiveTab] = useState('posts');
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<ProfileRecord | null>(null);
+  const [isOwnProfile, setIsOwnProfile] = useState(true);
+  const [viewedUserId, setViewedUserId] = useState<string | null>(userId || null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState(DEFAULT_PROFILE);
   const [saving, setSaving] = useState(false);
@@ -90,17 +99,28 @@ export function Profile() {
   const [following, setFollowing] = useState(0);
   const [postComments, setPostComments] = useState<Record<string, PostComment[]>>({});
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
+  const [isFriend, setIsFriend] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [unfriendModalOpen, setUnfriendModalOpen] = useState(false);
+  const [unfriending, setUnfriending] = useState(false);
 
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/profile', { credentials: 'include' });
-      if (res.status === 401) {
+      const url = viewedUserId 
+        ? `/api/profile?userId=${viewedUserId}` 
+        : '/api/profile';
+      const res = await fetch(url, { credentials: 'include' });
+      if (res.status === 401 || res.status === 404) {
         setProfile(null);
         return;
       }
       const data = await res.json();
       setProfile(data.profile);
+      setIsOwnProfile(data.isOwnProfile ?? false);
+      if (viewedUserId && !data.isOwnProfile) {
+        setViewedUserId(viewedUserId);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -109,14 +129,62 @@ export function Profile() {
   };
 
   useEffect(() => {
+    if (userId && userId !== viewedUserId) {
+      setViewedUserId(userId);
+    }
+  }, [userId]);
+
+  useEffect(() => {
     fetchProfile();
+  }, [viewedUserId]);
+
+  useEffect(() => {
+    const loadCurrentUser = async () => {
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        const data = await res.json();
+        if (res.ok && data.user?.sub) {
+          setCurrentUserId(String(data.user.sub));
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    loadCurrentUser();
   }, []);
+
+  useEffect(() => {
+    const checkFriendship = async () => {
+      if (!viewedUserId || !currentUserId || isOwnProfile) {
+        setIsFriend(false);
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/friends/list', { credentials: 'include' });
+        const data = await res.json();
+        if (res.ok) {
+          const friends = data.friends || [];
+          const friend = friends.find((f: any) => f.userId === viewedUserId);
+          setIsFriend(!!friend);
+        }
+      } catch (err) {
+        console.error(err);
+        setIsFriend(false);
+      }
+    };
+
+    checkFriendship();
+  }, [viewedUserId, currentUserId, isOwnProfile]);
 
   useEffect(() => {
     const fetchPosts = async () => {
       try {
         setLoadingPosts(true);
-        const res = await fetch('/api/posts/user', { credentials: 'include' });
+        const url = viewedUserId 
+          ? `/api/posts/user?userId=${viewedUserId}` 
+          : '/api/posts/user';
+        const res = await fetch(url, { credentials: 'include' });
         if (!res.ok) {
           setPosts([]);
           return;
@@ -131,8 +199,10 @@ export function Profile() {
       }
     };
 
-    fetchPosts();
-  }, []);
+    if (viewedUserId !== null) {
+      fetchPosts();
+    }
+  }, [viewedUserId]);
 
   useEffect(() => {
     const fetchFriendCounts = async () => {
@@ -327,24 +397,66 @@ export function Profile() {
                         {profile.name ? profile.name[0] : 'N'}
                       </AvatarFallback>
                 </Avatar>
-                <Button
-                  size="icon"
-                  className="absolute bottom-2 right-2 w-8 h-8 bg-white hover:bg-slate-100 text-slate-900 shadow-lg"
-                      onClick={openDialog}
-                >
-                  <Camera className="w-4 h-4" />
-                </Button>
+                {isOwnProfile && (
+                  <Button
+                    size="icon"
+                    className="absolute bottom-2 right-2 w-8 h-8 bg-white hover:bg-slate-100 text-slate-900 shadow-lg"
+                    onClick={openDialog}
+                  >
+                    <Camera className="w-4 h-4" />
+                  </Button>
+                )}
               </div>
 
-              <div className="flex gap-2 mt-4 sm:mt-0">
-                    <Button variant="outline" className="border-slate-300" onClick={openDialog}>
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit Profile
-                </Button>
-                <Button variant="outline" size="icon" className="border-slate-300">
-                  <Settings className="w-4 h-4" />
-                </Button>
-              </div>
+              {isOwnProfile && (
+                <div className="flex gap-2 mt-4 sm:mt-0">
+                  <Button variant="outline" className="border-slate-300" onClick={openDialog}>
+                    <Edit className="w-4 h-4 mr-2" />
+                    Edit Profile
+                  </Button>
+                  <Button variant="outline" size="icon" className="border-slate-300">
+                    <Settings className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+              {!isOwnProfile && (
+                <div className="flex gap-2 mt-4 sm:mt-0">
+                  {isFriend ? (
+                    <Button
+                      variant="outline"
+                      className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                      onClick={() => setUnfriendModalOpen(true)}
+                    >
+                      <UserMinus className="w-4 h-4 mr-2" />
+                      Unfriend
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      className="border-blue-200 text-blue-600 hover:bg-blue-50"
+                      onClick={async () => {
+                        if (!viewedUserId) return;
+                        try {
+                          const res = await fetch('/api/friends/request', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({ toUserId: viewedUserId }),
+                          });
+                          if (res.ok) {
+                            alert('Friend request sent!');
+                          }
+                        } catch (err) {
+                          console.error(err);
+                        }
+                      }}
+                    >
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Add Friend
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="space-y-4">
@@ -678,6 +790,39 @@ export function Profile() {
           </form>
         </DialogContent>
       </Dialog>
+      {profile && viewedUserId && (
+        <UnfriendModal
+          open={unfriendModalOpen}
+          onOpenChange={setUnfriendModalOpen}
+          user={{
+            id: viewedUserId,
+            name: profile.name,
+            username: profile.username,
+            avatarUrl: profile.avatarUrl,
+          }}
+          onConfirm={async () => {
+            if (!viewedUserId) return;
+            try {
+              setUnfriending(true);
+              const res = await fetch(`/api/friends/${viewedUserId}`, {
+                method: 'DELETE',
+                credentials: 'include',
+              });
+              if (res.ok) {
+                setIsFriend(false);
+                setUnfriendModalOpen(false);
+                // Reload page to update groups and feed
+                window.location.reload();
+              }
+            } catch (err) {
+              console.error(err);
+            } finally {
+              setUnfriending(false);
+            }
+          }}
+          unfriending={unfriending}
+        />
+      )}
     </ScrollArea>
   );
 }

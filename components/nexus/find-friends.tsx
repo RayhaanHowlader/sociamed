@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState, useRef } from 'react';
-import { UserPlus, Check, MapPin, AlertCircle } from 'lucide-react';
+import { UserPlus, Check, MapPin, AlertCircle, UserMinus } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { io, Socket } from 'socket.io-client';
+import { UnfriendModal } from './unfriend-modal';
 
 type FriendStatus = 'none' | 'friends' | 'outgoing' | 'incoming';
 
@@ -25,6 +26,9 @@ export function FindFriends() {
   const [profileComplete, setProfileComplete] = useState<boolean | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
+  const [unfriendModalOpen, setUnfriendModalOpen] = useState(false);
+  const [userToUnfriend, setUserToUnfriend] = useState<Suggestion | null>(null);
+  const [unfriending, setUnfriending] = useState(false);
 
   const checkProfile = async () => {
     try {
@@ -85,7 +89,7 @@ export function FindFriends() {
   useEffect(() => {
     if (!currentUserId) return;
     
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://sociamed.onrender.com';
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
     const socket = io(socketUrl);
     socketRef.current = socket;
 
@@ -131,6 +135,42 @@ export function FindFriends() {
     } catch (err) {
       console.error(err);
       setError('Unable to send friend request.');
+    }
+  };
+
+  const openUnfriendModal = (suggestion: Suggestion) => {
+    setUserToUnfriend(suggestion);
+    setUnfriendModalOpen(true);
+  };
+
+  const handleUnfriend = async () => {
+    if (!userToUnfriend) return;
+
+    try {
+      setUnfriending(true);
+      setError('');
+      const res = await fetch(`/api/friends/${userToUnfriend.userId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Unable to unfriend user.');
+        return;
+      }
+
+      // Update status to 'none' so they can send request again
+      setSuggestions((prev) =>
+        prev.map((s) => (s.userId === userToUnfriend.userId ? { ...s, status: 'none' as FriendStatus } : s)),
+      );
+
+      setUnfriendModalOpen(false);
+      setUserToUnfriend(null);
+    } catch (err) {
+      console.error(err);
+      setError('Unable to unfriend user.');
+    } finally {
+      setUnfriending(false);
     }
   };
 
@@ -221,9 +261,14 @@ export function FindFriends() {
                       </Button>
                     )}
                     {s.status === 'friends' && (
-                      <Button size="sm" variant="outline" disabled>
-                        <Check className="w-4 h-4 mr-2 text-green-600" />
-                        Friends
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => openUnfriendModal(s)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                      >
+                        <UserMinus className="w-4 h-4 mr-2" />
+                        Unfriend
                       </Button>
                     )}
                   </div>
@@ -233,6 +278,19 @@ export function FindFriends() {
           </div>
         )}
       </div>
+
+      <UnfriendModal
+        open={unfriendModalOpen}
+        onOpenChange={setUnfriendModalOpen}
+        user={userToUnfriend ? {
+          id: userToUnfriend.userId,
+          name: userToUnfriend.name,
+          username: userToUnfriend.username,
+          avatarUrl: userToUnfriend.avatarUrl,
+        } : null}
+        onConfirm={handleUnfriend}
+        unfriending={unfriending}
+      />
     </div>
   );
 }

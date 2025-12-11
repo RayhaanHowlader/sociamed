@@ -34,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { SharePostModal } from './share-post-modal';
 
 interface Post {
   _id: string;
@@ -88,6 +89,8 @@ export function Feed() {
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Post | null>(null);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shareTarget, setShareTarget] = useState<Post | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const postsContainerRef = useRef<HTMLDivElement | null>(null);
   const [postComments, setPostComments] = useState<Record<string, PostComment[]>>({});
@@ -95,7 +98,9 @@ export function Feed() {
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
   const [hasMoreComments, setHasMoreComments] = useState<Record<string, boolean>>({});
   const [loadingMoreComments, setLoadingMoreComments] = useState<Record<string, boolean>>({});
+  const [highlightedPostId, setHighlightedPostId] = useState<string | null>(null);
   const commentsContainerRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const postRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const fetchProfile = async () => {
     try {
@@ -170,6 +175,35 @@ export function Feed() {
     fetchProfile();
     fetchPosts();
     fetchCurrentUser();
+  }, []);
+
+  // Listen for post highlight events
+  useEffect(() => {
+    const handleHighlightPost = (e: CustomEvent<{ postId: string }>) => {
+      const postId = e.detail.postId;
+      setHighlightedPostId(postId);
+      
+      // Scroll to the post if it exists
+      setTimeout(() => {
+        const postElement = postRefs.current[postId];
+        if (postElement) {
+          postElement.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+          });
+          
+          // Remove highlight after 3 seconds
+          setTimeout(() => {
+            setHighlightedPostId(null);
+          }, 3000);
+        }
+      }, 200);
+    };
+
+    window.addEventListener('highlight-post' as any, handleHighlightPost as EventListener);
+    return () => {
+      window.removeEventListener('highlight-post' as any, handleHighlightPost as EventListener);
+    };
   }, []);
 
   // Handle scroll to detect when user scrolls near bottom
@@ -457,6 +491,25 @@ export function Feed() {
     }
   };
 
+  const handleSharePost = (post: Post) => {
+    setShareTarget(post);
+    setShareModalOpen(true);
+  };
+
+  const handleShareSuccess = (sharedCount: number) => {
+    if (shareTarget) {
+      setPosts((prev) =>
+        prev.map((p) =>
+          p._id === shareTarget._id
+            ? { ...p, stats: { ...(p.stats || { likes: 0, comments: 0, shares: 0 }), shares: (p.stats?.shares ?? 0) + sharedCount } }
+            : p,
+        ),
+      );
+    }
+    setShareModalOpen(false);
+    setShareTarget(null);
+  };
+
   const composerDisabled = !profile || posting || uploadingImage;
 
   return (
@@ -558,10 +611,27 @@ export function Feed() {
             const commentsForPost = postComments[post._id] ?? [];
             const commentValue = commentInputs[post._id] ?? '';
             return (
-            <Card key={post._id} className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <Card 
+              key={post._id} 
+              ref={(el) => {
+                postRefs.current[post._id] = el;
+              }}
+              className={`border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 ${
+                highlightedPostId === post._id 
+                  ? 'ring-2 ring-blue-500 ring-offset-2 bg-blue-50/50' 
+                  : ''
+              }`}
+            >
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-4">
-                <div className="flex gap-3">
+                <div 
+                  className="flex gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => {
+                    if (post.userId && post.userId !== currentUserId) {
+                      window.dispatchEvent(new CustomEvent('view-profile', { detail: { userId: post.userId } }));
+                    }
+                  }}
+                >
                   <Avatar>
                       <AvatarImage src={post.author.avatarUrl} />
                       <AvatarFallback>{post.author.name?.[0]}</AvatarFallback>
@@ -652,7 +722,12 @@ export function Feed() {
                   <MessageCircle className="w-5 h-5 mr-2" />
                   {post.stats?.comments ?? 0}
                 </Button>
-                <Button variant="ghost" size="sm" className="hover:text-green-600 hover:bg-green-50">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="hover:text-green-600 hover:bg-green-50"
+                  onClick={() => handleSharePost(post)}
+                >
                   <Share2 className="w-5 h-5 mr-2" />
                   {post.stats?.shares ?? 0}
                 </Button>
@@ -682,7 +757,16 @@ export function Feed() {
                   >
                     {commentsForPost.map((c) => (
                       <div key={c.id} className="text-slate-700">
-                        <span className="font-semibold">{c.author.name}</span>{' '}
+                        <span 
+                          className="font-semibold cursor-pointer hover:underline"
+                          onClick={() => {
+                            if (c.userId && c.userId !== currentUserId) {
+                              window.dispatchEvent(new CustomEvent('view-profile', { detail: { userId: c.userId } }));
+                            }
+                          }}
+                        >
+                          {c.author.name}
+                        </span>{' '}
                         <span className="text-slate-500 text-xs">{c.author.username}</span>
                         <div>{c.content}</div>
                       </div>
@@ -780,6 +864,18 @@ export function Feed() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <SharePostModal
+        open={shareModalOpen}
+        onOpenChange={(open) => {
+          setShareModalOpen(open);
+          if (!open) {
+            setShareTarget(null);
+          }
+        }}
+        post={shareTarget}
+        onShareSuccess={handleShareSuccess}
+      />
     </div>
   );
 }

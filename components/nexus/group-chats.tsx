@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Search, Send, UserPlus, Settings, Hash, Lock, Paperclip, Smile, Trash2 } from 'lucide-react';
+import { Search, Send, UserPlus, Settings, Hash, Lock, Paperclip, Smile, Trash2, ArrowLeft, X, Users, Pin } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,10 @@ import { io, Socket } from 'socket.io-client';
 import { GroupMessageBubble } from './group-message-bubble';
 import { FilePreview } from './file-preview';
 import { UploadProgress } from './upload-progress';
-import { X, AlertCircle } from 'lucide-react';
+import { ImageViewerModal } from './image-viewer-modal';
+import { AlertCircle } from 'lucide-react';
+import { AddMembersModal } from './add-members-modal';
+import { RemoveMemberModal } from './remove-member-modal';
 
 interface Group {
   _id: string;
@@ -51,8 +54,14 @@ interface GroupMessage {
   fileUrl?: string;
   fileName?: string;
   mimeType?: string;
+  filePublicId?: string;
   isImage?: boolean;
   createdAt: string;
+  deleted?: boolean;
+  deletedBy?: string;
+  pinned?: boolean;
+  pinnedBy?: string;
+  pinnedAt?: string;
 }
 
 const MOCK_GROUP_MESSAGES = [
@@ -126,17 +135,119 @@ export function GroupChats() {
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const [socketReady, setSocketReady] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsName, setSettingsName] = useState('');
   const [settingsAllowEdit, setSettingsAllowEdit] = useState(false);
   const [settingsAllowInvite, setSettingsAllowInvite] = useState(false);
   const [settingsAddMemberIds, setSettingsAddMemberIds] = useState<Set<string>>(new Set());
   const [savingSettings, setSavingSettings] = useState(false);
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [removeMemberOpen, setRemoveMemberOpen] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState<{ id: string; name: string; username: string; avatarUrl?: string } | null>(null);
+  const [removingMember, setRemovingMember] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [filePreview, setFilePreview] = useState<{ url: string; type: 'image' | 'video' | 'audio'; file: File } | null>(null);
   const [uploadError, setUploadError] = useState('');
+  const [imageViewerOpen, setImageViewerOpen] = useState(false);
+  const [imageViewerData, setImageViewerData] = useState<{
+    url: string;
+    senderName?: string;
+    senderAvatar?: string;
+    senderUsername?: string;
+    timestamp?: string;
+    caption?: string;
+    fileName?: string;
+  } | null>(null);
+  const [pinnedMessages, setPinnedMessages] = useState<GroupMessage[]>([]);
+  const [showPinnedMessages, setShowPinnedMessages] = useState(true);
+
+  const isObjectId = (val: string) => /^[a-f\d]{24}$/i.test(val);
+
+  // Load pinned messages for the selected group
+  const loadPinnedMessages = useCallback(async () => {
+    if (!selectedGroup) return;
+    try {
+      const res = await fetch(`/api/groups/pinned?groupId=${selectedGroup._id}`, {
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPinnedMessages(data.messages ?? []);
+      }
+    } catch (err) {
+      console.error('Failed to load pinned messages:', err);
+    }
+  }, [selectedGroup]);
+
+  // Pin or unpin a message
+  const togglePinMessage = async (messageId: string, shouldPin: boolean) => {
+    if (!selectedGroup || !isCurrentUserAdmin) return;
+    
+    // Check if this is a temporary ID (not a valid ObjectId)
+    const isValidObjectId = /^[a-f\d]{24}$/i.test(messageId);
+    if (!isValidObjectId) {
+      console.warn('Cannot pin message with temporary ID:', messageId);
+      return;
+    }
+    
+    try {
+      const res = await fetch('/api/groups/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          groupId: selectedGroup._id,
+          messageId,
+          pin: shouldPin
+        }),
+      });
+      
+      const data = await res.json();
+      if (!res.ok) {
+        console.error(data.error || 'Failed to pin/unpin message');
+        return;
+      }
+      
+      // Update the message in the main messages list (optimistic update)
+      setMessages(prev => prev.map(m => 
+        m.id === messageId 
+          ? { ...m, pinned: shouldPin, pinnedBy: shouldPin ? (currentUserId || undefined) : undefined, pinnedAt: shouldPin ? new Date().toISOString() : undefined }
+          : m
+      ));
+      
+      // Update pinned messages list (optimistic update)
+      if (shouldPin) {
+        const messageToPin = messages.find(m => m.id === messageId);
+        if (messageToPin) {
+          const pinnedMessage = { ...messageToPin, pinned: true, pinnedBy: currentUserId || undefined, pinnedAt: new Date().toISOString() };
+          setPinnedMessages(prev => {
+            // Check if message is already pinned to avoid duplicates
+            if (prev.some(p => p.id === messageId)) return prev;
+            return [...prev, pinnedMessage];
+          });
+        }
+      } else {
+        setPinnedMessages(prev => prev.filter(m => m.id !== messageId));
+      }
+      
+      // Emit socket event to notify other group members
+      if (socketRef.current) {
+        socketRef.current.emit('group:pin', {
+          groupId: selectedGroup._id,
+          messageId,
+          pin: shouldPin,
+          pinnedBy: currentUserId
+        });
+      }
+      
+    } catch (err) {
+      console.error('Failed to pin/unpin message:', err);
+    }
+  };
 
   const ICON_OPTIONS = ['🎨', '🚀', '⚡', '☕', '💬', '📚', '🎮', '🎧'];
 
@@ -229,14 +340,16 @@ export function GroupChats() {
   useEffect(() => {
     if (!currentUserId) return;
 
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://sociamed.onrender.com';
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
     const socket = io(socketUrl);
     socketRef.current = socket;
     setSocketReady(true);
+    console.log('[socket] connect', socketUrl);
 
     socket.on('group:message', (payload: GroupMessage) => {
       // Ignore messages already added locally
       if (payload.fromUserId === currentUserId) return;
+      console.log('[socket] group:message received', payload.id);
       setMessages((prev) => [...prev, payload]);
       
       // Scroll to bottom when receiving a new message
@@ -245,12 +358,88 @@ export function GroupChats() {
       }, 100);
     });
 
+    socket.on('group:message:id', ({ tempId, newId, filePublicId }: { tempId: string; newId: string; filePublicId?: string }) => {
+      console.log('[socket] group:message:id received', { tempId, newId });
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === tempId ? { ...m, id: newId, filePublicId: filePublicId ?? m.filePublicId } : m,
+        ),
+      );
+    });
+
+    socket.on('group:delete', ({ messageIds, by }: { messageIds: string[]; by?: string }) => {
+      if (!Array.isArray(messageIds) || messageIds.length === 0) return;
+      console.log('[socket] group:delete received', messageIds);
+      setMessages((prev) =>
+        prev.map((m) =>
+          messageIds.includes(m.id)
+            ? { ...m, deleted: true, deletedBy: by ?? m.deletedBy, content: '', fileUrl: '', fileName: '', mimeType: '', isImage: false }
+            : m,
+        ),
+      );
+      refreshCurrentGroup();
+    });
+
+    socket.on('group:pin', ({ messageId, pin, pinnedBy }: { messageId: string; pin: boolean; pinnedBy: string | null }) => {
+      console.log('[socket] group:pin received', { messageId, pin, pinnedBy });
+      
+      // Only update if this event is from another user (not the current user who initiated the pin)
+      if (pinnedBy === currentUserId) {
+        console.log('[socket] Ignoring own pin event to prevent duplicates');
+        return;
+      }
+      
+      // Update the message in the main messages list
+      setMessages((prev) =>
+        prev.map((m): GroupMessage =>
+          m.id === messageId
+            ? { ...m, pinned: pin, pinnedBy: pin ? (pinnedBy || undefined) : undefined, pinnedAt: pin ? new Date().toISOString() : undefined }
+            : m,
+        ),
+      );
+      
+      // Update pinned messages list
+      if (pin) {
+        setMessages((prev) => {
+          const messageToPin = prev.find(m => m.id === messageId);
+          if (messageToPin) {
+            const pinnedMessage: GroupMessage = { 
+              ...messageToPin, 
+              pinned: true, 
+              pinnedBy: pinnedBy || undefined, 
+              pinnedAt: new Date().toISOString() 
+            };
+            setPinnedMessages(prevPinned => {
+              // Check if message is already pinned to avoid duplicates
+              if (prevPinned.some(p => p.id === messageId)) return prevPinned;
+              return [...prevPinned, pinnedMessage];
+            });
+          }
+          return prev;
+        });
+      } else {
+        setPinnedMessages(prev => prev.filter(m => m.id !== messageId));
+      }
+    });
+
     return () => {
+      console.log('[socket] disconnect');
       socket.disconnect();
       socketRef.current = null;
       setSocketReady(false);
     };
   }, [currentUserId]);
+
+  // Join all group rooms (so delete/message events reach even if not currently open)
+  useEffect(() => {
+    if (!socketRef.current || !currentUserId) return;
+    groups.forEach((g) => {
+      if (g._id) {
+        socketRef.current?.emit('group:join', { groupId: g._id });
+        console.log('[socket] group:join (all)', g._id);
+      }
+    });
+  }, [groups, currentUserId]);
 
   // Join group room and load initial history (latest 5) when socket is ready and selected group changes
   useEffect(() => {
@@ -272,6 +461,7 @@ export function GroupChats() {
           console.error(data.error || 'Unable to load group history');
           return;
         }
+        clearSelection();
         setMessages(data.messages ?? []);
         setHasMoreMessages(data.hasMore ?? false);
         
@@ -285,6 +475,7 @@ export function GroupChats() {
     };
 
     void loadHistory();
+    void loadPinnedMessages();
   }, [selectedGroup, socketReady]);
 
   // Load more messages when scrolling up
@@ -294,6 +485,10 @@ export function GroupChats() {
     const oldestMessage = messages[0];
     if (!oldestMessage) return;
 
+    console.log('[group scroll] loadMoreMessages start', {
+      groupId: selectedGroup._id,
+      before: oldestMessage.createdAt,
+    });
     setLoadingMore(true);
     try {
       const res = await fetch(
@@ -311,6 +506,10 @@ export function GroupChats() {
       // Prepend older messages to the beginning
       setMessages((prev) => [...(data.messages ?? []), ...prev]);
       setHasMoreMessages(data.hasMore ?? false);
+      console.log('[group scroll] loadMoreMessages success', {
+        received: data.messages?.length ?? 0,
+        hasMore: data.hasMore,
+      });
     } catch (err) {
       console.error(err);
     } finally {
@@ -342,6 +541,7 @@ export function GroupChats() {
         setTimeout(setupScrollListener, 200);
         return;
       }
+      console.log('[group scroll] container ready');
 
       const handleScroll = () => {
         if (!container || !hasMoreMessages || loadingMore) return;
@@ -354,6 +554,11 @@ export function GroupChats() {
         // If user has scrolled up near the top
         if (scrollTop < 150 && hasMoreMessages && !loadingMore) {
           const previousScrollHeight = scrollHeight;
+          console.log('[group scroll] near top -> loadMore', {
+            scrollTop,
+            hasMoreMessages,
+            loadingMore,
+          });
           loadMoreMessages().then(() => {
             // Maintain scroll position after loading more messages
             requestAnimationFrame(() => {
@@ -475,6 +680,98 @@ export function GroupChats() {
     }
   };
 
+  const openRemoveMemberModal = (member: { id: string; name: string; username: string; avatarUrl?: string }) => {
+    setMemberToRemove(member);
+    setRemoveMemberOpen(true);
+  };
+
+  const handleRemoveMember = async () => {
+    if (!selectedGroup || !currentUserId || !memberToRemove) return;
+
+    try {
+      setRemovingMember(true);
+      setError('');
+      const res = await fetch(
+        `/api/groups/members?groupId=${selectedGroup._id}&memberId=${memberToRemove.id}`,
+        {
+          method: 'DELETE',
+          credentials: 'include',
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Unable to remove member');
+        return;
+      }
+
+      // Remove member from local state
+      setGroupMembers((prev) => prev.filter((m) => m.id !== memberToRemove.id));
+      
+      // Update groups list to reflect member removal
+      setGroups((prev) =>
+        prev.map((g) =>
+          g._id === selectedGroup._id
+            ? { ...g, memberIds: g.memberIds?.filter((id) => id !== memberToRemove.id) ?? [] }
+            : g
+        )
+      );
+
+      // Emit socket notification
+      if (socketRef.current && data.notification) {
+        socketRef.current.emit('group:member:removed:notify', {
+          userId: memberToRemove.id,
+          groupId: selectedGroup._id,
+          groupName: selectedGroup.name,
+          removedBy: currentUserId,
+          removedByProfile: data.notification.removedByProfile,
+        });
+      }
+
+      setRemoveMemberOpen(false);
+      setMemberToRemove(null);
+    } catch (err) {
+      console.error(err);
+      setError('Unable to remove member');
+    } finally {
+      setRemovingMember(false);
+    }
+  };
+
+  const handleAddMembersSuccess = async () => {
+    if (!selectedGroup) return;
+    
+    // Reload members
+    try {
+      const membersRes = await fetch(`/api/groups/members?groupId=${selectedGroup._id}`, {
+        credentials: 'include',
+      });
+      const membersData = await membersRes.json();
+      if (membersRes.ok) {
+        setGroupMembers(
+          (membersData.members ?? []).map((m: any) => ({
+            id: m.userId,
+            name: m.name,
+            username: m.username,
+            avatarUrl: m.avatarUrl,
+          })),
+        );
+      }
+
+      // Reload groups to get updated member count
+      const groupsRes = await fetch('/api/groups', { credentials: 'include' });
+      const groupsData = await groupsRes.json();
+      if (groupsRes.ok) {
+        setGroups(groupsData.groups ?? []);
+        const updatedGroup = groupsData.groups?.find((g: Group) => g._id === selectedGroup._id);
+        if (updatedGroup) {
+          setSelectedGroup(updatedGroup);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleDeleteGroup = async () => {
     if (!selectedGroup) return;
 
@@ -571,8 +868,9 @@ export function GroupChats() {
     if (!selectedGroup || !currentUserId || !socketRef.current) return;
     if (!message.trim()) return;
 
+    const tempId = `${Date.now()}`;
     const payload: GroupMessage = {
-      id: `${Date.now()}`,
+      id: tempId,
       groupId: selectedGroup._id,
       fromUserId: currentUserId,
       content: message.trim(),
@@ -594,9 +892,89 @@ export function GroupChats() {
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ groupId: selectedGroup._id, content: payload.content }),
-    }).catch((err) => console.error('Failed to save group message', err));
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.message?.id) return;
+        const newId = String(data.message.id);
+        setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, id: newId } : m)));
+      })
+      .catch((err) => console.error('Failed to save group message', err));
 
     setMessage('');
+  };
+
+  const refreshCurrentGroup = useCallback(async () => {
+    if (!selectedGroup) return;
+    try {
+      const res = await fetch(`/api/groups/history?groupId=${selectedGroup._id}&limit=20`, {
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        console.error(data.error || 'Unable to refresh group history');
+        return;
+      }
+      setMessages(data.messages ?? []);
+      setHasMoreMessages(data.hasMore ?? false);
+    } catch (err) {
+      console.error(err);
+    }
+  }, [selectedGroup]);
+
+  const toggleMessageSelection = (id: string, isMine: boolean) => {
+    if (!isMine && !(selectedGroup?.ownerId === currentUserId)) return;
+    if (!isObjectId(id)) return;
+    setSelectMode(true);
+    setSelectedMessageIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedMessageIds(new Set());
+    setSelectMode(false);
+  };
+
+  const deleteSelectedMessages = async () => {
+    if (!selectedGroup || !currentUserId) return;
+    const ids = Array.from(selectedMessageIds).filter(isObjectId);
+    if (ids.length === 0) {
+      await refreshCurrentGroup();
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/groups/message', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ groupId: selectedGroup._id, messageIds: ids }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Failed to delete messages');
+        return;
+      }
+
+      setMessages((prev) =>
+        prev.map((m) =>
+          ids.includes(m.id)
+            ? { ...m, deleted: true, deletedBy: currentUserId, content: '', fileUrl: '', fileName: '', mimeType: '', isImage: false, filePublicId: '' }
+            : m,
+        ),
+      );
+
+      socketRef.current?.emit('group:delete', { groupId: selectedGroup._id, messageIds: ids, by: currentUserId });
+      await refreshCurrentGroup();
+      clearSelection();
+    } catch (err) {
+      console.error(err);
+      setError('Failed to delete messages');
+    }
   };
 
   const handleFileChange = (file: File) => {
@@ -688,14 +1066,16 @@ export function GroupChats() {
       const mimeType = data.mimeType || file.type || '';
       const isImage = data.isImage ?? mimeType.startsWith('image/');
       
+      const tempId = `${Date.now()}`;
       const payload: GroupMessage = {
-        id: `${Date.now()}`,
+        id: tempId,
         groupId: selectedGroup._id,
         fromUserId: currentUserId,
         content: '',
         fileUrl: data.url,
         fileName: data.fileName || file.name,
         mimeType: mimeType,
+        filePublicId: data.publicId,
         isImage: isImage,
         createdAt: new Date().toISOString(),
       };
@@ -714,8 +1094,17 @@ export function GroupChats() {
           fileName: data.fileName || file.name,
           mimeType: mimeType,
           isImage: isImage,
+          filePublicId: data.publicId,
         }),
-      }).catch((err) => console.error('Failed to save group file message', err));
+      })
+        .then(async (res) => {
+          const resp = await res.json().catch(() => null);
+          if (!res.ok || !resp?.message?.id) return;
+          const newId = String(resp.message.id);
+          setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, id: newId } : m)));
+          socketRef.current?.emit('group:message:id', { groupId: selectedGroup._id, tempId, newId, filePublicId: data.publicId });
+        })
+        .catch((err) => console.error('Failed to save group file message', err));
 
       // Clear preview and reset
       setFilePreview(null);
@@ -745,9 +1134,33 @@ export function GroupChats() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const handleGroupImageClick = useCallback(
+    (payload: { url: string; message: GroupMessage }) => {
+      const { message } = payload;
+      const memberInfo = groupMembers.find((m) => m.id === message.fromUserId);
+      const isMine = message.fromUserId === currentUserId;
+
+      setImageViewerData({
+        url: payload.url,
+        senderName: isMine ? 'You' : memberInfo?.name,
+        senderAvatar: memberInfo?.avatarUrl,
+        senderUsername: memberInfo?.username,
+        timestamp: message.createdAt,
+        caption: message.content,
+        fileName: message.fileName,
+      });
+      setImageViewerOpen(true);
+    },
+    [currentUserId, groupMembers],
+  );
+
   return (
     <div className="h-full flex flex-col md:flex-row bg-white">
-      <div className="w-full md:w-80 border-b md:border-b-0 md:border-r border-slate-200 flex flex-col max-h-[50vh] md:max-h-none">
+      {/* Groups List - Hidden on mobile when group is selected */}
+      <div className={cn(
+        'w-full md:w-80 border-b md:border-b-0 md:border-r border-slate-200 flex flex-col max-h-[50vh] md:max-h-none',
+        selectedGroup && 'hidden md:flex'
+      )}>
         <div className="p-2 md:p-3 lg:p-4 border-b border-slate-200 flex-shrink-0">
           <div className="flex items-center justify-between mb-2 md:mb-4">
             <h2 className="text-base md:text-lg lg:text-xl font-bold text-slate-900">Groups</h2>
@@ -810,11 +1223,24 @@ export function GroupChats() {
         </ScrollArea>
       </div>
 
-      <div className="flex-1 flex flex-col min-h-0">
+      {/* Chat View - Hidden on mobile when no group selected */}
+      <div className={cn(
+        'flex-1 flex flex-col min-h-0',
+        !selectedGroup && 'hidden md:flex'
+      )}>
         {selectedGroup ? (
           <>
-        <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-white">
-          <div className="flex items-center gap-3">
+        <div className="p-3 md:p-4 border-b border-slate-200 flex items-center justify-between bg-white">
+          <div className="flex items-center gap-2 md:gap-3">
+            {/* Back button - only visible on mobile */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden text-slate-600 hover:text-slate-900"
+              onClick={() => setSelectedGroup(null)}
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-xl">
                   {selectedGroup.icon || '💬'}
             </div>
@@ -828,14 +1254,25 @@ export function GroupChats() {
                   </p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center flex-wrap justify-end sticky top-0 bg-white z-10 py-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-slate-600 hover:text-blue-600"
+              onClick={() => setAddMemberOpen(true)}
+              disabled={!canInviteMembers}
+              title={canInviteMembers ? "Add members" : "You don't have permission to add members"}
+            >
+              <UserPlus className="w-5 h-5" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
               className="text-slate-600 hover:text-blue-600"
               onClick={() => setShowMembers(!showMembers)}
+              title="View members"
             >
-              <UserPlus className="w-5 h-5" />
+              <Users className="w-5 h-5" />
             </Button>
                 <Button
                   variant="ghost"
@@ -853,25 +1290,112 @@ export function GroupChats() {
                 >
                   <Trash2 className="w-5 h-5" />
                 </Button>
+            <Button
+              variant={selectMode ? 'secondary' : 'outline'}
+              size="sm"
+              disabled={!selectedGroup}
+              onClick={() => (selectMode ? clearSelection() : setSelectMode(true))}
+              className="min-w-[92px]"
+            >
+              {selectMode ? 'Cancel' : 'Select'}
+            </Button>
+            {selectedMessageIds.size > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={deleteSelectedMessages}
+                className="min-w-[110px]"
+              >
+                Delete ({selectedMessageIds.size})
+              </Button>
+            )}
           </div>
         </div>
 
         <div className="flex flex-1 overflow-hidden min-h-0">
           <ScrollArea 
-            className="flex-1 p-3 md:p-6 bg-slate-50 h-full"
+            className="flex-1 p-3 md:p-6 bg-slate-50 h-[calc(100vh-220px)]"
             ref={messagesContainerRef}
           >
             <div className="space-y-3 md:space-y-4 max-w-3xl mx-auto">
+              {/* Pinned Messages Section */}
+              {pinnedMessages.length > 0 && showPinnedMessages && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Pin className="w-4 h-4 text-yellow-600" />
+                      <span className="text-sm font-medium text-yellow-800">
+                        Pinned Messages ({pinnedMessages.length})
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowPinnedMessages(false)}
+                      className="h-6 px-2 text-yellow-600 hover:text-yellow-800"
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {pinnedMessages.map((msg) => {
+                      const member = groupMembers.find((m) => m.id === msg.fromUserId);
+                      const displayName = member?.name || 'Unknown';
+                      const avatarUrl = member?.avatarUrl;
+                      const isMine = msg.fromUserId === currentUserId;
+
+                      return (
+                        <GroupMessageBubble
+                          key={`pinned-${msg.id}`}
+                          message={msg}
+                          isMine={isMine}
+                          displayName={displayName}
+                          avatarUrl={avatarUrl}
+                          selectable={false}
+                          selected={false}
+                          onSelectToggle={() => {}}
+                          ownerId={selectedGroup?.ownerId}
+                          currentUserId={currentUserId || undefined}
+                          onImageClick={handleGroupImageClick}
+                          onPinToggle={togglePinMessage}
+                          isAdmin={isCurrentUserAdmin}
+                          isPinnedView={true}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              
+              {/* Show Pinned Messages Button (when hidden) */}
+              {pinnedMessages.length > 0 && !showPinnedMessages && (
+                <div className="flex justify-center mb-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowPinnedMessages(true)}
+                    className="text-yellow-600 border-yellow-200 hover:bg-yellow-50"
+                  >
+                    <Pin className="w-3 h-3 mr-1" />
+                    Show {pinnedMessages.length} Pinned Message{pinnedMessages.length > 1 ? 's' : ''}
+                  </Button>
+                </div>
+              )}
+
               {/* Load more button or loading indicator */}
-              {hasMoreMessages && !loadingMore && (
+              {hasMoreMessages && (
                 <div className="flex justify-center py-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => loadMoreMessages()}
+                    onClick={() => {
+                      console.log('[group scroll] load more button click');
+                      loadMoreMessages();
+                    }}
                     className="text-xs"
+                    disabled={loadingMore}
                   >
-                    Load older messages
+                    {loadingMore ? 'Loading…' : 'Load older messages'}
                   </Button>
                 </div>
               )}
@@ -891,6 +1415,7 @@ export function GroupChats() {
                   ? 'You'
                   : memberInfo?.name || 'Member';
                 const avatarUrl = isMine ? undefined : memberInfo?.avatarUrl;
+                const selectable = selectMode && !msg.deleted && (isMine || selectedGroup?.ownerId === currentUserId);
 
                 return (
                   <GroupMessageBubble
@@ -899,6 +1424,15 @@ export function GroupChats() {
                     isMine={isMine}
                     displayName={displayName}
                     avatarUrl={avatarUrl}
+                    selectable={selectable}
+                    selected={selectedMessageIds.has(msg.id)}
+                    onSelectToggle={() => toggleMessageSelection(msg.id, isMine)}
+                    ownerId={selectedGroup?.ownerId}
+                    currentUserId={currentUserId || undefined}
+                    onImageClick={handleGroupImageClick}
+                    onPinToggle={togglePinMessage}
+                    isAdmin={isCurrentUserAdmin}
+                    isPinnedView={false}
                   />
                 );
               })}
@@ -925,6 +1459,8 @@ export function GroupChats() {
                       ) : (
                         groupMembers.map((member) => {
                           const isAdmin = selectedGroup.ownerId === member.id;
+                          const isCurrentUser = currentUserId === member.id;
+                          const canRemove = isCurrentUserAdmin && !isAdmin && !isCurrentUser;
                           return (
                     <div key={member.id} className="flex items-center gap-3">
                               <Avatar className="w-8 h-8">
@@ -937,12 +1473,23 @@ export function GroupChats() {
                                 </p>
                                 <p className="text-xs text-slate-500">@{member.username}</p>
                       </div>
+                              <div className="flex items-center gap-2">
                               <Badge
                                 variant={isAdmin ? 'default' : 'secondary'}
                                 className="text-xs"
                               >
                                 {isAdmin ? 'Admin' : 'Member'}
                         </Badge>
+                                {canRemove && (
+                                  <button
+                                    onClick={() => openRemoveMemberModal(member)}
+                                    className="inline-flex items-center justify-center rounded-md p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                    title="Remove member"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
                       </div>
                           );
                         })
@@ -1282,6 +1829,38 @@ export function GroupChats() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {selectedGroup && (
+        <>
+          <ImageViewerModal
+            open={imageViewerOpen}
+            onOpenChange={(open) => {
+              setImageViewerOpen(open);
+              if (!open) {
+                setImageViewerData(null);
+              }
+            }}
+            image={imageViewerData}
+          />
+          <AddMembersModal
+            open={addMemberOpen}
+            onOpenChange={setAddMemberOpen}
+            groupId={selectedGroup._id}
+            groupName={selectedGroup.name}
+            groupIcon={selectedGroup.icon}
+            existingMemberIds={selectedGroup.memberIds ?? []}
+            onSuccess={handleAddMembersSuccess}
+          />
+          <RemoveMemberModal
+            open={removeMemberOpen}
+            onOpenChange={setRemoveMemberOpen}
+            member={memberToRemove}
+            groupName={selectedGroup.name}
+            groupIcon={selectedGroup.icon}
+            onConfirm={handleRemoveMember}
+            removing={removingMember}
+          />
+        </>
+      )}
     </div>
   );
 }
