@@ -36,6 +36,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { SharePostModal } from './share-post-modal';
+import { ImageViewerModal } from './image-viewer-modal';
 
 interface Post {
   _id: string;
@@ -92,6 +93,15 @@ export function Feed() {
   const [deleteTarget, setDeleteTarget] = useState<Post | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [shareTarget, setShareTarget] = useState<Post | null>(null);
+  const [imageViewerOpen, setImageViewerOpen] = useState(false);
+  const [imageViewerData, setImageViewerData] = useState<{
+    url: string;
+    senderName?: string;
+    senderAvatar?: string;
+    senderUsername?: string;
+    timestamp?: string;
+    caption?: string;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const postsContainerRef = useRef<HTMLDivElement | null>(null);
   const [postComments, setPostComments] = useState<Record<string, PostComment[]>>({});
@@ -515,6 +525,20 @@ export function Feed() {
     setShareTarget(null);
   };
 
+  const handleImageClick = (post: Post) => {
+    if (!post.imageUrl) return;
+    
+    setImageViewerData({
+      url: post.imageUrl,
+      senderName: post.author.name,
+      senderAvatar: post.author.avatarUrl,
+      senderUsername: post.author.username,
+      timestamp: post.createdAt,
+      caption: post.content,
+    });
+    setImageViewerOpen(true);
+  };
+
   const composerDisabled = !profile || posting || uploadingImage;
 
   return (
@@ -700,7 +724,10 @@ export function Feed() {
                 )}
 
                 {post.imageUrl && (
-                <div className="rounded-xl overflow-hidden mb-4">
+                <div 
+                  className="rounded-xl overflow-hidden mb-4 cursor-pointer hover:opacity-95 transition-opacity"
+                  onClick={() => handleImageClick(post)}
+                >
                     <img src={post.imageUrl} alt="Post content" className="w-full object-cover" />
                 </div>
               )}
@@ -882,6 +909,12 @@ export function Feed() {
         }}
         post={shareTarget}
         onShareSuccess={handleShareSuccess}
+      />
+
+      <ImageViewerModal
+        open={imageViewerOpen}
+        onOpenChange={setImageViewerOpen}
+        image={imageViewerData}
       />
     </div>
   );
