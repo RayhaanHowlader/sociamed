@@ -105,8 +105,11 @@ export async function GET(req: NextRequest) {
       isImage: m.deleted ? false : Boolean(m.isImage),
       filePublicId: m.deleted ? "" : (m.filePublicId || ""),
       deleted: Boolean(m.deleted),
+      type: m.deleted ? undefined : m.type,
       sharedPostId: m.deleted ? undefined : m.sharedPostId ? String(m.sharedPostId) : undefined,
       sharedPostData: m.deleted ? undefined : m.sharedPostData,
+      sharedShort: m.deleted ? undefined : m.sharedShort,
+      sharedBy: m.deleted ? undefined : m.sharedBy,
       createdAt: m.createdAt instanceof Date ? m.createdAt.toISOString() : String(m.createdAt),
       status: "seen" as const,
     }))

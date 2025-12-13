@@ -8,6 +8,7 @@ import { CreateShortModal } from './create-short-modal';
 import { ShortCard } from './short-card';
 import { ShortViewerModal } from './short-viewer-modal';
 import { DeleteShortModal } from './delete-short-modal';
+import { ShareShortModal } from './share-short-modal';
 
 interface ShortItem {
   _id: string;
@@ -44,6 +45,8 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [shortPendingDelete, setShortPendingDelete] = useState<ShortItem | null>(null);
   const [deletingShort, setDeletingShort] = useState(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shortToShare, setShortToShare] = useState<ShortItem | null>(null);
 
   useEffect(() => {
     setModalOpen(createModalOpen);
@@ -94,6 +97,20 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
   useEffect(() => {
     fetchShorts();
     fetchProfile();
+  }, []);
+
+  // Listen for open-short events from shared shorts in messages
+  useEffect(() => {
+    const handleOpenShort = (e: CustomEvent<{ short: ShortItem }>) => {
+      setActiveShort(e.detail.short);
+      setViewerOpen(true);
+    };
+
+    window.addEventListener('open-short' as any, handleOpenShort as EventListener);
+    
+    return () => {
+      window.removeEventListener('open-short' as any, handleOpenShort as EventListener);
+    };
   }, []);
 
   const handleShortCreated = () => {
@@ -174,6 +191,18 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
     setDeleteModalOpen(open);
     if (!open) {
       setShortPendingDelete(null);
+    }
+  };
+
+  const handleShareShort = (short: ShortItem) => {
+    setShortToShare(short);
+    setShareModalOpen(true);
+  };
+
+  const handleShareModalToggle = (open: boolean) => {
+    setShareModalOpen(open);
+    if (!open) {
+      setShortToShare(null);
     }
   };
 
@@ -258,6 +287,7 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
                 }}
                 onLike={toggleLike}
                 onDelete={promptDeleteShort}
+                onShare={handleShareShort}
               />
             ))}
           </div>
@@ -291,6 +321,15 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
         short={shortPendingDelete}
         onConfirm={handleConfirmDeleteShort}
         deleting={deletingShort}
+      />
+
+      <ShareShortModal
+        open={shareModalOpen}
+        onOpenChange={handleShareModalToggle}
+        short={shortToShare}
+        onShareSuccess={(count) => {
+          console.log(`Short shared with ${count} friends`);
+        }}
       />
     </div>
   );

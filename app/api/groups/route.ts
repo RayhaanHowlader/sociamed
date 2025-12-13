@@ -10,16 +10,42 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  const url = new URL(req.url)
+  const page = parseInt(url.searchParams.get('page') || '1')
+  const limit = parseInt(url.searchParams.get('limit') || '5')
+  const search = url.searchParams.get('search') || ''
+  const skip = (page - 1) * limit
+
   const db = await getDb()
   const groups = db.collection("groups")
 
+  // Build search filter
+  let filter: any = { memberIds: String(user.sub) }
+
+  if (search.trim()) {
+    filter.name = { $regex: search, $options: 'i' }
+  }
+
+  // Get total count for pagination
+  const totalCount = await groups.countDocuments(filter)
+
+  // Get groups with pagination
   const items = await groups
-    .find({ memberIds: String(user.sub) })
-    .sort({ createdAt: -1 })
-    .limit(100)
+    .find(filter)
+    .sort({ lastActivityAt: -1, createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
     .toArray()
 
-  return NextResponse.json({ groups: items }, { status: 200 })
+  const hasMore = skip + limit < totalCount
+
+  return NextResponse.json({ 
+    groups: items,
+    hasMore,
+    total: totalCount,
+    page,
+    limit
+  }, { status: 200 })
 }
 
 export async function POST(req: NextRequest) {

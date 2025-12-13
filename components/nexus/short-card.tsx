@@ -1,6 +1,6 @@
 'use client';
 
-import { Video, Heart, MessageCircle, Trash2 } from 'lucide-react';
+import { Video, Heart, MessageCircle, Trash2, Share } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -29,9 +29,10 @@ interface ShortCardProps {
   onView: (short: ShortItem) => void;
   onLike: (shortId: string) => void;
   onDelete: (shortId: string) => void;
+  onShare: (short: ShortItem) => void;
 }
 
-export function ShortCard({ short, currentUserId, onView, onLike, onDelete }: ShortCardProps) {
+export function ShortCard({ short, currentUserId, onView, onLike, onDelete, onShare }: ShortCardProps) {
   const isOwnShort = currentUserId && short.userId === currentUserId;
 
   return (
@@ -88,7 +89,7 @@ export function ShortCard({ short, currentUserId, onView, onLike, onDelete }: Sh
             {short.caption && (
               <p className="text-xs text-slate-700 line-clamp-2">{short.caption}</p>
             )}
-            <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+            <div className="mt-2 flex items-center justify-between text-xs text-white">
               <button
                 type="button"
                 onClick={(e) => {
@@ -108,6 +109,17 @@ export function ShortCard({ short, currentUserId, onView, onLike, onDelete }: Sh
               >
                 <MessageCircle className="w-4 h-4" />
                 <span>{short.stats?.comments ?? 0}</span>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onShare(short);
+                }}
+                className="inline-flex items-center gap-1 hover:text-green-500 transition-colors"
+              >
+                <Share className="w-4 h-4" />
+                <span>Share</span>
               </button>
             </div>
           </div>

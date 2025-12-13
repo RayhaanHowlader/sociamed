@@ -16,6 +16,7 @@ interface ChatMessage {
   createdAt: string;
   status?: 'sent' | 'seen';
   deleted?: boolean;
+  type?: string;
   sharedPostId?: string;
   sharedPostData?: {
     content: string;
@@ -28,6 +29,23 @@ interface ChatMessage {
     };
     createdAt: string;
   };
+  sharedShort?: {
+    _id: string;
+    caption: string;
+    videoUrl: string;
+    duration: number;
+    author: {
+      name: string;
+      username: string;
+      avatarUrl?: string;
+    };
+    createdAt: string;
+  };
+  sharedBy?: {
+    name: string;
+    username: string;
+    avatarUrl?: string;
+  };
 }
 
 interface MessageBubbleProps {
@@ -39,10 +57,11 @@ interface MessageBubbleProps {
   onSelectToggle?: (id: string) => void;
   onImageClick?: (url: string) => void;
   onSharedPostClick?: (postId: string) => void;
+  onSharedShortClick?: (short: any) => void;
   onProfileClick?: (userId: string) => void;
 }
 
-export function MessageBubble({ message, isMine, currentUserId, selected, selectable, onSelectToggle, onImageClick, onSharedPostClick, onProfileClick }: MessageBubbleProps) {
+export function MessageBubble({ message, isMine, currentUserId, selected, selectable, onSelectToggle, onImageClick, onSharedPostClick, onSharedShortClick, onProfileClick }: MessageBubbleProps) {
   const time = new Date(message.createdAt).toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
@@ -64,8 +83,8 @@ export function MessageBubble({ message, isMine, currentUserId, selected, select
     if (hasVideoMimeType || hasVideoExtension) return 'video';
     
     // Check for audio
-    const hasAudioExtension = /\.(mp3|wav|ogg|m4a|aac|flac|wma|opus)$/i.test(fileName) ||
-                              /\.(mp3|wav|ogg|m4a|aac|flac|wma|opus)$/i.test(fileUrl);
+    const hasAudioExtension = /\.(mp3|wav|ogg|m4a|aac|flac|wma|opus|webm)$/i.test(fileName) ||
+                              /\.(mp3|wav|ogg|m4a|aac|flac|wma|opus|webm)$/i.test(fileUrl);
     const hasAudioMimeType = mimeType.startsWith('audio/');
     if (hasAudioMimeType || hasAudioExtension) return 'audio';
     
@@ -276,8 +295,97 @@ export function MessageBubble({ message, isMine, currentUserId, selected, select
           </div>
         )}
 
+        {/* Shared Short Display */}
+        {!message.deleted && message.sharedShort && (
+          <div className="mb-2">
+            <div 
+              className={cn(
+                'p-3 rounded-lg border cursor-pointer transition-colors',
+                isMine 
+                  ? 'bg-blue-700/50 border-blue-600/50 hover:bg-blue-700/70' 
+                  : 'bg-slate-100 border-slate-200 hover:bg-slate-150'
+              )}
+              onClick={() => onSharedShortClick?.(message.sharedShort)}
+            >
+              <div className="flex items-start gap-3">
+                {/* Video Thumbnail */}
+                <div className="w-16 h-20 bg-black rounded-lg overflow-hidden flex-shrink-0">
+                  <video
+                    src={message.sharedShort.videoUrl}
+                    className="w-full h-full object-cover"
+                    muted
+                    playsInline
+                  />
+                </div>
+                
+                {/* Short Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Avatar className="w-6 h-6">
+                      <AvatarImage src={message.sharedShort.author.avatarUrl} />
+                      <AvatarFallback className="text-xs">{message.sharedShort.author.name?.[0]}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className={cn(
+                        'text-xs font-medium truncate',
+                        isMine ? 'text-white' : 'text-slate-900'
+                      )}>
+                        {message.sharedShort.author.name}
+                      </p>
+                      <p className={cn(
+                        'text-xs truncate',
+                        isMine ? 'text-blue-100' : 'text-slate-500'
+                      )}>
+                        @{message.sharedShort.author.username}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {message.sharedShort.caption && (
+                    <p className={cn(
+                      'text-xs mb-1 line-clamp-2',
+                      isMine ? 'text-blue-100' : 'text-slate-700'
+                    )}>
+                      {message.sharedShort.caption}
+                    </p>
+                  )}
+                  
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className={cn(
+                      isMine ? 'text-blue-200' : 'text-slate-500'
+                    )}>
+                      {Math.floor(message.sharedShort.duration)}s
+                    </span>
+                    <span className={cn(
+                      isMine ? 'text-blue-200' : 'text-slate-500'
+                    )}>
+                      •
+                    </span>
+                    <span className={cn(
+                      isMine ? 'text-blue-200' : 'text-slate-500'
+                    )}>
+                      {new Date(message.sharedShort.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Click to view indicator */}
+              <div className={cn(
+                'flex items-center justify-center gap-1 mt-2 pt-2 border-t text-xs',
+                isMine 
+                  ? 'border-blue-600/30 text-blue-200' 
+                  : 'border-slate-300 text-slate-500'
+              )}>
+                <ExternalLink className="w-3 h-3" />
+                <span>Click to view short</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Text Content */}
-        {!message.deleted && message.content && !message.sharedPostData && <p className="text-sm">{message.content}</p>}
+        {!message.deleted && message.content && !message.sharedPostData && !message.sharedShort && <p className="text-sm">{message.content}</p>}
         
         {/* Text Content for shared posts (user's message) */}
         {!message.deleted && message.content && message.sharedPostData && (
@@ -288,6 +396,13 @@ export function MessageBubble({ message, isMine, currentUserId, selected, select
               const userMessage = lines.find(line => !line.includes('📎 Shared a post') && !line.startsWith('http') && line.trim());
               return userMessage ? <p className="text-sm mb-2">{userMessage}</p> : null;
             })()}
+          </div>
+        )}
+
+        {/* Text Content for shared shorts (user's message) */}
+        {!message.deleted && message.content && message.sharedShort && (
+          <div className="mb-2">
+            <p className="text-sm">{message.content}</p>
           </div>
         )}
 

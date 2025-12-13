@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useRef } from 'react';
-import { UserPlus, Check, MapPin, AlertCircle, UserMinus } from 'lucide-react';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { UserPlus, Check, MapPin, AlertCircle, UserMinus, Search, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { io, Socket } from 'socket.io-client';
 import { UnfriendModal } from './unfriend-modal';
 
@@ -22,6 +23,8 @@ interface Suggestion {
 export function FindFriends() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [error, setError] = useState('');
   const [profileComplete, setProfileComplete] = useState<boolean | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -29,6 +32,14 @@ export function FindFriends() {
   const [unfriendModalOpen, setUnfriendModalOpen] = useState(false);
   const [userToUnfriend, setUserToUnfriend] = useState<Suggestion | null>(null);
   const [unfriending, setUnfriending] = useState(false);
+  
+  // Pagination and search states
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const checkProfile = async () => {
     try {
@@ -48,27 +59,70 @@ export function FindFriends() {
     }
   };
 
-  const loadSuggestions = async () => {
+  const loadSuggestions = async (pageNum: number = 1, search: string = '', append: boolean = false) => {
     try {
-      setLoading(true);
-      const res = await fetch('/api/friends/suggestions', { credentials: 'include' });
+      if (pageNum === 1) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+      
+      if (search !== debouncedSearch) {
+        setSearching(true);
+      }
+
+      const params = new URLSearchParams({
+        page: pageNum.toString(),
+        limit: '5',
+        ...(search && { search })
+      });
+
+      const res = await fetch(`/api/friends/suggestions?${params}`, { credentials: 'include' });
       const data = await res.json();
+      
       if (!res.ok) {
         setError(data.error || 'Unable to load suggestions.');
         return;
       }
-      setSuggestions(data.suggestions ?? []);
+
+      if (append && pageNum > 1) {
+        setSuggestions(prev => [...prev, ...(data.suggestions ?? [])]);
+      } else {
+        setSuggestions(data.suggestions ?? []);
+      }
+      
+      setHasMore(data.hasMore ?? false);
+      setPage(pageNum);
     } catch (err) {
       console.error(err);
       setError('Unable to load suggestions.');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+      setSearching(false);
     }
   };
 
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Load suggestions when debounced search changes
+  useEffect(() => {
+    if (profileComplete !== null) {
+      setPage(1);
+      setHasMore(true);
+      loadSuggestions(1, debouncedSearch, false);
+    }
+  }, [debouncedSearch, profileComplete]);
+
   useEffect(() => {
     checkProfile();
-    loadSuggestions();
     
     // Get current user ID
     const loadCurrentUser = async () => {
@@ -84,6 +138,32 @@ export function FindFriends() {
     };
     loadCurrentUser();
   }, []);
+
+  // Setup intersection observer for lazy loading
+  useEffect(() => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading && profileComplete) {
+          loadSuggestions(page + 1, debouncedSearch, true);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (loadMoreRef.current) {
+      observerRef.current.observe(loadMoreRef.current);
+    }
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [hasMore, loadingMore, loading, page, debouncedSearch, profileComplete]);
 
   // Setup socket connection
   useEffect(() => {
@@ -187,6 +267,23 @@ export function FindFriends() {
           </p>
         </div>
 
+        {profileComplete && (
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <Input
+              placeholder="Search friends by name, username, or location..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 bg-white border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+            />
+            {searching && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+              </div>
+            )}
+          </div>
+        )}
+
         {error && (
           <div className="flex items-center gap-2 text-sm text-red-600">
             <AlertCircle className="w-4 h-4" />
@@ -210,16 +307,34 @@ export function FindFriends() {
           </Card>
         )}
 
-        {loading ? (
-          <p className="text-slate-500 text-sm">Loading suggestions...</p>
+        {loading && page === 1 ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+            <span className="ml-2 text-slate-500 text-sm">Loading suggestions...</span>
+          </div>
         ) : !profileComplete ? (
           <p className="text-slate-500 text-sm">Complete your profile to see friend suggestions.</p>
         ) : suggestions.length === 0 ? (
-          <p className="text-slate-500 text-sm">No suggestions right now. Try again later.</p>
+          <div className="text-center py-8">
+            <UserPlus className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 text-sm">
+              {searchQuery ? `No friends found for "${searchQuery}"` : 'No suggestions right now. Try again later.'}
+            </p>
+            {searchQuery && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => setSearchQuery('')}
+              >
+                Clear search
+              </Button>
+            )}
+          </div>
         ) : (
           <div className="space-y-3">
             {suggestions.map((s) => (
-              <Card key={s.userId} className="border-slate-200 shadow-sm">
+              <Card key={s.userId} className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="p-4 flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <Avatar className="h-10 w-10">
@@ -228,7 +343,7 @@ export function FindFriends() {
                     </Avatar>
                     <div>
                       <p className="font-semibold text-slate-900">{s.name}</p>
-                      <p className="text-xs text-slate-500">{s.username}</p>
+                      <p className="text-xs text-slate-500">@{s.username}</p>
                       {s.location && (
                         <p className="flex items-center gap-1 text-xs text-slate-500 mt-1">
                           <MapPin className="w-3 h-3" />
@@ -241,7 +356,7 @@ export function FindFriends() {
                     {s.status === 'none' && (
                       <Button
                         size="sm"
-                        className="bg-gradient-to-r from-blue-600 to-cyan-600"
+                        className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
                         onClick={() => sendRequest(s.userId)}
                         disabled={!profileComplete}
                       >
@@ -275,6 +390,24 @@ export function FindFriends() {
                 </CardContent>
               </Card>
             ))}
+            
+            {/* Lazy loading trigger */}
+            {hasMore && (
+              <div ref={loadMoreRef} className="flex items-center justify-center py-4">
+                {loadingMore && (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                    <span className="ml-2 text-slate-500 text-sm">Loading more...</span>
+                  </>
+                )}
+              </div>
+            )}
+            
+            {!hasMore && suggestions.length > 0 && (
+              <div className="text-center py-4">
+                <p className="text-slate-500 text-sm">You've reached the end of suggestions</p>
+              </div>
+            )}
           </div>
         )}
       </div>

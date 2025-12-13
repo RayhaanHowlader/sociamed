@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Search, Send, UserPlus, Settings, Hash, Lock, Paperclip, Smile, Trash2, ArrowLeft, X, Users, Pin } from 'lucide-react';
+import { Search, Send, UserPlus, Settings, Hash, Lock, Paperclip, Smile, Trash2, ArrowLeft, X, Users, Pin, Mic, MoreVertical, Upload, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,9 @@ import { ImageViewerModal } from './image-viewer-modal';
 import { AlertCircle } from 'lucide-react';
 import { AddMembersModal } from './add-members-modal';
 import { RemoveMemberModal } from './remove-member-modal';
+import { EmojiPicker } from './emoji-picker';
+import { VoiceInput } from './voice-input';
+import { GroupSearchMedia } from './group-search-media';
 
 interface Group {
   _id: string;
@@ -112,12 +115,22 @@ export function GroupChats() {
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [message, setMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [showMembers, setShowMembers] = useState(false);
+  const [groupsPage, setGroupsPage] = useState(1);
+  const [hasMoreGroups, setHasMoreGroups] = useState(true);
+  const [loadingMoreGroups, setLoadingMoreGroups] = useState(false);
+  const [searchingGroups, setSearchingGroups] = useState(false);
+  const groupsObserverRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreGroupsRef = useRef<HTMLDivElement | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
   const [groupName, setGroupName] = useState('');
   const [groupIcon, setGroupIcon] = useState('🎨');
+  const [customIconUrl, setCustomIconUrl] = useState('');
+  const [uploadingIcon, setUploadingIcon] = useState(false);
+  const iconInputRef = useRef<HTMLInputElement | null>(null);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [loadingFriends, setLoadingFriends] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -164,6 +177,7 @@ export function GroupChats() {
   } | null>(null);
   const [pinnedMessages, setPinnedMessages] = useState<GroupMessage[]>([]);
   const [showPinnedMessages, setShowPinnedMessages] = useState(true);
+  const [searchMediaOpen, setSearchMediaOpen] = useState(false);
 
   const isObjectId = (val: string) => /^[a-f\d]{24}$/i.test(val);
 
@@ -249,11 +263,115 @@ export function GroupChats() {
     }
   };
 
+  const handleEmojiSelect = (emoji: string) => {
+    setMessage((prev) => prev + emoji);
+  };
+
+  const handleVoiceTextReceived = (text: string) => {
+    setMessage(text);
+  };
+
+  const handleVoiceMessageSent = async (audioBlob: Blob, duration: number) => {
+    if (!selectedGroup || !currentUserId || !socketRef.current) return;
+
+    try {
+      // Upload audio file
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'voice-message.webm');
+
+      const uploadRes = await fetch('/api/chat/upload', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) {
+        throw new Error(uploadData.error || 'Failed to upload voice message');
+      }
+
+      // Send voice message
+      const tempId = `${Date.now()}`;
+      const payload = {
+        id: tempId,
+        groupId: selectedGroup._id,
+        fromUserId: currentUserId,
+        content: `🎤 Voice message (${Math.round(duration)}s)`,
+        fileUrl: uploadData.url,
+        fileName: uploadData.fileName || 'voice-message.webm',
+        mimeType: 'audio/webm',
+        isImage: false,
+        createdAt: new Date().toISOString(),
+      };
+
+      // Optimistic UI update
+      setMessages((prev) => [...prev, payload]);
+      socketRef.current.emit('group:message', payload);
+
+      // Save to database
+      fetch('/api/groups/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          groupId: selectedGroup._id,
+          content: payload.content,
+          fileUrl: uploadData.url,
+          fileName: uploadData.fileName,
+          mimeType: 'audio/webm',
+          isImage: false,
+        }),
+      })
+        .then(async (res) => {
+          const data = await res.json().catch(() => null);
+          if (!res.ok || !data?.message?.id) return;
+          const newId = String(data.message.id);
+          setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, id: newId } : m)));
+        })
+        .catch((err) => console.error('Failed to save group voice message', err));
+
+    } catch (err) {
+      console.error('Group voice message error:', err);
+    }
+  };
+
   const ICON_OPTIONS = ['🎨', '🚀', '⚡', '☕', '💬', '📚', '🎮', '🎧'];
 
-  const filteredGroups = groups.filter((g) =>
-    g.name.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const handleIconUpload = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file');
+      return;
+    }
+
+    try {
+      setUploadingIcon(true);
+      setError('');
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/chat/upload', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to upload icon');
+      }
+
+      setCustomIconUrl(data.url);
+      setGroupIcon(''); // Clear emoji selection when custom icon is uploaded
+    } catch (err) {
+      console.error('Icon upload error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to upload icon');
+    } finally {
+      setUploadingIcon(false);
+    }
+  };
+
+  // Remove client-side filtering since we're doing it on the backend
 
   const isCurrentUserAdmin = selectedGroup && currentUserId
     ? selectedGroup.ownerId === currentUserId
@@ -271,27 +389,73 @@ export function GroupChats() {
     (selectedGroup.ownerId === currentUserId ||
       (selectedGroup.allowMemberInvite && selectedGroup.memberIds.includes(currentUserId)));
 
+  // Debounce search query
   useEffect(() => {
-    const loadGroups = async () => {
-      try {
-        setLoadingGroups(true);
-        const res = await fetch('/api/groups', { credentials: 'include' });
-        const data = await res.json();
-        if (!res.ok) {
-          console.error(data.error || 'Unable to load groups');
-          return;
-        }
-        setGroups(data.groups ?? []);
-        if (!selectedGroup && data.groups && data.groups.length > 0) {
-          setSelectedGroup(data.groups[0]);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoadingGroups(false);
-      }
-    };
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 500);
 
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Load groups when debounced search changes
+  useEffect(() => {
+    setGroupsPage(1);
+    setHasMoreGroups(true);
+    loadGroups(1, debouncedSearch, false);
+  }, [debouncedSearch]);
+
+  const loadGroups = async (pageNum: number = 1, search: string = '', append: boolean = false) => {
+    try {
+      if (pageNum === 1) {
+        setLoadingGroups(true);
+      } else {
+        setLoadingMoreGroups(true);
+      }
+      
+      if (search !== debouncedSearch) {
+        setSearchingGroups(true);
+      }
+
+      const params = new URLSearchParams({
+        page: pageNum.toString(),
+        limit: '5',
+        ...(search && { search })
+      });
+
+      const res = await fetch(`/api/groups?${params}`, { credentials: 'include' });
+      const data = await res.json();
+      
+      if (!res.ok) {
+        console.error(data.error || 'Unable to load groups');
+        return;
+      }
+
+      if (append && pageNum > 1) {
+        setGroups(prev => [...prev, ...(data.groups ?? [])]);
+      } else {
+        setGroups(data.groups ?? []);
+        // Auto-select first group only on desktop and when not searching
+        if (data.groups?.length && pageNum === 1 && !search) {
+          const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
+          if (isDesktop && !selectedGroup) {
+            setSelectedGroup(data.groups[0]);
+          }
+        }
+      }
+      
+      setHasMoreGroups(data.hasMore ?? false);
+      setGroupsPage(pageNum);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingGroups(false);
+      setLoadingMoreGroups(false);
+      setSearchingGroups(false);
+    }
+  };
+
+  useEffect(() => {
     const loadFriends = async () => {
       try {
         setLoadingFriends(true);
@@ -316,9 +480,34 @@ export function GroupChats() {
       }
     };
 
-    void loadGroups();
-    void loadFriends();
+    loadFriends();
   }, []);
+
+  // Setup intersection observer for lazy loading groups
+  useEffect(() => {
+    if (groupsObserverRef.current) {
+      groupsObserverRef.current.disconnect();
+    }
+
+    groupsObserverRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMoreGroups && !loadingMoreGroups && !loadingGroups) {
+          loadGroups(groupsPage + 1, debouncedSearch, true);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (loadMoreGroupsRef.current) {
+      groupsObserverRef.current.observe(loadMoreGroupsRef.current);
+    }
+
+    return () => {
+      if (groupsObserverRef.current) {
+        groupsObserverRef.current.disconnect();
+      }
+    };
+  }, [hasMoreGroups, loadingMoreGroups, loadingGroups, groupsPage, debouncedSearch]);
 
   // Load current user and connect socket
   useEffect(() => {
@@ -638,6 +827,7 @@ export function GroupChats() {
   const openCreateDialog = () => {
     setGroupName('');
     setGroupIcon('🎨');
+    setCustomIconUrl('');
     setSelectedMemberIds(new Set());
     setError('');
     setCreateOpen(true);
@@ -646,6 +836,11 @@ export function GroupChats() {
   const handleCreateGroup = async () => {
     if (!groupName.trim()) {
       setError('Please enter a group name');
+      return;
+    }
+
+    if (!groupIcon && !customIconUrl) {
+      setError('Please select an icon or upload a custom one');
       return;
     }
 
@@ -658,7 +853,7 @@ export function GroupChats() {
         credentials: 'include',
         body: JSON.stringify({
           name: groupName,
-          icon: groupIcon,
+          icon: customIconUrl || groupIcon, // Use custom icon URL if available, otherwise use emoji
           memberIds: Array.from(selectedMemberIds),
         }),
       });
@@ -1180,45 +1375,93 @@ export function GroupChats() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8 md:pl-10 border-slate-200 text-sm h-8 md:h-10"
             />
+            {searchingGroups && (
+              <div className="absolute right-2 md:right-3 top-1/2 transform -translate-y-1/2">
+                <div className="w-3 h-3 md:w-4 md:h-4 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin"></div>
+              </div>
+            )}
           </div>
         </div>
 
         <ScrollArea className="flex-1">
           <div className="p-1 md:p-2">
-            {loadingGroups && (
-              <p className="px-2 py-4 text-xs text-slate-500">Loading groups...</p>
-            )}
-            {!loadingGroups && filteredGroups.length === 0 && (
-              <p className="px-2 py-4 text-xs text-slate-500">
-                No groups yet. Create a new group to get started.
-              </p>
-            )}
-            {filteredGroups.map((group) => (
-              <button
-                key={group._id}
-                onClick={() => setSelectedGroup(group)}
-                className={cn(
-                  'w-full p-2 md:p-3 rounded-lg flex items-center gap-2 md:gap-3 hover:bg-slate-50 transition-colors',
-                  selectedGroup && selectedGroup._id === group._id && 'bg-blue-50'
+            {loadingGroups && groupsPage === 1 ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-4 h-4 md:w-5 md:h-5 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin"></div>
+                <span className="ml-2 text-slate-500 text-xs md:text-sm">Loading groups...</span>
+              </div>
+            ) : groups.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="px-2 py-4 text-xs text-slate-500">
+                  {searchQuery ? `No groups found for "${searchQuery}"` : 'No groups yet. Create a new group to get started.'}
+                </p>
+                {searchQuery && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => setSearchQuery('')}
+                  >
+                    Clear search
+                  </Button>
                 )}
-              >
-                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-xl md:text-2xl flex-shrink-0">
-                  {group.icon}
-                </div>
-                <div className="flex-1 text-left min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5 md:mb-1">
-                    <p className="font-semibold text-slate-900 text-xs md:text-sm truncate">{group.name}</p>
-                    {group.isPrivate && <Lock className="w-3 h-3 text-slate-400 flex-shrink-0" />}
+              </div>
+            ) : (
+              <>
+                {groups.map((group) => (
+                  <button
+                    key={group._id}
+                    onClick={() => setSelectedGroup(group)}
+                    className={cn(
+                      'w-full p-2 md:p-3 rounded-lg flex items-center gap-2 md:gap-3 hover:bg-slate-50 transition-colors cursor-pointer',
+                      selectedGroup && selectedGroup._id === group._id && 'bg-blue-50'
+                    )}
+                  >
+                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-xl md:text-2xl flex-shrink-0 overflow-hidden">
+                      {group.icon?.startsWith('http') ? (
+                        <img 
+                          src={group.icon} 
+                          alt={`${group.name} icon`}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        group.icon
+                      )}
+                    </div>
+                    <div className="flex-1 text-left min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5 md:mb-1">
+                        <p className="font-semibold text-slate-900 text-xs md:text-sm truncate">{group.name}</p>
+                        {group.isPrivate && <Lock className="w-3 h-3 text-slate-400 flex-shrink-0" />}
+                      </div>
+                      <p className="text-xs text-slate-500 mb-0.5 md:mb-1">
+                        {group.memberIds?.length ?? 0} members
+                      </p>
+                      <p className="text-xs md:text-sm text-slate-600 truncate break-words">
+                        {group.lastMessage || 'Start the conversation'}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+                
+                {/* Lazy loading trigger */}
+                {hasMoreGroups && (
+                  <div ref={loadMoreGroupsRef} className="flex items-center justify-center py-4">
+                    {loadingMoreGroups && (
+                      <>
+                        <div className="w-3 h-3 md:w-4 md:h-4 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin"></div>
+                        <span className="ml-2 text-slate-500 text-xs">Loading more...</span>
+                      </>
+                    )}
                   </div>
-                  <p className="text-xs text-slate-500 mb-0.5 md:mb-1">
-                    {group.memberIds?.length ?? 0} members
-                  </p>
-                  <p className="text-xs md:text-sm text-slate-600 truncate break-words">
-                    {group.lastMessage || 'Start the conversation'}
-                  </p>
-                </div>
-              </button>
-            ))}
+                )}
+                
+                {!hasMoreGroups && groups.length > 0 && (
+                  <div className="text-center py-4">
+                    <p className="text-slate-500 text-xs">You've reached the end of your groups</p>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </ScrollArea>
       </div>
@@ -1241,8 +1484,16 @@ export function GroupChats() {
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-xl">
-                  {selectedGroup.icon || '💬'}
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-xl overflow-hidden">
+              {selectedGroup.icon?.startsWith('http') ? (
+                <img 
+                  src={selectedGroup.icon} 
+                  alt={`${selectedGroup.name} icon`}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                selectedGroup.icon || '💬'
+              )}
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -1273,6 +1524,15 @@ export function GroupChats() {
               title="View members"
             >
               <Users className="w-5 h-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-slate-600 hover:text-blue-600"
+              onClick={() => setSearchMediaOpen(true)}
+              title="Search messages and media"
+            >
+              <MoreVertical className="w-5 h-5" />
             </Button>
                 <Button
                   variant="ghost"
@@ -1547,9 +1807,19 @@ export function GroupChats() {
                   <Paperclip className="w-4 h-4 md:w-5 md:h-5" />
                 </Button>
               </div>
-              <Button variant="ghost" size="icon" className="text-slate-600 hover:text-blue-600 h-8 w-8 md:h-10 md:w-10">
-                <Smile className="w-4 h-4 md:w-5 md:h-5" />
-              </Button>
+              <EmojiPicker onEmojiSelect={handleEmojiSelect}>
+                <Button variant="ghost" size="icon" className="text-slate-600 hover:text-blue-600 h-8 w-8 md:h-10 md:w-10">
+                  <Smile className="w-4 h-4 md:w-5 md:h-5" />
+                </Button>
+              </EmojiPicker>
+              <VoiceInput 
+                onTextReceived={handleVoiceTextReceived}
+                onVoiceMessageSent={handleVoiceMessageSent}
+              >
+                <Button variant="ghost" size="icon" className="text-slate-600 hover:text-green-600 h-8 w-8 md:h-10 md:w-10">
+                  <Mic className="w-4 h-4 md:w-5 md:h-5" />
+                </Button>
+              </VoiceInput>
               <Input
                 placeholder={selectedGroup ? 'Type a message...' : 'Select a group to start chatting'}
                 value={message}
@@ -1615,21 +1885,89 @@ export function GroupChats() {
             </div>
             <div className="space-y-2">
               <p className="text-sm font-medium text-slate-700">Group icon</p>
+              
+              {/* Custom Icon Preview */}
+              {customIconUrl && (
+                <div className="mb-3">
+                  <p className="text-xs text-slate-500 mb-2">Custom icon:</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-lg border-2 border-blue-500 bg-blue-50 overflow-hidden">
+                      <img 
+                        src={customIconUrl} 
+                        alt="Custom group icon" 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setCustomIconUrl('');
+                        setGroupIcon('🎨');
+                        if (iconInputRef.current) iconInputRef.current.value = '';
+                      }}
+                    >
+                      <X className="w-3 h-3 mr-1" />
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-wrap gap-2">
+                {/* Upload Custom Icon Button */}
+                <div>
+                  <input
+                    ref={iconInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleIconUpload(file);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => iconInputRef.current?.click()}
+                    disabled={uploadingIcon}
+                    className={cn(
+                      'w-10 h-10 rounded-lg flex items-center justify-center border border-dashed border-slate-300 hover:border-blue-300 hover:bg-blue-50 transition-colors',
+                      uploadingIcon && 'opacity-50 cursor-not-allowed',
+                      customIconUrl && 'border-blue-500 bg-blue-50'
+                    )}
+                  >
+                    {uploadingIcon ? (
+                      <div className="w-4 h-4 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin"></div>
+                    ) : (
+                      <Upload className="w-4 h-4 text-slate-500" />
+                    )}
+                  </button>
+                </div>
+
+                {/* Emoji Options */}
                 {ICON_OPTIONS.map((icon) => (
                   <button
                     key={icon}
                     type="button"
-                    onClick={() => setGroupIcon(icon)}
+                    onClick={() => {
+                      setGroupIcon(icon);
+                      setCustomIconUrl(''); // Clear custom icon when emoji is selected
+                    }}
                     className={cn(
                       'w-10 h-10 rounded-lg flex items-center justify-center text-xl border border-transparent hover:border-blue-300',
-                      groupIcon === icon && 'border-blue-500 bg-blue-50',
+                      groupIcon === icon && !customIconUrl && 'border-blue-500 bg-blue-50',
                     )}
                   >
                     {icon}
                   </button>
                 ))}
               </div>
+              
+              <p className="text-xs text-slate-500">
+                Choose an emoji or upload a custom image (recommended: 64x64px)
+              </p>
             </div>
             <div className="space-y-2">
               <p className="text-sm font-medium text-slate-700">Add members</p>
@@ -1858,6 +2196,22 @@ export function GroupChats() {
             groupIcon={selectedGroup.icon}
             onConfirm={handleRemoveMember}
             removing={removingMember}
+          />
+          <GroupSearchMedia
+            open={searchMediaOpen}
+            onOpenChange={setSearchMediaOpen}
+            groupId={selectedGroup._id}
+            currentUserId={currentUserId || ''}
+            groupName={selectedGroup.name}
+            groupMembers={groupMembers}
+            onImageClick={(url) => {
+              setImageViewerData({
+                url,
+                senderName: 'Group Member',
+                timestamp: new Date().toISOString(),
+              });
+              setImageViewerOpen(true);
+            }}
           />
         </>
       )}

@@ -84,12 +84,25 @@ export default function Home() {
       }, 100);
     };
 
+    const handleNavigateToShort = (e: CustomEvent<{ short: any }>) => {
+      // Switch to shorts view and let the Shorts component handle opening the short
+      setActiveView('shorts');
+      // Dispatch another event that the Shorts component can listen to
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('open-short', { 
+          detail: { short: e.detail.short } 
+        }));
+      }, 100);
+    };
+
     window.addEventListener('view-profile' as any, handleViewProfile as EventListener);
     window.addEventListener('navigate-to-post' as any, handleNavigateToPost as EventListener);
+    window.addEventListener('navigate-to-short' as any, handleNavigateToShort as EventListener);
     
     return () => {
       window.removeEventListener('view-profile' as any, handleViewProfile as EventListener);
       window.removeEventListener('navigate-to-post' as any, handleNavigateToPost as EventListener);
+      window.removeEventListener('navigate-to-short' as any, handleNavigateToShort as EventListener);
     };
   }, []);
 

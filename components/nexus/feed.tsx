@@ -18,6 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { EmojiPicker } from './emoji-picker';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -496,6 +497,10 @@ export function Feed() {
     setShareModalOpen(true);
   };
 
+  const handleEmojiSelect = (emoji: string) => {
+    setPostContent((prev) => prev + emoji);
+  };
+
   const handleShareSuccess = (sharedCount: number) => {
     if (shareTarget) {
       setPosts((prev) =>
@@ -568,10 +573,12 @@ export function Feed() {
                             if (file) handleImageUpload(file);
                           }}
                         />
-                        <Button variant="ghost" size="sm" className="text-slate-600" disabled>
-                      <Smile className="w-4 h-4 mr-2" />
-                      Emoji
-                    </Button>
+                        <EmojiPicker onEmojiSelect={handleEmojiSelect}>
+                          <Button variant="ghost" size="sm" className="text-slate-600 hover:text-slate-900">
+                            <Smile className="w-4 h-4 mr-2" />
+                            Emoji
+                          </Button>
+                        </EmojiPicker>
                   </div>
                       <Button
                         className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"

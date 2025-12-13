@@ -10,6 +10,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  const url = new URL(request.url)
+  const page = parseInt(url.searchParams.get('page') || '1')
+  const limit = parseInt(url.searchParams.get('limit') || '5')
+  const search = url.searchParams.get('search') || ''
+  const skip = (page - 1) * limit
+
   const db = await getDb()
   const users = db.collection("users")
   const profiles = db.collection("profiles")
@@ -19,19 +25,35 @@ export async function GET(request: Request) {
   // Check if user's profile is complete
   const userProfile = await profiles.findOne({ userId: user.sub })
   if (!userProfile || !userProfile.name || !userProfile.username) {
-    return NextResponse.json({ error: "Please complete your profile to continue", suggestions: [] }, { status: 403 })
+    return NextResponse.json({ 
+      error: "Please complete your profile to continue", 
+      suggestions: [],
+      hasMore: false,
+      total: 0
+    }, { status: 403 })
   }
 
-  // All registered users except the current one
-  const userDocs = await users
-    .find({ email: { $exists: true } })
-    .project<{ _id: string; email: string }>({ _id: 1, email: 1 })
-    .toArray()
+  // Build search filter for profiles
+  let profileFilter: any = { 
+    userId: { $ne: user.sub }, // Exclude current user
+    name: { $exists: true, $ne: null },
+    username: { $exists: true, $ne: null }
+  }
 
-  const userIds = userDocs.map((u) => String(u._id))
+  if (search.trim()) {
+    profileFilter.$or = [
+      { name: { $regex: search, $options: 'i' } },
+      { username: { $regex: search, $options: 'i' } },
+      { location: { $regex: search, $options: 'i' } }
+    ]
+  }
 
+  // Get total count for pagination
+  const totalCount = await profiles.countDocuments(profileFilter)
+
+  // Get profiles with pagination
   const profileDocs = await profiles
-    .find({ userId: { $in: userIds } })
+    .find(profileFilter)
     .project<{ userId: string; name?: string; username?: string; avatarUrl?: string; location?: string }>({
       userId: 1,
       name: 1,
@@ -39,14 +61,20 @@ export async function GET(request: Request) {
       avatarUrl: 1,
       location: 1,
     })
+    .skip(skip)
+    .limit(limit)
     .toArray()
 
+  const userIds = profileDocs.map(p => p.userId)
+
+  // Get friend relationships
   const friendPairs = await friends
     .find({ userId: user.sub })
     .project<{ friendUserId: string }>({ friendUserId: 1, _id: 0 })
     .toArray()
   const friendIds = new Set(friendPairs.map((f) => f.friendUserId))
 
+  // Get pending requests
   const pendingRequests = await friendRequests
     .find({
       $or: [
@@ -56,20 +84,9 @@ export async function GET(request: Request) {
     })
     .toArray()
 
-  const suggestions = userDocs
-    .map((u) => {
-      const userId = String(u._id)
-
-      // Skip the current user – we don't want to suggest ourselves
-      if (userId === String(user.sub)) {
-        return null
-      }
-
-      // Only include people who have completed a profile
-      const profile = profileDocs.find((p) => p.userId === userId)
-      if (!profile) {
-        return null
-      }
+  const suggestions = profileDocs
+    .map((profile) => {
+      const userId = profile.userId
 
       let status: "none" | "friends" | "outgoing" | "incoming" = "none"
       if (friendIds.has(userId)) {
@@ -96,7 +113,15 @@ export async function GET(request: Request) {
     })
     .filter(Boolean)
 
-  return NextResponse.json({ suggestions }, { status: 200 })
+  const hasMore = skip + limit < totalCount
+
+  return NextResponse.json({ 
+    suggestions, 
+    hasMore,
+    total: totalCount,
+    page,
+    limit
+  }, { status: 200 })
 }
 
 

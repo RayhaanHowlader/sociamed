@@ -15,9 +15,13 @@ import {
   X,
   AlertCircle,
   ArrowLeft,
+  Loader2,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
+import { EmojiPicker } from './emoji-picker';
+import { VoiceInput } from './voice-input';
+import { ChatSearchMedia } from './chat-search-media';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -68,7 +72,15 @@ export function DirectMessages() {
   const [selectedChat, setSelectedChat] = useState<FriendConversation | null>(null);
   const [message, setMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [friendsPage, setFriendsPage] = useState(1);
+  const [hasMoreFriends, setHasMoreFriends] = useState(true);
+  const [loadingFriends, setLoadingFriends] = useState(false);
+  const [loadingMoreFriends, setLoadingMoreFriends] = useState(false);
+  const [searchingFriends, setSearchingFriends] = useState(false);
+  const friendsObserverRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreFriendsRef = useRef<HTMLDivElement | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -92,6 +104,7 @@ export function DirectMessages() {
     caption?: string;
     fileName?: string;
   } | null>(null);
+  const [searchMediaOpen, setSearchMediaOpen] = useState(false);
 
   // Voice call hook
   const {
@@ -109,27 +122,74 @@ export function DirectMessages() {
     friendId: selectedChat?.userId || null,
   });
 
+  // Debounce search query
   useEffect(() => {
-    const loadFriends = async () => {
-      try {
-        const res = await fetch('/api/friends/list', { credentials: 'include' });
-        const data = await res.json();
-        if (!res.ok) return;
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Load friends when debounced search changes
+  useEffect(() => {
+    setFriendsPage(1);
+    setHasMoreFriends(true);
+    loadFriends(1, debouncedSearch, false);
+  }, [debouncedSearch]);
+
+  const loadFriends = async (pageNum: number = 1, search: string = '', append: boolean = false) => {
+    try {
+      if (pageNum === 1) {
+        setLoadingFriends(true);
+      } else {
+        setLoadingMoreFriends(true);
+      }
+      
+      if (search !== debouncedSearch) {
+        setSearchingFriends(true);
+      }
+
+      const params = new URLSearchParams({
+        page: pageNum.toString(),
+        limit: '5',
+        ...(search && { search })
+      });
+
+      const res = await fetch(`/api/friends/search?${params}`, { credentials: 'include' });
+      const data = await res.json();
+      
+      if (!res.ok) {
+        console.error(data.error || 'Unable to load friends');
+        return;
+      }
+
+      if (append && pageNum > 1) {
+        setFriends(prev => [...prev, ...(data.friends ?? [])]);
+      } else {
         setFriends(data.friends ?? []);
         // Don't auto-select on mobile - let user choose
         // Only auto-select on desktop (md breakpoint and above)
-        if (data.friends?.length) {
-          // Check if we're on desktop using a media query approach
+        if (data.friends?.length && pageNum === 1 && !search) {
           const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
           if (isDesktop) {
             setSelectedChat(data.friends[0]);
           }
         }
-      } catch (err) {
-        console.error(err);
       }
-    };
+      
+      setHasMoreFriends(data.hasMore ?? false);
+      setFriendsPage(pageNum);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingFriends(false);
+      setLoadingMoreFriends(false);
+      setSearchingFriends(false);
+    }
+  };
 
+  useEffect(() => {
     const loadCurrentUser = async () => {
       try {
         const res = await fetch('/api/auth/me', { credentials: 'include' });
@@ -142,7 +202,6 @@ export function DirectMessages() {
       }
     };
 
-    loadFriends();
     loadCurrentUser();
   }, []);
 
@@ -225,6 +284,32 @@ export function DirectMessages() {
       socketRef.current = null;
     };
   }, [currentUserId]);
+
+  // Setup intersection observer for lazy loading friends
+  useEffect(() => {
+    if (friendsObserverRef.current) {
+      friendsObserverRef.current.disconnect();
+    }
+
+    friendsObserverRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMoreFriends && !loadingMoreFriends && !loadingFriends) {
+          loadFriends(friendsPage + 1, debouncedSearch, true);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (loadMoreFriendsRef.current) {
+      friendsObserverRef.current.observe(loadMoreFriendsRef.current);
+    }
+
+    return () => {
+      if (friendsObserverRef.current) {
+        friendsObserverRef.current.disconnect();
+      }
+    };
+  }, [hasMoreFriends, loadingMoreFriends, loadingFriends, friendsPage, debouncedSearch]);
 
   useEffect(() => {
     if (!socketRef.current || !currentUserId) return;
@@ -667,6 +752,90 @@ export function DirectMessages() {
     }));
   }, []);
 
+  const handleSharedShortClick = useCallback((short: any) => {
+    // Navigate to the shorts section and open the short viewer
+    window.dispatchEvent(new CustomEvent('navigate-to-short', { 
+      detail: { short } 
+    }));
+  }, []);
+
+  const handleEmojiSelect = useCallback((emoji: string) => {
+    setMessage((prev) => prev + emoji);
+  }, []);
+
+  const handleVoiceTextReceived = useCallback((text: string) => {
+    setMessage(text);
+  }, []);
+
+  const handleVoiceMessageSent = useCallback(async (audioBlob: Blob, duration: number) => {
+    if (!selectedChat || !currentUserId) return;
+
+    try {
+      // Upload audio file
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'voice-message.webm');
+
+      const uploadRes = await fetch('/api/chat/upload', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) {
+        throw new Error(uploadData.error || 'Failed to upload voice message');
+      }
+
+      // Send voice message
+      const tempId = `${Date.now()}`;
+      const payload = {
+        id: tempId,
+        fromUserId: currentUserId,
+        toUserId: selectedChat.userId,
+        content: `🎤 Voice message (${Math.round(duration)}s)`,
+        fileUrl: uploadData.url,
+        fileName: uploadData.fileName || 'voice-message.webm',
+        mimeType: 'audio/webm',
+        isImage: false,
+        createdAt: new Date().toISOString(),
+      };
+
+      // Optimistic UI update
+      setMessages((prev) => [...prev, payload]);
+
+      // Emit socket event
+      if (socketRef.current) {
+        socketRef.current.emit('chat:message', payload);
+      }
+
+      // Save to database
+      fetch('/api/chat/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          toUserId: selectedChat.userId,
+          content: payload.content,
+          fileUrl: uploadData.url,
+          fileName: uploadData.fileName,
+          mimeType: 'audio/webm',
+          isImage: false,
+        }),
+      })
+        .then(async (res) => {
+          const data = await res.json().catch(() => null);
+          if (!res.ok || !data?.message?._id) return;
+          const newId = String(data.message._id);
+          setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, id: newId } : m)));
+        })
+        .catch((err) => console.error('Failed to save voice message', err));
+
+    } catch (err) {
+      console.error('Voice message error:', err);
+      setError('Failed to send voice message');
+    }
+  }, [selectedChat, currentUserId]);
+
   return (
     <div className="h-full flex flex-col md:flex-row bg-white">
       {/* Friends List - Hidden on mobile when chat is selected */}
@@ -679,58 +848,96 @@ export function DirectMessages() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
             <Input
-              placeholder="Search messages..."
+              placeholder="Search friends..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 border-slate-200"
             />
+            {searchingFriends && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <div className="w-4 h-4 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin"></div>
+              </div>
+            )}
           </div>
         </div>
 
         <ScrollArea className="flex-1">
           <div className="p-2">
-            {friends.length === 0 ? (
-              <p className="text-xs text-slate-500 px-2 py-4">
-                Add friends first to start conversations.
-              </p>
-            ) : (
-              friends
-                .filter((f) =>
-                  `${f.name} ${f.username}`.toLowerCase().includes(searchQuery.toLowerCase()),
-                )
-                .map((conv) => (
-              <div
-                    key={conv.userId}
-                className={cn(
-                  'w-full p-3 rounded-lg flex items-center gap-3 hover:bg-slate-50 transition-colors',
-                      selectedChat?.userId === conv.userId && 'bg-blue-50',
-                )}
-              >
-                  <Avatar 
-                    className="cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // Navigate to the friend's profile
-                      window.dispatchEvent(new CustomEvent('view-profile', { 
-                        detail: { userId: conv.userId } 
-                      }));
-                    }}
+            {loadingFriends && friendsPage === 1 ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-5 h-5 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin"></div>
+                <span className="ml-2 text-slate-500 text-sm">Loading friends...</span>
+              </div>
+            ) : friends.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-xs text-slate-500 px-2 py-4">
+                  {searchQuery ? `No friends found for "${searchQuery}"` : 'Add friends first to start conversations.'}
+                </p>
+                {searchQuery && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => setSearchQuery('')}
                   >
+                    Clear search
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <>
+                {friends.map((conv) => (
+                  <div
+                    key={conv.userId}
+                    className={cn(
+                      'w-full p-3 rounded-lg flex items-center gap-3 hover:bg-slate-50 transition-colors cursor-pointer',
+                      selectedChat?.userId === conv.userId && 'bg-blue-50',
+                    )}
+                  >
+                    <Avatar 
+                      className="cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Navigate to the friend's profile
+                        window.dispatchEvent(new CustomEvent('view-profile', { 
+                          detail: { userId: conv.userId } 
+                        }));
+                      }}
+                    >
                       <AvatarImage src={conv.avatarUrl} />
-                    <AvatarFallback>{conv.name[0]}</AvatarFallback>
-                  </Avatar>
-                <div 
-                  className="flex-1 text-left overflow-hidden cursor-pointer"
-                  onClick={() => setSelectedChat(conv)}
-                >
-                    <p className="font-semibold text-slate-900 text-sm">{conv.name}</p>
-                      <p className="text-xs text-slate-500">{conv.username}</p>
+                      <AvatarFallback>{conv.name[0]}</AvatarFallback>
+                    </Avatar>
+                    <div 
+                      className="flex-1 text-left overflow-hidden cursor-pointer"
+                      onClick={() => setSelectedChat(conv)}
+                    >
+                      <p className="font-semibold text-slate-900 text-sm">{conv.name}</p>
+                      <p className="text-xs text-slate-500">@{conv.username}</p>
                       <p className="text-sm text-slate-600 truncate">
                         Start a conversation with {conv.name}
                       </p>
+                    </div>
                   </div>
-              </div>
-                ))
+                ))}
+                
+                {/* Lazy loading trigger */}
+                {hasMoreFriends && (
+                  <div ref={loadMoreFriendsRef} className="flex items-center justify-center py-4">
+                    {loadingMoreFriends && (
+                      <>
+                        <div className="w-4 h-4 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin"></div>
+                        <span className="ml-2 text-slate-500 text-sm">Loading more...</span>
+                      </>
+                    )}
+                  </div>
+                )}
+                
+                {!hasMoreFriends && friends.length > 0 && (
+                  <div className="text-center py-4">
+                    <p className="text-slate-500 text-xs">You've reached the end of your friends list</p>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </ScrollArea>
@@ -808,7 +1015,12 @@ export function DirectMessages() {
               <Video className="w-5 h-5" />
             </Button>
 
-            <Button variant="ghost" size="icon" className="text-slate-600 hover:text-slate-900">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="text-slate-600 hover:text-slate-900"
+              onClick={() => setSearchMediaOpen(true)}
+            >
               <MoreVertical className="w-5 h-5" />
             </Button>
             <Button
@@ -882,6 +1094,7 @@ export function DirectMessages() {
                       onSelectToggle={() => toggleMessageSelection(msg.id, isMine)}
                       onImageClick={(url) => handleImageClick({ url, message: msg })}
                       onSharedPostClick={handleSharedPostClick}
+                      onSharedShortClick={handleSharedShortClick}
                     />
                   );
                 })}
@@ -943,9 +1156,19 @@ export function DirectMessages() {
                   <Paperclip className="w-5 h-5" />
                 </Button>
               </div>
-              <Button variant="ghost" size="icon" className="text-slate-600 hover:text-blue-600">
-                <Smile className="w-5 h-5" />
-              </Button>
+              <EmojiPicker onEmojiSelect={handleEmojiSelect}>
+                <Button variant="ghost" size="icon" className="text-slate-600 hover:text-blue-600">
+                  <Smile className="w-5 h-5" />
+                </Button>
+              </EmojiPicker>
+              <VoiceInput 
+                onTextReceived={handleVoiceTextReceived}
+                onVoiceMessageSent={handleVoiceMessageSent}
+              >
+                <Button variant="ghost" size="icon" className="text-slate-600 hover:text-green-600">
+                  <Mic className="w-5 h-5" />
+                </Button>
+              </VoiceInput>
               <Input
                 placeholder={selectedChat ? 'Type a message...' : 'Select a friend to start chatting'}
                 value={message}
@@ -991,6 +1214,24 @@ export function DirectMessages() {
           }
         }}
         image={imageViewerData}
+      />
+
+      <ChatSearchMedia
+        open={searchMediaOpen}
+        onOpenChange={setSearchMediaOpen}
+        friendId={selectedChat?.userId || ''}
+        currentUserId={currentUserId || ''}
+        friendName={selectedChat?.name || ''}
+        friendAvatar={selectedChat?.avatarUrl}
+        onImageClick={(url) => {
+          setImageViewerData({
+            url,
+            senderName: selectedChat?.name,
+            senderAvatar: selectedChat?.avatarUrl,
+          });
+          setImageViewerOpen(true);
+          setSearchMediaOpen(false);
+        }}
       />
 
       <Dialog open={callState.isReceivingCall && !callState.isInCall} onOpenChange={(open) => !open && !callState.isInCall && rejectCall()}>

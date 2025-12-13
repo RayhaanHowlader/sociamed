@@ -61,8 +61,8 @@ export function GroupMessageBubble({ message, isMine, displayName, avatarUrl, se
     if (hasVideoMimeType || hasVideoExtension) return 'video';
     
     // Check for audio
-    const hasAudioExtension = /\.(mp3|wav|ogg|m4a|aac|flac|wma|opus)$/i.test(fileName) ||
-                              /\.(mp3|wav|ogg|m4a|aac|flac|wma|opus)$/i.test(fileUrl);
+    const hasAudioExtension = /\.(mp3|wav|ogg|m4a|aac|flac|wma|opus|webm)$/i.test(fileName) ||
+                              /\.(mp3|wav|ogg|m4a|aac|flac|wma|opus|webm)$/i.test(fileUrl);
     const hasAudioMimeType = mimeType.startsWith('audio/');
     if (hasAudioMimeType || hasAudioExtension) return 'audio';
     
