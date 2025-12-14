@@ -1,11 +1,11 @@
 'use client';
 
-import { Home, MessageCircle, Users, User, Video, UserPlus, Bell, CircleDot, StickyNote } from 'lucide-react';
+import { Home, MessageCircle, Users, User, Video, UserPlus, Bell, CircleDot, StickyNote, Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SidebarProps {
-  activeView: 'feed' | 'messages' | 'groups' | 'profile' | 'shorts' | 'friends' | 'notifications' | 'stories' | 'notes';
-  onViewChange: (view: 'feed' | 'messages' | 'groups' | 'profile' | 'shorts' | 'friends' | 'notifications' | 'stories' | 'notes') => void;
+  activeView: 'feed' | 'messages' | 'groups' | 'profile' | 'shorts' | 'friends' | 'notifications' | 'stories' | 'notes' | 'ai-assistant';
+  onViewChange: (view: 'feed' | 'messages' | 'groups' | 'profile' | 'shorts' | 'friends' | 'notifications' | 'stories' | 'notes' | 'ai-assistant') => void;
   notificationCount?: number;
 }
 
@@ -16,6 +16,7 @@ export function Sidebar({ activeView, onViewChange, notificationCount = 0 }: Sid
     { id: 'notes' as const, icon: StickyNote, label: 'Notes' },
     { id: 'messages' as const, icon: MessageCircle, label: 'Messages' },
     { id: 'groups' as const, icon: Users, label: 'Groups' },
+    { id: 'ai-assistant' as const, icon: Bot, label: 'AI Assistant' },
     { id: 'profile' as const, icon: User, label: 'Profile' },
     { id: 'friends' as const, icon: UserPlus, label: 'Find friends' },
     { id: 'notifications' as const, icon: Bell, label: 'Notifications' },
@@ -24,15 +25,15 @@ export function Sidebar({ activeView, onViewChange, notificationCount = 0 }: Sid
 
   return (
     // Hidden on mobile, shown on md+; mobile nav is handled in the top header
-    <aside className="hidden md:flex w-72 bg-white border-r border-slate-200 flex-col">
-      <div className="p-4 md:p-6 border-b border-slate-200">
-        <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+    <aside className="hidden md:flex w-56 bg-white border-r border-slate-200 flex-col h-full">
+      <div className="p-4 border-b border-slate-200 flex-shrink-0">
+        <h1 className="text-sm font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
           Nexus
         </h1>
-        <p className="text-xs md:text-sm text-slate-500 mt-1">Connect & Share</p>
+        <p className="text-[10px] text-slate-500">Connect & Share</p>
       </div>
 
-      <nav className="flex-1 px-2 py-2 md:p-4 space-y-1 md:space-y-2 max-h-[50vh] md:max-h-none overflow-y-auto md:overflow-visible">
+      <nav className="flex-1 px-3 py-3 space-y-2 min-h-0">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeView === item.id;
@@ -57,7 +58,7 @@ export function Sidebar({ activeView, onViewChange, notificationCount = 0 }: Sid
                   </span>
                 )}
               </div>
-              <span className="font-medium text-sm md:text-base">{item.label}</span>
+              <span className="font-medium text-base">{item.label}</span>
             </button>
           );
         })}

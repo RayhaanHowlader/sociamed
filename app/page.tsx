@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { LogOut, Menu, X, Home as HomeIcon, BookOpen, MessageSquare, Users, User, UserPlus, Bell, Video, FileText } from 'lucide-react';
+import { LogOut, Menu, X, Home as HomeIcon, BookOpen, MessageSquare, Users, User, UserPlus, Bell, Video, FileText, Bot } from 'lucide-react';
 import { Sidebar } from '@/components/nexus/sidebar';
 import { Feed } from '@/components/nexus/feed';
 import { DirectMessages } from '@/components/nexus/direct-messages';
@@ -12,6 +12,7 @@ import { FindFriends } from '@/components/nexus/find-friends';
 import { Notifications } from '@/components/nexus/notifications';
 import { Stories } from '@/components/nexus/stories';
 import { Notes } from '@/components/nexus/notes';
+import { AIAssistant } from '@/components/nexus/ai-assistant';
 import { NotificationPopup } from '@/components/nexus/notification-popup';
 import LoginPage from '@/components/LoginPage';
 import SignupPage from '@/components/SignupPage';
@@ -29,7 +30,7 @@ interface FriendRequestNotification {
 
 export default function Home() {
   const [activeView, setActiveView] =
-    useState<'feed' | 'messages' | 'groups' | 'profile' | 'shorts' | 'friends' | 'notifications' | 'stories' | 'notes'>('feed');
+    useState<'feed' | 'messages' | 'groups' | 'profile' | 'shorts' | 'friends' | 'notifications' | 'stories' | 'notes' | 'ai-assistant'>('feed');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authChecked, setAuthChecked] = useState(false);
@@ -274,7 +275,7 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-slate-50">
+    <div className="flex h-screen bg-slate-50 overflow-hidden">
       {/* Desktop sidebar */}
       <Sidebar
         activeView={activeView}
@@ -289,9 +290,9 @@ export default function Home() {
         }}
         notificationCount={notificationCount}
       />
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Top navbar */}
-        <header className="h-14 md:h-16 border-b border-slate-200 bg-white/80 backdrop-blur flex items-center justify-between px-4 md:px-6">
+        <header className="h-16 border-b border-slate-200 bg-white/80 backdrop-blur flex items-center justify-between px-4 flex-shrink-0">
           <div className="flex items-center gap-3">
             {/* Mobile menu toggle */}
             <button
@@ -301,8 +302,8 @@ export default function Home() {
             >
               {mobileNavOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center shadow-sm">
-              <span className="text-white font-bold text-lg tracking-tight">N</span>
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center shadow-sm">
+              <span className="text-white font-bold text-base tracking-tight">N</span>
             </div>
             <div>
               <p className="text-sm font-semibold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
@@ -314,9 +315,9 @@ export default function Home() {
 
           <button
             onClick={handleLogout}
-            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 md:px-4 py-1.5 text-[11px] md:text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-100 hover:border-slate-300 transition"
+            className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-medium text-slate-700 shadow-sm hover:bg-slate-100 hover:border-slate-300 transition"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-3 w-3" />
             <span className="hidden sm:inline">Log out</span>
           </button>
         </header>
@@ -339,8 +340,8 @@ export default function Home() {
             {/* Drawer Header */}
             <div className="flex items-center justify-between p-4 border-b border-slate-200">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center shadow-sm">
-                  <span className="text-white font-bold text-lg tracking-tight">N</span>
+                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center shadow-sm">
+                  <span className="text-white font-bold text-base tracking-tight">N</span>
                 </div>
                 <div>
                   <p className="text-sm font-semibold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
@@ -366,6 +367,7 @@ export default function Home() {
                 { id: 'notes', label: 'Notes', icon: FileText },
                 { id: 'messages', label: 'Messages', icon: MessageSquare },
                 { id: 'groups', label: 'Groups', icon: Users },
+                { id: 'ai-assistant', label: 'AI Assistant', icon: Bot },
                 { id: 'profile', label: 'Profile', icon: User },
                 { id: 'friends', label: 'Find friends', icon: UserPlus },
                 { id: 'notifications', label: 'Notifications', icon: Bell, badge: notificationCount > 0 ? notificationCount : undefined },
@@ -415,12 +417,13 @@ export default function Home() {
         </div>
 
         {/* Main content */}
-        <section className="flex-1 overflow-hidden">
+        <section className="flex-1 overflow-hidden min-h-0 h-full">
         {activeView === 'feed' && <Feed />}
         {activeView === 'stories' && <Stories />}
         {activeView === 'notes' && <Notes />}
         {activeView === 'messages' && <DirectMessages />}
         {activeView === 'groups' && <GroupChats />}
+        {activeView === 'ai-assistant' && <AIAssistant />}
         {activeView === 'profile' && <Profile userId={viewingUserId || undefined} />}
           {activeView === 'friends' && <FindFriends />}
           {activeView === 'notifications' && <Notifications />}
