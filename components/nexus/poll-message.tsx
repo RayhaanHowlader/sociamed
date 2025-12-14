@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { BarChart3, Clock, Users, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+
 import { cn } from '@/lib/utils';
 
 interface PollOption {
@@ -203,7 +203,12 @@ export function PollMessage({ poll, currentUserId, onVote, className }: PollMess
                       {percentage}% ({option.votes})
                     </div>
                   </div>
-                  <Progress value={percentage} className="h-2 bg-slate-200" />
+                  <div className="w-full bg-slate-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${percentage}%` }}
+                    />
+                  </div>
                 </div>
               ) : (
                 // Voting view
