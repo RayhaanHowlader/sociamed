@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     // Check if user is a member of the group
     const group = await groups.findOne({
       _id: new ObjectId(groupId),
-      members: { $elemMatch: { userId: user.sub } }
+      memberIds: user.sub
     });
 
     if (!group) {
@@ -71,21 +71,18 @@ export async function POST(request: NextRequest) {
     const result = await polls.insertOne(pollDoc);
 
     // Add poll message to group chat
-    const chatMessages = db.collection('chatMessages');
+    const groupMessages = db.collection('groupMessages');
     const messageDoc = {
       groupId: groupId,
-      senderId: user.sub,
-      senderName: profile.name,
-      senderAvatar: profile.avatarUrl || '',
+      fromUserId: user.sub,
       content: '',
       type: 'poll',
       pollId: result.insertedId.toString(),
       createdAt: new Date(),
-      edited: false,
-      reactions: []
+      deleted: false
     };
 
-    await chatMessages.insertOne(messageDoc);
+    await groupMessages.insertOne(messageDoc);
 
     return NextResponse.json({
       success: true,
@@ -121,7 +118,7 @@ export async function GET(request: NextRequest) {
     // Check if user is a member of the group
     const group = await groups.findOne({
       _id: new ObjectId(groupId),
-      members: { $elemMatch: { userId: user.sub } }
+      memberIds: user.sub
     });
 
     if (!group) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef } from 'react';
-import { Send, Paperclip, Smile, Mic, AlertCircle, X } from 'lucide-react';
+import { Send, Paperclip, Smile, Mic, AlertCircle, X, BarChart3 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { FilePreview } from './file-preview';
@@ -38,6 +38,7 @@ interface GroupMessageInputProps {
   onEmojiSelect: (emoji: string) => void;
   onVoiceTextReceived: (text: string) => void;
   onVoiceMessageSent: (audioBlob: Blob, duration: number) => void;
+  onCreatePoll: () => void;
 }
 
 export function GroupMessageInput({
@@ -55,7 +56,8 @@ export function GroupMessageInput({
   onClearUploadError,
   onEmojiSelect,
   onVoiceTextReceived,
-  onVoiceMessageSent
+  onVoiceMessageSent,
+  onCreatePoll
 }: GroupMessageInputProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -139,6 +141,16 @@ export function GroupMessageInput({
               <Mic className="w-4 h-4 md:w-5 md:h-5" />
             </Button>
           </VoiceInput>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-slate-600 hover:text-purple-600 h-8 w-8 md:h-10 md:w-10"
+            onClick={onCreatePoll}
+            disabled={!selectedGroup || uploadingFile}
+            title="Create Poll"
+          >
+            <BarChart3 className="w-4 h-4 md:w-5 md:h-5" />
+          </Button>
           <Input
             placeholder={selectedGroup ? 'Type a message...' : 'Select a group to start chatting'}
             value={message}

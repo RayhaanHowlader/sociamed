@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     // Check if user is a member of the group
     const group = await groups.findOne({
       _id: new ObjectId(poll.groupId),
-      members: { $elemMatch: { userId: user.sub } }
+      memberIds: user.sub
     });
 
     if (!group) {
@@ -65,37 +65,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Multiple choices not allowed' }, { status: 400 });
     }
 
-    // Update poll with votes
-    const updateOperations: any = {};
-    let totalVotesIncrement = 0;
+    // Update poll with votes - use simpler approach
+    let totalVotesIncrement = optionIds.length;
 
-    optionIds.forEach((optionId: string) => {
-      updateOperations[`options.$[option_${optionId}].votes`] = { $inc: 1 };
-      updateOperations[`options.$[option_${optionId}].voters`] = { $push: user.sub };
-      totalVotesIncrement++;
-    });
-
-    // Build array filters for the update
-    const arrayFilters = optionIds.map((optionId: string) => ({
-      [`option_${optionId}.id`]: optionId
-    }));
-
-    // Perform the update
-    const updateResult = await polls.updateOne(
-      { _id: new ObjectId(pollId) },
-      {
-        $inc: { totalVotes: totalVotesIncrement },
-        ...Object.keys(updateOperations).reduce((acc, key) => {
-          if (key.includes('.votes')) {
-            acc[key] = updateOperations[key];
-          }
-          return acc;
-        }, {} as any)
-      },
-      { arrayFilters }
-    );
-
-    // Update voters arrays separately (MongoDB limitation with array filters)
+    // Update each option separately to avoid complex array filter issues
     for (const optionId of optionIds) {
       await polls.updateOne(
         { 
@@ -108,6 +81,12 @@ export async function POST(request: NextRequest) {
         }
       );
     }
+
+    // Update total votes count
+    await polls.updateOne(
+      { _id: new ObjectId(pollId) },
+      { $inc: { totalVotes: totalVotesIncrement } }
+    );
 
     // Get updated poll
     const updatedPoll = await polls.findOne({ _id: new ObjectId(pollId) });

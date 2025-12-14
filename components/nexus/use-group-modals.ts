@@ -11,6 +11,7 @@ export function useGroupModals() {
   const [removeMemberOpen, setRemoveMemberOpen] = useState(false);
   const [imageViewerOpen, setImageViewerOpen] = useState(false);
   const [searchMediaOpen, setSearchMediaOpen] = useState(false);
+  const [createPollOpen, setCreatePollOpen] = useState(false);
 
   // UI states
   const [showMembers, setShowMembers] = useState(false);
@@ -86,6 +87,8 @@ export function useGroupModals() {
     setImageViewerOpen,
     searchMediaOpen,
     setSearchMediaOpen,
+    createPollOpen,
+    setCreatePollOpen,
 
     // UI states
     showMembers,

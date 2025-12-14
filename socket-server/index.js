@@ -98,6 +98,13 @@ io.on('connection', (socket) => {
     io.to(`group:${groupId}`).emit('group:pin', { messageId, pin, pinnedBy })
   })
 
+  socket.on('group:poll:vote', (payload) => {
+    const { groupId, pollId, optionIds, voterId } = payload || {}
+    if (!groupId || !pollId || !optionIds || !voterId) return
+    console.log('group:poll:vote broadcast', { groupId, pollId, optionIds, voterId })
+    io.to(`group:${groupId}`).emit('group:poll:vote', { pollId, optionIds, voterId })
+  })
+
   // Voice call events
   socket.on('call:offer', ({ fromUserId, toUserId, offer, callId }) => {
     if (!fromUserId || !toUserId || !offer || !callId) return

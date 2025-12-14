@@ -42,6 +42,29 @@ interface GroupMessage {
   pinned?: boolean;
   pinnedBy?: string;
   pinnedAt?: string;
+  type?: 'text' | 'poll' | 'file';
+  pollId?: string;
+  poll?: {
+    _id: string;
+    question: string;
+    options: Array<{
+      id: string;
+      text: string;
+      votes: number;
+      voters: string[];
+    }>;
+    allowMultiple: boolean;
+    anonymous: boolean;
+    createdBy: string;
+    createdAt: string;
+    expiresAt: string;
+    totalVotes: number;
+    author: {
+      name: string;
+      username: string;
+      avatarUrl: string;
+    };
+  };
 }
 
 interface GroupMessagesAreaProps {
@@ -61,6 +84,7 @@ interface GroupMessagesAreaProps {
   onToggleMessageSelection: (id: string, isMine: boolean) => void;
   onImageClick: (payload: { url: string; message: GroupMessage }) => void;
   onPinToggle: (messageId: string, shouldPin: boolean) => void;
+  onPollVote: (pollId: string, optionIds: string[]) => void;
   messagesContainerRef: React.RefObject<HTMLDivElement>;
   messagesEndRef: React.RefObject<HTMLDivElement>;
 }
@@ -82,6 +106,7 @@ export function GroupMessagesArea({
   onToggleMessageSelection,
   onImageClick,
   onPinToggle,
+  onPollVote,
   messagesContainerRef,
   messagesEndRef
 }: GroupMessagesAreaProps) {
@@ -230,6 +255,7 @@ export function GroupMessagesArea({
                     currentUserId={currentUserId || undefined}
                     onImageClick={onImageClick}
                     onPinToggle={onPinToggle}
+                    onPollVote={onPollVote}
                     isAdmin={isCurrentUserAdmin}
                     isPinnedView={true}
                   />
@@ -321,6 +347,7 @@ export function GroupMessagesArea({
               currentUserId={currentUserId || undefined}
               onImageClick={onImageClick}
               onPinToggle={onPinToggle}
+              onPollVote={onPollVote}
               isAdmin={isCurrentUserAdmin}
               isPinnedView={false}
             />

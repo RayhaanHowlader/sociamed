@@ -38,6 +38,29 @@ export interface GroupMessage {
   pinned?: boolean;
   pinnedBy?: string;
   pinnedAt?: string;
+  type?: 'text' | 'poll' | 'file';
+  pollId?: string;
+  poll?: {
+    _id: string;
+    question: string;
+    options: Array<{
+      id: string;
+      text: string;
+      votes: number;
+      voters: string[];
+    }>;
+    allowMultiple: boolean;
+    anonymous: boolean;
+    createdBy: string;
+    createdAt: string;
+    expiresAt: string;
+    totalVotes: number;
+    author: {
+      name: string;
+      username: string;
+      avatarUrl: string;
+    };
+  };
 }
 
 export interface FileUploadCallbacks {
@@ -456,4 +479,60 @@ export const sendTextMessage = async (
       setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, id: newId } : m)));
     })
     .catch((err) => console.error('Failed to save group message', err));
+};
+
+// Vote on poll utility
+export const voteOnPoll = async (
+  pollId: string,
+  optionIds: string[],
+  setMessages: React.Dispatch<React.SetStateAction<GroupMessage[]>>,
+  socketRef?: React.RefObject<Socket | null>,
+  currentUserId?: string,
+  groupId?: string
+): Promise<void> => {
+  try {
+    console.log('Sending vote request:', { pollId, optionIds });
+    const response = await fetch('/api/groups/polls/vote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ pollId, optionIds })
+    });
+
+    const data = await response.json();
+    console.log('Vote response:', data);
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to vote');
+    }
+
+    // Update the poll in messages
+    setMessages(prev => {
+      const updated = prev.map(msg => {
+        if (msg.type === 'poll' && msg.pollId === pollId && msg.poll) {
+          console.log('Updating poll in message:', msg.id, 'with new data:', data.poll);
+          return {
+            ...msg,
+            poll: data.poll
+          };
+        }
+        return msg;
+      });
+      console.log('Messages updated');
+      return updated;
+    });
+
+    // Emit socket event to notify other group members
+    if (socketRef?.current && currentUserId && groupId) {
+      socketRef.current.emit('group:poll:vote', {
+        groupId,
+        pollId,
+        optionIds,
+        voterId: currentUserId
+      });
+    }
+  } catch (error) {
+    console.error('Failed to vote on poll:', error);
+    throw error;
+  }
 };

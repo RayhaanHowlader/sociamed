@@ -38,7 +38,7 @@ export function useGroupSocket({
   useEffect(() => {
     if (!currentUserId) return;
  
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://sociamed.onrender.com';
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
     const socket = io(socketUrl);
     socketRef.current = socket;
     
@@ -126,6 +126,19 @@ export function useGroupSocket({
       } else {
         setPinnedMessagesRef.current(prev => prev.filter(m => m.id !== messageId));
       }
+    });
+
+    socket.on('group:poll:vote', ({ pollId, optionIds, voterId }: { pollId: string; optionIds: string[]; voterId: string }) => {
+      console.log('[socket] group:poll:vote received', { pollId, optionIds, voterId });
+      
+      // Only update if this vote is from another user
+      if (voterId === currentUserId) {
+        console.log('[socket] Ignoring own poll vote event to prevent duplicates');
+        return;
+      }
+      
+      // Refresh poll data by refetching from server
+      refreshCurrentGroupRef.current();
     });
 
     return () => {

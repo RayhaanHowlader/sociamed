@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Pin, PinOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PollMessage } from './poll-message';
 
 interface GroupMessage {
   id: string;
@@ -21,6 +22,29 @@ interface GroupMessage {
   pinned?: boolean;
   pinnedBy?: string;
   pinnedAt?: string;
+  type?: 'text' | 'poll' | 'file';
+  pollId?: string;
+  poll?: {
+    _id: string;
+    question: string;
+    options: Array<{
+      id: string;
+      text: string;
+      votes: number;
+      voters: string[];
+    }>;
+    allowMultiple: boolean;
+    anonymous: boolean;
+    createdBy: string;
+    createdAt: string;
+    expiresAt: string;
+    totalVotes: number;
+    author: {
+      name: string;
+      username: string;
+      avatarUrl: string;
+    };
+  };
 }
 
 interface GroupMessageBubbleProps {
@@ -35,11 +59,12 @@ interface GroupMessageBubbleProps {
   currentUserId?: string;
   onImageClick?: (payload: { url: string; message: GroupMessage }) => void;
   onPinToggle?: (messageId: string, shouldPin: boolean) => void;
+  onPollVote?: (pollId: string, optionIds: string[]) => void;
   isAdmin?: boolean;
   isPinnedView?: boolean;
 }
 
-export function GroupMessageBubble({ message, isMine, displayName, avatarUrl, selectable, selected, onSelectToggle, ownerId, currentUserId, onImageClick, onPinToggle, isAdmin, isPinnedView }: GroupMessageBubbleProps) {
+export function GroupMessageBubble({ message, isMine, displayName, avatarUrl, selectable, selected, onSelectToggle, ownerId, currentUserId, onImageClick, onPinToggle, onPollVote, isAdmin, isPinnedView }: GroupMessageBubbleProps) {
   const time = new Date(message.createdAt).toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
@@ -198,8 +223,21 @@ export function GroupMessageBubble({ message, isMine, displayName, avatarUrl, se
             </div>
           )}
 
+          {/* Poll Content */}
+          {!message.deleted && message.type === 'poll' && message.poll && currentUserId && (
+            <div className="w-full">
+              <PollMessage
+                key={`poll-${message.poll._id}-${message.poll.totalVotes}`}
+                poll={message.poll}
+                currentUserId={currentUserId}
+                onVote={onPollVote || (() => {})}
+                className="w-full"
+              />
+            </div>
+          )}
+
           {/* Text Content */}
-          {!message.deleted && message.content && <p className="text-xs md:text-sm break-words">{message.content}</p>}
+          {!message.deleted && message.content && message.type !== 'poll' && <p className="text-xs md:text-sm break-words">{message.content}</p>}
           
           {/* Pinned Message Indicator */}
           {message.pinned && !isPinnedView && (

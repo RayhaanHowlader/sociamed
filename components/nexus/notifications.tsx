@@ -121,7 +121,7 @@ export function Notifications() {
   useEffect(() => {
     if (!currentUserId) return;
 
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://sociamed.onrender.com';
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
     const socket = io(socketUrl);
     
     socket.emit('notification:join', { userId: currentUserId });

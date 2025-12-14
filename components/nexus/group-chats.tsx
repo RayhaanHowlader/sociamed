@@ -23,13 +23,15 @@ import {
   uploadVoiceMessage,
   togglePinMessage,
   deleteMessages,
-  sendTextMessage
+  sendTextMessage,
+  voteOnPoll
 } from './group-chat-utils';
 import { useGroupData } from './use-group-data';
 import { useGroupSocket } from './use-group-socket';
 import { useGroupMessages } from './use-group-messages';
 import { useGroupModals } from './use-group-modals';
 import { useGroupOperations } from './use-group-operations';
+import { CreatePollModal } from './create-poll-modal';
 
 
 
@@ -78,6 +80,8 @@ export function GroupChats() {
     setImageViewerOpen,
     searchMediaOpen,
     setSearchMediaOpen,
+    createPollOpen,
+    setCreatePollOpen,
     showMembers,
     setShowMembers,
     selectMode,
@@ -233,6 +237,23 @@ export function GroupChats() {
   const handleVoiceMessageSent = (audioBlob: Blob, duration: number) => {
     if (!selectedGroup || !currentUserId) return;
     uploadVoiceMessage(audioBlob, duration, selectedGroup, currentUserId, socketRef, setMessages);
+  };
+
+  const handleCreatePoll = () => {
+    setCreatePollOpen(true);
+  };
+
+  const handlePollCreated = () => {
+    // Refresh messages to show the new poll
+    refreshCurrentGroup();
+  };
+
+  const handlePollVote = async (pollId: string, optionIds: string[]) => {
+    try {
+      await voteOnPoll(pollId, optionIds, setMessages, socketRef, currentUserId || undefined, selectedGroup?._id);
+    } catch (error) {
+      console.error('Failed to vote on poll:', error);
+    }
   };
 
 
@@ -531,6 +552,7 @@ export function GroupChats() {
             onToggleMessageSelection={toggleMessageSelection}
             onImageClick={handleGroupImageClick}
             onPinToggle={handleTogglePinMessage}
+            onPollVote={handlePollVote}
             messagesContainerRef={messagesContainerRef}
             messagesEndRef={messagesEndRef}
           />
@@ -562,6 +584,7 @@ export function GroupChats() {
           onEmojiSelect={handleEmojiSelect}
           onVoiceTextReceived={handleVoiceTextReceived}
           onVoiceMessageSent={handleVoiceMessageSent}
+          onCreatePoll={handleCreatePoll}
         />
           </>
         ) : (
@@ -666,6 +689,12 @@ export function GroupChats() {
               });
               setImageViewerOpen(true);
             }}
+          />
+          <CreatePollModal
+            open={createPollOpen}
+            onOpenChange={setCreatePollOpen}
+            groupId={selectedGroup._id}
+            onPollCreated={handlePollCreated}
           />
         </>
       )}
