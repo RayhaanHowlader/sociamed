@@ -12,18 +12,55 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const userId = searchParams.get("userId")
+  const limit = parseInt(searchParams.get("limit") || "5")
+  const after = searchParams.get("after")
 
   // If userId is provided, fetch that user's posts, otherwise fetch current user's posts
-  const targetUserId = userId || user.sub
+  const targetUserId = String(userId || user.sub)
 
   const db = await getDb()
   const posts = db.collection("posts")
 
+  // Build query (matching the pattern from main posts API)
+  const query: any = {
+    userId: targetUserId
+  }
+
+  // Add pagination
+  if (after) {
+    query.createdAt = { $lt: new Date(after) }
+  }
+
+  // Fetch posts with pagination
   const userPosts = await posts
-    .find({ userId: targetUserId })
+    .find(query)
     .sort({ createdAt: -1 })
+    .limit(limit + 1) // Fetch one extra to check if there are more
     .toArray()
 
-  return NextResponse.json({ posts: userPosts }, { status: 200 })
+  // Check if there are more posts
+  const hasMore = userPosts.length > limit
+  if (hasMore) {
+    userPosts.pop() // Remove the extra post
+  }
+
+  // Transform posts data to match expected format
+  const transformedPosts = userPosts.map((post: any) => ({
+    id: post._id.toString(),
+    content: post.content,
+    imageUrl: post.imageUrl,
+    createdAt: post.createdAt,
+    stats: {
+      likes: post.likes?.length || 0,
+      comments: post.comments?.length || 0,
+      shares: post.shares?.length || 0
+    },
+    liked: post.likes?.includes(user.sub) || false
+  }))
+
+  return NextResponse.json({ 
+    posts: transformedPosts,
+    hasMore 
+  }, { status: 200 })
 }
 

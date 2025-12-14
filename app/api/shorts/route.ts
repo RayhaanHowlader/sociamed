@@ -16,7 +16,17 @@ export async function GET() {
     .limit(50)
     .toArray()
 
-  return NextResponse.json({ shorts: items }, { status: 200 })
+  // Ensure views field exists for all shorts (default to 0 if not present)
+  const shortsWithViews = items.map(short => ({
+    ...short,
+    views: short.views || 0,
+    stats: {
+      ...short.stats,
+      views: short.views || 0
+    }
+  }))
+
+  return NextResponse.json({ shorts: shortsWithViews }, { status: 200 })
 }
 
 export async function POST(req: NextRequest) {
@@ -68,6 +78,7 @@ export async function POST(req: NextRequest) {
       likes: 0,
       comments: 0,
     },
+    views: 0,
   }
 
   const result = await shorts.insertOne(doc)

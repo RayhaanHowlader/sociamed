@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { ObjectId } from "mongodb"
 import { getDb } from "@/lib/mongodb"
 import { getUserFromRequest } from "@/lib/auth"
 
@@ -37,6 +38,15 @@ export async function GET(req: NextRequest) {
     .limit(limit)
     .toArray()
 
+  // Get poll data for poll messages
+  const polls = db.collection("polls")
+  const pollIds = docs.filter(m => m.type === 'poll' && m.pollId).map(m => m.pollId)
+  const pollData = pollIds.length > 0 ? await polls.find({ 
+    _id: { $in: pollIds.map(id => typeof id === 'string' ? new ObjectId(id) : id) }
+  }).toArray() : []
+  
+  const pollMap = new Map(pollData.map(poll => [poll._id.toString(), poll]))
+
   // Reverse to show oldest first in UI (chronological order)
   const items = docs
     .reverse()
@@ -53,6 +63,9 @@ export async function GET(req: NextRequest) {
       deletedBy: m.deletedBy ? String(m.deletedBy) : "",
       deleted: Boolean(m.deleted),
       createdAt: m.createdAt instanceof Date ? m.createdAt.toISOString() : m.createdAt,
+      type: m.type || 'text',
+      pollId: m.pollId || null,
+      poll: m.type === 'poll' && m.pollId ? pollMap.get(String(m.pollId)) : null,
     }))
 
   // Check if there are more messages to load

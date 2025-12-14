@@ -27,11 +27,11 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
+import { ProfileShortCard } from './profile-short-card';
 
 interface ProfileRecord {
   name: string;
@@ -55,6 +55,41 @@ interface UserPost {
     shares: number;
   };
   liked?: boolean;
+}
+
+interface UserShort {
+  id: string;
+  videoUrl: string;
+  thumbnailUrl?: string;
+  title: string;
+  description?: string;
+  createdAt: string;
+  stats: {
+    likes: number;
+    comments: number;
+    shares: number;
+    views: number;
+  };
+  liked?: boolean;
+}
+
+interface LikedPost {
+  _id: string;
+  content: string;
+  imageUrl?: string;
+  createdAt: string;
+  userId: string;
+  author: {
+    name: string;
+    username: string;
+    avatarUrl?: string;
+  };
+  stats: {
+    likes: number;
+    comments: number;
+    shares: number;
+  };
+  liked: boolean;
 }
 
 interface PostComment {
@@ -93,8 +128,28 @@ export function Profile({ userId }: ProfileProps = {}) {
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState<'avatar' | 'cover' | null>(null);
   const [error, setError] = useState('');
+  
+  // Posts state
   const [posts, setPosts] = useState<UserPost[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
+  const [hasMorePosts, setHasMorePosts] = useState(false);
+  const [loadingMorePosts, setLoadingMorePosts] = useState(false);
+  
+  // Shorts state
+  const [shorts, setShorts] = useState<UserShort[]>([]);
+  const [loadingShorts, setLoadingShorts] = useState(false);
+  const [hasMoreShorts, setHasMoreShorts] = useState(false);
+  const [loadingMoreShorts, setLoadingMoreShorts] = useState(false);
+  
+  // Likes state
+  const [likedPosts, setLikedPosts] = useState<LikedPost[]>([]);
+  const [likedShorts, setLikedShorts] = useState<UserShort[]>([]);
+  const [loadingLikes, setLoadingLikes] = useState(false);
+  const [hasMoreLikedPosts, setHasMoreLikedPosts] = useState(false);
+  const [hasMoreLikedShorts, setHasMoreLikedShorts] = useState(false);
+  const [loadingMoreLikes, setLoadingMoreLikes] = useState(false);
+  
+  // Other state
   const [followers, setFollowers] = useState(0);
   const [following, setFollowing] = useState(0);
   const [postComments, setPostComments] = useState<Record<string, PostComment[]>>({});
@@ -177,31 +232,37 @@ export function Profile({ userId }: ProfileProps = {}) {
     checkFriendship();
   }, [viewedUserId, currentUserId, isOwnProfile]);
 
+  // Fetch initial posts
   useEffect(() => {
     const fetchPosts = async () => {
       try {
         setLoadingPosts(true);
         const url = viewedUserId 
-          ? `/api/posts/user?userId=${viewedUserId}` 
-          : '/api/posts/user';
+          ? `/api/posts/user?userId=${viewedUserId}&limit=5` 
+          : '/api/posts/user?limit=5';
+
         const res = await fetch(url, { credentials: 'include' });
         if (!res.ok) {
+
           setPosts([]);
+          setHasMorePosts(false);
           return;
         }
         const data = await res.json();
+
         setPosts(data.posts ?? []);
+        setHasMorePosts(data.hasMore ?? false);
       } catch (err) {
-        console.error(err);
+        console.error('Error fetching posts:', err);
         setPosts([]);
+        setHasMorePosts(false);
       } finally {
         setLoadingPosts(false);
       }
     };
 
-    if (viewedUserId !== null) {
-      fetchPosts();
-    }
+    // Always fetch posts - if viewedUserId is null, it means current user's own profile
+    fetchPosts();
   }, [viewedUserId]);
 
   useEffect(() => {
@@ -225,6 +286,76 @@ export function Profile({ userId }: ProfileProps = {}) {
 
     fetchFriendCounts();
   }, []);
+
+  // Fetch initial shorts when Shorts tab is activated
+  const fetchShorts = async () => {
+    if (shorts.length > 0) return; // Already loaded
+    
+    try {
+      setLoadingShorts(true);
+      const url = viewedUserId 
+        ? `/api/shorts/user?userId=${viewedUserId}&limit=5` 
+        : '/api/shorts/user?limit=5';
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) {
+        setShorts([]);
+        setHasMoreShorts(false);
+        return;
+      }
+      const data = await res.json();
+      setShorts(data.shorts ?? []);
+      setHasMoreShorts(data.hasMore ?? false);
+    } catch (err) {
+      console.error(err);
+      setShorts([]);
+      setHasMoreShorts(false);
+    } finally {
+      setLoadingShorts(false);
+    }
+  };
+
+  // Fetch initial liked content when Likes tab is activated
+  const fetchLikedContent = async () => {
+    if (likedPosts.length > 0 || likedShorts.length > 0) return; // Already loaded
+    
+    try {
+      setLoadingLikes(true);
+      
+      // Fetch liked posts and shorts in parallel
+      const [postsRes, shortsRes] = await Promise.all([
+        fetch(viewedUserId 
+          ? `/api/posts/liked?userId=${viewedUserId}&limit=3` 
+          : '/api/posts/liked?limit=3', 
+          { credentials: 'include' }
+        ),
+        fetch(viewedUserId 
+          ? `/api/shorts/liked?userId=${viewedUserId}&limit=2` 
+          : '/api/shorts/liked?limit=2', 
+          { credentials: 'include' }
+        )
+      ]);
+
+      if (postsRes.ok) {
+        const postsData = await postsRes.json();
+        setLikedPosts(postsData.posts ?? []);
+        setHasMoreLikedPosts(postsData.hasMore ?? false);
+      }
+
+      if (shortsRes.ok) {
+        const shortsData = await shortsRes.json();
+        setLikedShorts(shortsData.shorts ?? []);
+        setHasMoreLikedShorts(shortsData.hasMore ?? false);
+      }
+    } catch (err) {
+      console.error(err);
+      setLikedPosts([]);
+      setLikedShorts([]);
+      setHasMoreLikedPosts(false);
+      setHasMoreLikedShorts(false);
+    } finally {
+      setLoadingLikes(false);
+    }
+  };
 
   const toggleLike = async (postId: string) => {
     try {
@@ -290,6 +421,113 @@ export function Profile({ userId }: ProfileProps = {}) {
       );
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  // Load more functions
+  const loadMorePosts = async () => {
+    if (loadingMorePosts || !hasMorePosts) return;
+    
+    const oldestPost = posts[posts.length - 1];
+    if (!oldestPost) return;
+
+    setLoadingMorePosts(true);
+    try {
+      const url = viewedUserId 
+        ? `/api/posts/user?userId=${viewedUserId}&limit=5&after=${oldestPost.createdAt}` 
+        : `/api/posts/user?limit=5&after=${oldestPost.createdAt}`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) return;
+      
+      const data = await res.json();
+      setPosts(prev => [...prev, ...(data.posts ?? [])]);
+      setHasMorePosts(data.hasMore ?? false);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingMorePosts(false);
+    }
+  };
+
+  const loadMoreShorts = async () => {
+    if (loadingMoreShorts || !hasMoreShorts) return;
+    
+    const oldestShort = shorts[shorts.length - 1];
+    if (!oldestShort) return;
+
+    setLoadingMoreShorts(true);
+    try {
+      const url = viewedUserId 
+        ? `/api/shorts/user?userId=${viewedUserId}&limit=5&after=${oldestShort.createdAt}` 
+        : `/api/shorts/user?limit=5&after=${oldestShort.createdAt}`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) return;
+      
+      const data = await res.json();
+      setShorts(prev => [...prev, ...(data.shorts ?? [])]);
+      setHasMoreShorts(data.hasMore ?? false);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingMoreShorts(false);
+    }
+  };
+
+  const loadMoreLikedContent = async () => {
+    if (loadingMoreLikes || (!hasMoreLikedPosts && !hasMoreLikedShorts)) return;
+
+    setLoadingMoreLikes(true);
+    try {
+      const promises = [];
+      
+      // Load more liked posts if available
+      if (hasMoreLikedPosts && likedPosts.length > 0) {
+        const oldestPost = likedPosts[likedPosts.length - 1];
+        const postsPromise = fetch(viewedUserId 
+          ? `/api/posts/liked?userId=${viewedUserId}&limit=3&after=${oldestPost.createdAt}` 
+          : `/api/posts/liked?limit=3&after=${oldestPost.createdAt}`, 
+          { credentials: 'include' }
+        );
+        promises.push(postsPromise);
+      }
+
+      // Load more liked shorts if available
+      if (hasMoreLikedShorts && likedShorts.length > 0) {
+        const oldestShort = likedShorts[likedShorts.length - 1];
+        const shortsPromise = fetch(viewedUserId 
+          ? `/api/shorts/liked?userId=${viewedUserId}&limit=2&after=${oldestShort.createdAt}` 
+          : `/api/shorts/liked?limit=2&after=${oldestShort.createdAt}`, 
+          { credentials: 'include' }
+        );
+        promises.push(shortsPromise);
+      }
+
+      const results = await Promise.all(promises);
+      
+      // Process results
+      let postsIndex = 0;
+      if (hasMoreLikedPosts && likedPosts.length > 0) {
+        const postsRes = results[postsIndex];
+        if (postsRes.ok) {
+          const postsData = await postsRes.json();
+          setLikedPosts(prev => [...prev, ...(postsData.posts ?? [])]);
+          setHasMoreLikedPosts(postsData.hasMore ?? false);
+        }
+        postsIndex++;
+      }
+
+      if (hasMoreLikedShorts && likedShorts.length > 0) {
+        const shortsRes = results[postsIndex];
+        if (shortsRes.ok) {
+          const shortsData = await shortsRes.json();
+          setLikedShorts(prev => [...prev, ...(shortsData.shorts ?? [])]);
+          setHasMoreLikedShorts(shortsData.hasMore ?? false);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingMoreLikes(false);
     }
   };
 
@@ -377,8 +615,8 @@ export function Profile({ userId }: ProfileProps = {}) {
           </div>
         ) : profile ? (
           <>
-        <div className="relative">
-          <div className="h-64 bg-gradient-to-r from-blue-600 to-cyan-600 relative">
+            <div className="relative">
+              <div className="h-64 bg-gradient-to-r from-blue-600 to-cyan-600 relative">
                 {profile.coverUrl ? (
                   <img src={profile.coverUrl} alt="Cover" className="w-full h-full object-cover" />
                 ) : (
@@ -386,97 +624,97 @@ export function Profile({ userId }: ProfileProps = {}) {
                     Cover image
                   </div>
                 )}
-          </div>
+              </div>
 
-          <div className="px-6 pb-6">
-            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between -mt-16 mb-4">
-              <div className="relative">
-                <Avatar className="w-32 h-32 border-4 border-white shadow-xl">
+              <div className="px-6 pb-6">
+                <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between -mt-16 mb-4">
+                  <div className="relative">
+                    <Avatar className="w-32 h-32 border-4 border-white shadow-xl">
                       <AvatarImage src={profile.avatarUrl} />
                       <AvatarFallback className="text-3xl">
                         {profile.name ? profile.name[0] : 'N'}
                       </AvatarFallback>
-                </Avatar>
-                {isOwnProfile && (
-                  <Button
-                    size="icon"
-                    className="absolute bottom-2 right-2 w-8 h-8 bg-white hover:bg-slate-100 text-slate-900 shadow-lg"
-                    onClick={openDialog}
-                  >
-                    <Camera className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
+                    </Avatar>
+                    {isOwnProfile && (
+                      <Button
+                        size="icon"
+                        className="absolute bottom-2 right-2 w-8 h-8 bg-white hover:bg-slate-100 text-slate-900 shadow-lg"
+                        onClick={openDialog}
+                      >
+                        <Camera className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
 
-              {isOwnProfile && (
-                <div className="flex gap-2 mt-4 sm:mt-0">
-                  <Button variant="outline" className="border-slate-300" onClick={openDialog}>
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit Profile
-                  </Button>
-                  <Button variant="outline" size="icon" className="border-slate-300">
-                    <Settings className="w-4 h-4" />
-                  </Button>
-                </div>
-              )}
-              {!isOwnProfile && (
-                <div className="flex gap-2 mt-4 sm:mt-0">
-                  {isFriend ? (
-                    <Button
-                      variant="outline"
-                      className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                      onClick={() => setUnfriendModalOpen(true)}
-                    >
-                      <UserMinus className="w-4 h-4 mr-2" />
-                      Unfriend
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      className="border-blue-200 text-blue-600 hover:bg-blue-50"
-                      onClick={async () => {
-                        if (!viewedUserId) return;
-                        try {
-                          const res = await fetch('/api/friends/request', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            credentials: 'include',
-                            body: JSON.stringify({ toUserId: viewedUserId }),
-                          });
-                          if (res.ok) {
-                            alert('Friend request sent!');
-                          }
-                        } catch (err) {
-                          console.error(err);
-                        }
-                      }}
-                    >
-                      <UserPlus className="w-4 h-4 mr-2" />
-                      Add Friend
-                    </Button>
+                  {isOwnProfile && (
+                    <div className="flex gap-2 mt-4 sm:mt-0">
+                      <Button variant="outline" className="border-slate-300" onClick={openDialog}>
+                        <Edit className="w-4 h-4 mr-2" />
+                        Edit Profile
+                      </Button>
+                      <Button variant="outline" size="icon" className="border-slate-300">
+                        <Settings className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+                  {!isOwnProfile && (
+                    <div className="flex gap-2 mt-4 sm:mt-0">
+                      {isFriend ? (
+                        <Button
+                          variant="outline"
+                          className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                          onClick={() => setUnfriendModalOpen(true)}
+                        >
+                          <UserMinus className="w-4 h-4 mr-2" />
+                          Unfriend
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          className="border-blue-200 text-blue-600 hover:bg-blue-50"
+                          onClick={async () => {
+                            if (!viewedUserId) return;
+                            try {
+                              const res = await fetch('/api/friends/request', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                credentials: 'include',
+                                body: JSON.stringify({ toUserId: viewedUserId }),
+                              });
+                              if (res.ok) {
+                                alert('Friend request sent!');
+                              }
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }}
+                        >
+                          <UserPlus className="w-4 h-4 mr-2" />
+                          Add Friend
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
 
-            <div className="space-y-4">
-              <div>
+                <div className="space-y-4">
+                  <div>
                     <h1 className="text-2xl font-bold text-slate-900">{profile.name}</h1>
                     <p className="text-slate-600">{profile.username}</p>
-              </div>
+                  </div>
 
                   {profile.bio && <p className="text-slate-700">{profile.bio}</p>}
 
-              <div className="flex flex-wrap gap-4 text-sm text-slate-600">
+                  <div className="flex flex-wrap gap-4 text-sm text-slate-600">
                     {profile.location && (
-                <div className="flex items-center gap-1">
-                  <MapPin className="w-4 h-4" />
+                      <div className="flex items-center gap-1">
+                        <MapPin className="w-4 h-4" />
                         <span>{profile.location}</span>
-                </div>
+                      </div>
                     )}
                     {profile.website && (
-                <div className="flex items-center gap-1">
-                  <LinkIcon className="w-4 h-4" />
+                      <div className="flex items-center gap-1">
+                        <LinkIcon className="w-4 h-4" />
                         <a
                           href={profile.website.startsWith('http') ? profile.website : `https://${profile.website}`}
                           target="_blank"
@@ -484,46 +722,46 @@ export function Profile({ userId }: ProfileProps = {}) {
                           className="text-blue-600 hover:underline"
                         >
                           {profile.website.replace(/^https?:\/\//, '')}
-                  </a>
-                </div>
+                        </a>
+                      </div>
                     )}
-                <div className="flex items-center gap-1">
-                  <Calendar className="w-4 h-4" />
+                    <div className="flex items-center gap-1">
+                      <Calendar className="w-4 h-4" />
                       <span>{joinedLabel}</span>
-                </div>
-              </div>
+                    </div>
+                  </div>
 
-              <div className="flex gap-6">
-                <button className="hover:underline">
+                  <div className="flex gap-6">
+                    <button className="hover:underline">
                       <span className="font-bold text-slate-900">{posts.length}</span>
-                  <span className="text-slate-600 ml-1">Posts</span>
-                </button>
-                <button className="hover:underline">
+                      <span className="text-slate-600 ml-1">Posts</span>
+                    </button>
+                    <button className="hover:underline">
                       <span className="font-bold text-slate-900">{followers}</span>
-                  <span className="text-slate-600 ml-1">Followers</span>
-                </button>
-                <button className="hover:underline">
+                      <span className="text-slate-600 ml-1">Followers</span>
+                    </button>
+                    <button className="hover:underline">
                       <span className="font-bold text-slate-900">{following}</span>
-                  <span className="text-slate-600 ml-1">Following</span>
-                </button>
+                      <span className="text-slate-600 ml-1">Following</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        <div className="px-6 pb-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="w-full grid grid-cols-3 mb-6">
-              <TabsTrigger value="posts">Posts</TabsTrigger>
-              <TabsTrigger value="media">Media</TabsTrigger>
-              <TabsTrigger value="likes">Likes</TabsTrigger>
-            </TabsList>
+            <div className="px-6 pb-6">
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="w-full grid grid-cols-3 mb-6">
+                  <TabsTrigger value="posts">Posts</TabsTrigger>
+                  <TabsTrigger value="shorts" onClick={fetchShorts}>Shorts</TabsTrigger>
+                  <TabsTrigger value="likes" onClick={fetchLikedContent}>Likes</TabsTrigger>
+                </TabsList>
 
                 <TabsContent value="posts">
                   {loadingPosts ? (
                     <div className="text-center py-12 text-slate-500">
                       Loading your posts...
-                      </div>
+                    </div>
                   ) : posts.length === 0 ? (
                     <div className="text-center py-12 text-slate-500">
                       Your posts will appear here.
@@ -544,13 +782,13 @@ export function Profile({ userId }: ProfileProps = {}) {
                               </p>
                               {post.imageUrl && (
                                 <div className="rounded-xl overflow-hidden border border-slate-100">
-                        <img
+                                  <img
                                     src={post.imageUrl}
-                          alt="Post"
-                          className="w-full object-cover"
-                        />
-                      </div>
-                    )}
+                                    alt="Post"
+                                    className="w-full object-cover"
+                                  />
+                                </div>
+                              )}
                               <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
                                 <span>
                                   {new Date(post.createdAt).toLocaleString(undefined, {
@@ -627,21 +865,193 @@ export function Profile({ userId }: ProfileProps = {}) {
                           </Card>
                         );
                       })}
+                      
+                      {/* Load more posts button */}
+                      {hasMorePosts && (
+                        <div className="flex justify-center py-4">
+                          <Button
+                            variant="outline"
+                            onClick={loadMorePosts}
+                            disabled={loadingMorePosts}
+                            className="text-sm"
+                          >
+                            {loadingMorePosts ? (
+                              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                            ) : null}
+                            Load more posts
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )}
-            </TabsContent>
-            <TabsContent value="media">
-                  <div className="text-center py-12 text-slate-500">
-                    Uploaded media will appear here.
-              </div>
-            </TabsContent>
-            <TabsContent value="likes">
-                  <div className="text-center py-12 text-slate-500">
-                    Liked posts will appear here.
-              </div>
-            </TabsContent>
-          </Tabs>
-        </div>
+                </TabsContent>
+
+                <TabsContent value="shorts">
+                  {loadingShorts ? (
+                    <div className="text-center py-12 text-slate-500">
+                      <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
+                      Loading your shorts...
+                    </div>
+                  ) : shorts.length === 0 ? (
+                    <div className="text-center py-12 text-slate-500">
+                      Your shorts will appear here.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {shorts.map((short) => (
+                          <ProfileShortCard
+                            key={short.id}
+                            short={short}
+                            isOwnProfile={isOwnProfile}
+                            onView={(shortId) => {
+                              // Open short viewer modal
+                              window.dispatchEvent(new CustomEvent('view-short', { 
+                                detail: { shortId } 
+                              }));
+                            }}
+                            onEdit={(short) => {
+                              // Handle edit - could open edit modal
+                              console.log('Edit short:', short);
+                            }}
+                            onDelete={(shortId) => {
+                              // Handle delete - could show confirmation dialog
+                              console.log('Delete short:', shortId);
+                            }}
+                          />
+                        ))}
+                      </div>
+                      
+                      {/* Load more shorts button */}
+                      {hasMoreShorts && (
+                        <div className="flex justify-center py-4">
+                          <Button
+                            variant="outline"
+                            onClick={loadMoreShorts}
+                            disabled={loadingMoreShorts}
+                            className="text-sm"
+                          >
+                            {loadingMoreShorts ? (
+                              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                            ) : null}
+                            Load more shorts
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="likes">
+                  {loadingLikes ? (
+                    <div className="text-center py-12 text-slate-500">
+                      <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
+                      Loading liked content...
+                    </div>
+                  ) : likedPosts.length === 0 && likedShorts.length === 0 ? (
+                    <div className="text-center py-12 text-slate-500">
+                      Liked posts and shorts will appear here.
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {/* Liked Posts Section */}
+                      {likedPosts.length > 0 && (
+                        <div>
+                          <h3 className="text-lg font-semibold text-slate-900 mb-4">Liked Posts</h3>
+                          <div className="space-y-4">
+                            {likedPosts.map((post) => (
+                              <Card
+                                key={post._id}
+                                className="border-slate-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                                onClick={() => {
+                                  // Navigate to original post
+                                  window.dispatchEvent(new CustomEvent('highlight-post', { 
+                                    detail: { postId: post._id } 
+                                  }));
+                                }}
+                              >
+                                <CardContent className="p-4">
+                                  <div className="flex items-start gap-3 mb-3">
+                                    <Avatar className="w-8 h-8">
+                                      <AvatarImage src={post.author.avatarUrl} />
+                                      <AvatarFallback>{post.author.name?.[0]}</AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-semibold text-sm text-slate-900">{post.author.name}</p>
+                                      <p className="text-xs text-slate-500">{post.author.username}</p>
+                                    </div>
+                                    <span className="text-xs text-slate-400">
+                                      {new Date(post.createdAt).toLocaleDateString()}
+                                    </span>
+                                  </div>
+                                  
+                                  <p className="text-sm text-slate-700 mb-3 line-clamp-3">{post.content}</p>
+                                  
+                                  {post.imageUrl && (
+                                    <div className="rounded-lg overflow-hidden mb-3">
+                                      <img
+                                        src={post.imageUrl}
+                                        alt="Post content"
+                                        className="w-full h-32 object-cover"
+                                      />
+                                    </div>
+                                  )}
+                                  
+                                  <div className="flex items-center gap-4 text-xs text-slate-500">
+                                    <span>{post.stats.likes} likes</span>
+                                    <span>{post.stats.comments} comments</span>
+                                    <span>{post.stats.shares} shares</span>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Liked Shorts Section */}
+                      {likedShorts.length > 0 && (
+                        <div>
+                          <h3 className="text-lg font-semibold text-slate-900 mb-4">Liked Shorts</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            {likedShorts.map((short) => (
+                              <ProfileShortCard
+                                key={short.id}
+                                short={short}
+                                isOwnProfile={false}
+                                onView={(shortId) => {
+                                  // Open short viewer modal
+                                  window.dispatchEvent(new CustomEvent('view-short', { 
+                                    detail: { shortId } 
+                                  }));
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Load more liked content button */}
+                      {(hasMoreLikedPosts || hasMoreLikedShorts) && (
+                        <div className="flex justify-center py-4">
+                          <Button
+                            variant="outline"
+                            onClick={loadMoreLikedContent}
+                            disabled={loadingMoreLikes}
+                            className="text-sm"
+                          >
+                            {loadingMoreLikes ? (
+                              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                            ) : null}
+                            Load more liked content
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </div>
           </>
         ) : (
           <div className="px-6 py-16">
@@ -790,6 +1200,7 @@ export function Profile({ userId }: ProfileProps = {}) {
           </form>
         </DialogContent>
       </Dialog>
+      
       {profile && viewedUserId && (
         <UnfriendModal
           open={unfriendModalOpen}

@@ -1,6 +1,6 @@
 'use client';
 
-import { Video, Heart, MessageCircle, Trash2, Share } from 'lucide-react';
+import { Video, Heart, MessageCircle, Trash2, Share, Eye } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -19,6 +19,7 @@ interface ShortItem {
   stats?: {
     likes?: number;
     comments?: number;
+    views?: number;
   };
   liked?: boolean;
 }
@@ -110,6 +111,10 @@ export function ShortCard({ short, currentUserId, onView, onLike, onDelete, onSh
                 <MessageCircle className="w-4 h-4" />
                 <span>{short.stats?.comments ?? 0}</span>
               </button>
+              <div className="inline-flex items-center gap-1">
+                <Eye className="w-4 h-4" />
+                <span>{short.stats?.views ?? 0}</span>
+              </div>
               <button
                 type="button"
                 onClick={(e) => {

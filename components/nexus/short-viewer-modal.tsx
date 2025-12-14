@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Loader2, Heart, MessageCircle, Trash2 } from 'lucide-react';
+import { Loader2, Heart, MessageCircle, Trash2, Eye } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -14,6 +14,7 @@ interface ShortItem {
   createdAt: string;
   duration: number;
   userId?: string;
+  views?: number; // Add views at top level
   author: {
     name: string;
     username: string;
@@ -22,6 +23,7 @@ interface ShortItem {
   stats?: {
     likes?: number;
     comments?: number;
+    views?: number;
   };
   liked?: boolean;
 }
@@ -60,15 +62,30 @@ export function ShortViewerModal({
   const [shortComments, setShortComments] = useState<ShortComment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentInput, setCommentInput] = useState('');
+  const [viewTracked, setViewTracked] = useState(false);
+  const [views, setViews] = useState(0);
+
+  // Track the current short ID to prevent unnecessary reloads
+  const [currentShortId, setCurrentShortId] = useState<string | null>(null);
 
   useEffect(() => {
     if (open && short?._id) {
-      void loadComments(short._id);
+      // Only reload comments if it's a different short
+      if (currentShortId !== short._id) {
+        void loadComments(short._id);
+        setCurrentShortId(short._id);
+        setViewTracked(false);
+      }
+      // Always update views from the short object (but don't reload comments)
+      setViews(short.stats?.views || 0);
     } else {
       setShortComments([]);
       setCommentInput('');
+      setViewTracked(false);
+      setViews(0);
+      setCurrentShortId(null);
     }
-  }, [open, short]);
+  }, [open, short?._id, short?.stats?.views]); // Depend on views to update when parent updates
 
   const loadComments = async (shortId: string) => {
     try {
@@ -86,6 +103,62 @@ export function ShortViewerModal({
       console.error(err);
     } finally {
       setCommentsLoading(false);
+    }
+  };
+
+  const trackView = async () => {
+    if (!short?._id) {
+      console.log('No short ID available for view tracking');
+      return;
+    }
+
+    if (viewTracked) {
+      console.log('View already tracked for this session, skipping');
+      return;
+    }
+
+    console.log('Tracking view for short:', short._id);
+    try {
+      const res = await fetch('/api/shorts/view', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ shortId: short._id }),
+      });
+      const data = await res.json();
+      console.log('View tracking response:', data);
+      
+      if (res.ok && data.newView) {
+        // Only update if it's actually a new view
+        console.log('New view tracked, incrementing local count');
+        
+        // Update local views state immediately (increment by 1)
+        setViews(prev => prev + 1);
+        setViewTracked(true);
+        
+        // Update short stats in parent component with incremented value
+        if (short) {
+          const currentViews = short.stats?.views || short.views || 0;
+          const updatedShort = {
+            ...short,
+            stats: {
+              ...short.stats,
+              views: currentViews + 1,
+            },
+            views: currentViews + 1, // Also update the top-level views field
+          };
+          console.log('Updating short with incremented views:', updatedShort);
+          onShortUpdated(updatedShort);
+        }
+      } else if (res.ok && !data.newView) {
+        // View was already counted, just mark as tracked
+        console.log('View already counted, marking as tracked');
+        setViewTracked(true);
+      } else {
+        console.error('View tracking failed:', data);
+      }
+    } catch (err) {
+      console.error('Error tracking view:', err);
     }
   };
 
@@ -111,13 +184,13 @@ export function ShortViewerModal({
       setShortComments((prev) => [...prev, data.comment]);
       setCommentInput('');
 
-      // Update short stats
+      // Update short stats - preserve all existing stats including views
       if (short) {
         const updatedShort = {
           ...short,
           stats: {
-            likes: short.stats?.likes ?? 0,
-            comments: (short.stats?.comments ?? 0) + 1,
+            ...short.stats, // Preserve all existing stats
+            comments: (short.stats?.comments ?? 0) + 1, // Only increment comments
           },
         };
         onShortUpdated(updatedShort);
@@ -171,6 +244,12 @@ export function ShortViewerModal({
               autoPlay
               className="w-full h-full object-contain"
               style={{ maxHeight: '70vh' }}
+              onEnded={() => {
+                // Track view only when video ends completely
+                console.log('Video ended! Tracking view. ViewTracked:', viewTracked, 'Short ID:', short?._id);
+                console.log('Calling trackView function...');
+                trackView();
+              }}
             />
           </div>
           
@@ -191,6 +270,10 @@ export function ShortViewerModal({
               <div className="inline-flex items-center gap-1">
                 <MessageCircle className="w-4 h-4" />
                 <span>{short.stats?.comments ?? 0}</span>
+              </div>
+              <div className="inline-flex items-center gap-1">
+                <Eye className="w-4 h-4" />
+                <span>{views}</span>
               </div>
             </div>
             

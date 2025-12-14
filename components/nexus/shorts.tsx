@@ -25,6 +25,7 @@ interface ShortItem {
   stats?: {
     likes?: number;
     comments?: number;
+    views?: number;
   };
   liked?: boolean;
 }
@@ -118,6 +119,7 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
   };
 
   const handleShortUpdated = (updatedShort: ShortItem) => {
+    console.log('Updating short in shorts list:', updatedShort);
     setShorts((prev) =>
       prev.map((s) => (s._id === updatedShort._id ? updatedShort : s))
     );

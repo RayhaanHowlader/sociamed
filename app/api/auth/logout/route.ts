@@ -1,20 +1,10 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from 'next/server';
 
-export const dynamic = "force-dynamic"
-
-export async function POST() {
-  const response = NextResponse.json({ success: true }, { status: 200 })
-
-  // Clear the auth cookie
-  response.cookies.set("auth_token", "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
-  })
-
-  return response
+export async function POST(request: NextRequest) {
+  try {
+    // TODO: Implement logout logic
+    return NextResponse.json({ message: 'Logout endpoint - not implemented yet' }, { status: 501 });
+  } catch (error) {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
 }
-
-
