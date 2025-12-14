@@ -169,7 +169,7 @@ export function FindFriends() {
   useEffect(() => {
     if (!currentUserId) return;
     
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://sociamed.onrender.com';
     const socket = io(socketUrl);
     socketRef.current = socket;
 
