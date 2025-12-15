@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days
     };
 
-    const token = jwt.sign(tokenPayload, JWT_SECRET);
+    const token = jwt.sign(tokenPayload, JWT_SECRET as string);
 
     // Create response
     const response = NextResponse.json({
