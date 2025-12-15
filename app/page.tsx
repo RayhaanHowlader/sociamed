@@ -16,6 +16,7 @@ import { AIAssistant } from '@/components/nexus/ai-assistant';
 import { NotificationPopup } from '@/components/nexus/notification-popup';
 import LoginPage from '@/components/LoginPage';
 import SignupPage from '@/components/SignupPage';
+import ForgotPassword from '@/components/ForgotPassword';
 import { io, Socket } from 'socket.io-client';
 
 interface FriendRequestNotification {
@@ -32,7 +33,7 @@ export default function Home() {
   const [activeView, setActiveView] =
     useState<'feed' | 'messages' | 'groups' | 'profile' | 'shorts' | 'friends' | 'notifications' | 'stories' | 'notes' | 'ai-assistant'>('feed');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [authMode, setAuthMode] = useState<'login' | 'signup' | 'forgot-password'>('login');
   const [authChecked, setAuthChecked] = useState(false);
   const [shortsModalOpen, setShortsModalOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -286,10 +287,19 @@ export default function Home() {
       );
     }
 
+    if (authMode === 'forgot-password') {
+      return (
+        <ForgotPassword
+          onBackToLogin={() => setAuthMode('login')}
+        />
+      );
+    }
+
     return (
       <LoginPage
         onLoginSuccess={() => setIsLoggedIn(true)}
         onSwitchToSignup={() => setAuthMode('signup')}
+        onSwitchToForgotPassword={() => setAuthMode('forgot-password')}
       />
     );
   }

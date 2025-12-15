@@ -44,4 +44,18 @@ export async function sendOtpEmail(to: string, code: string) {
   return info
 }
 
+export async function sendEmail(to: string, subject: string, html: string, text?: string) {
+  const transporter = getTransporter()
+
+  const info = await transporter.sendMail({
+    from: fromEmail,
+    to,
+    subject,
+    text: text || subject,
+    html,
+  })
+
+  return info
+}
+
 

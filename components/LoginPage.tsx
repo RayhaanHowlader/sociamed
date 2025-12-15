@@ -4,9 +4,10 @@ import { Mail, Lock, AlertCircle, Loader, Eye, EyeOff } from "lucide-react"
 interface LoginPageProps {
   onSwitchToSignup?: () => void
   onLoginSuccess?: () => void
+  onSwitchToForgotPassword?: () => void
 }
 
-export default function LoginPage({ onSwitchToSignup, onLoginSuccess }: LoginPageProps) {
+export default function LoginPage({ onSwitchToSignup, onLoginSuccess, onSwitchToForgotPassword }: LoginPageProps) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [otp, setOtp] = useState("")
@@ -208,6 +209,15 @@ export default function LoginPage({ onSwitchToSignup, onLoginSuccess }: LoginPag
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+                <div className="text-right mt-2">
+                  <button
+                    type="button"
+                    onClick={onSwitchToForgotPassword}
+                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    Forgot Password?
                   </button>
                 </div>
               </div>
