@@ -50,8 +50,8 @@ export async function POST(request: NextRequest) {
     const tokenPayload = {
       sub: user._id.toString(),
       email: user.email,
-      name: user.name,
-      username: user.username,
+      name: user.fullName,
+      username: user.username || user.email.split('@')[0], // Use email prefix if no username
       iat: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60), // 7 days
     };
@@ -65,8 +65,8 @@ export async function POST(request: NextRequest) {
       user: {
         id: user._id.toString(),
         email: user.email,
-        name: user.name,
-        username: user.username,
+        name: user.fullName,
+        username: user.username || user.email.split('@')[0],
       },
     }, { status: 200 });
 
