@@ -54,7 +54,7 @@ export default function LoginPage({ onSwitchToSignup, onLoginSuccess }: LoginPag
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ email, code: otp }),
+          body: JSON.stringify({ email, otp }),
         })
 
         const data = await response.json()

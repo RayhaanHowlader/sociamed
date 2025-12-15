@@ -236,17 +236,37 @@ export default function Home() {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', {
+      const res = await fetch('/api/auth/logout', {
         method: 'POST',
         credentials: 'include',
       });
-    } catch {
-      // ignore errors, we'll still clear local state
-    } finally {
-      setIsLoggedIn(false);
-      setAuthMode('login');
-      setShortsModalOpen(false);
+      
+      if (res.ok) {
+        console.log('Logout successful');
+      } else {
+        console.error('Logout failed:', await res.text());
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
     }
+    
+    // Always clear local state regardless of API response
+    setIsLoggedIn(false);
+    setAuthMode('login');
+    setShortsModalOpen(false);
+    setCurrentUserId(null);
+    setNotificationCount(0);
+    setCurrentNotification(null);
+    setViewingUserId(null);
+    
+    // Disconnect socket if connected
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+    
+    // Set authChecked to true to prevent loading state
+    setAuthChecked(true);
   };
 
   if (!authChecked) {

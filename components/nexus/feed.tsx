@@ -104,6 +104,7 @@ export function Feed() {
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const postsContainerRef = useRef<HTMLDivElement | null>(null);
+  const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null);
   const [postComments, setPostComments] = useState<Record<string, PostComment[]>>({});
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
@@ -224,18 +225,59 @@ export function Feed() {
     const handleScroll = () => {
       if (loadingMore || !hasMorePosts) return;
 
-      // Check if scrolled near the bottom (within 200px)
+      // Check if scrolled near the bottom (within 300px for better UX)
       const scrollTop = window.scrollY || document.documentElement.scrollTop;
       const windowHeight = window.innerHeight;
       const documentHeight = document.documentElement.scrollHeight;
 
-      if (documentHeight - (scrollTop + windowHeight) < 200) {
+      if (documentHeight - (scrollTop + windowHeight) < 300) {
         loadMorePosts();
       }
     };
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    // Throttle scroll events for better performance
+    let ticking = false;
+    const throttledHandleScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          handleScroll();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', throttledHandleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', throttledHandleScroll);
+  }, [hasMorePosts, loadingMore, loadMorePosts]);
+
+  // Intersection Observer for more reliable lazy loading
+  useEffect(() => {
+    if (!hasMorePosts || !loadMoreTriggerRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting && !loadingMore && hasMorePosts) {
+          loadMorePosts();
+        }
+      },
+      {
+        rootMargin: '100px', // Trigger 100px before the element comes into view
+        threshold: 0.1,
+      }
+    );
+
+    const currentTrigger = loadMoreTriggerRef.current;
+    if (currentTrigger) {
+      observer.observe(currentTrigger);
+    }
+
+    return () => {
+      if (currentTrigger) {
+        observer.unobserve(currentTrigger);
+      }
+    };
   }, [hasMorePosts, loadingMore, loadMorePosts]);
 
   const handleImageUpload = async (file: File) => {
@@ -853,6 +895,14 @@ export function Feed() {
           </Card>
           )})}
           
+          {/* Intersection observer trigger for automatic loading */}
+          {hasMorePosts && (
+            <div 
+              ref={loadMoreTriggerRef}
+              className="h-4 w-full"
+            />
+          )}
+
           {/* Load more button or loading indicator */}
           {hasMorePosts && !loadingMore && (
             <div className="flex justify-center py-4">
@@ -869,6 +919,13 @@ export function Feed() {
           {loadingMore && (
             <div className="flex justify-center py-4">
               <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+            </div>
+          )}
+
+          {/* End of posts indicator */}
+          {!hasMorePosts && posts.length > 0 && (
+            <div className="flex justify-center py-8">
+              <p className="text-sm text-slate-500">You've reached the end of the feed</p>
             </div>
           )}
         </>
