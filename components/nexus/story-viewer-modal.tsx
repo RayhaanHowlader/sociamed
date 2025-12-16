@@ -4,7 +4,7 @@ import { useRef } from 'react';
 import { ChevronLeft, ChevronRight, X, Pencil, Trash2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 interface Story {
   _id: string;
@@ -49,6 +49,7 @@ interface StoryViewerModalProps {
   onStoryIndexChange: (index: number) => void;
   onMediaIndexChange: (index: number) => void;
   onProgressReset: () => void;
+  onProgressUpdate: (progress: number) => void;
   onNextStory: () => void;
   onPrevStory: () => void;
   onEditStory: (story: Story) => void;
@@ -67,6 +68,7 @@ export function StoryViewerModal({
   onStoryIndexChange,
   onMediaIndexChange,
   onProgressReset,
+  onProgressUpdate,
   onNextStory,
   onPrevStory,
   onEditStory,
@@ -94,9 +96,15 @@ export function StoryViewerModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg p-0 bg-black">
+        <DialogTitle className="sr-only">
+          {activeStoryGroup?.author.name}'s Story
+        </DialogTitle>
+        <DialogDescription className="sr-only">
+          Viewing story from {activeStoryGroup?.author.name}
+        </DialogDescription>
         <div className="relative h-[600px]">
           {/* Progress Bar */}
-          <div className="absolute top-0 left-0 right-0 z-10 p-2">
+          <div className="absolute top-0 left-0 right-0 z-20 p-2 bg-gradient-to-b from-black/50 to-transparent">
             <div className="flex gap-1">
               {activeStoryGroup.stories.map((story, idx) => {
                 const storyMediaItems = story.mediaItems || (story.mediaUrl ? [{
@@ -115,7 +123,7 @@ export function StoryViewerModal({
                       return (
                         <div
                           key={mediaIdx}
-                          className="flex-1 h-1 bg-white/30 rounded-full overflow-hidden cursor-pointer"
+                          className="flex-1 h-1.5 bg-white/30 rounded-full overflow-hidden cursor-pointer"
                           onClick={() => {
                             onStoryIndexChange(idx);
                             onMediaIndexChange(mediaIdx);
@@ -123,7 +131,7 @@ export function StoryViewerModal({
                           }}
                         >
                           <div
-                            className="h-full bg-white transition-all duration-100"
+                            className="h-full bg-white transition-all duration-100 rounded-full"
                             style={{
                               width: isPast ? '100%' : isActive ? `${progress}%` : '0%',
                             }}
@@ -178,10 +186,13 @@ export function StoryViewerModal({
                       const video = e.currentTarget;
                       if (video.duration) {
                         const currentProgress = (video.currentTime / video.duration) * 100;
-                        // Update progress through parent component
+                        onProgressUpdate(currentProgress);
                       }
                     }}
-                    onEnded={onNextStory}
+                    onEnded={() => {
+                      // Small delay before auto-advancing to prevent immediate closure
+                      setTimeout(onNextStory, 200);
+                    }}
                   />
                 );
               }

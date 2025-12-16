@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
 } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -205,6 +206,7 @@ export function GroupSearchMedia({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl w-[95vw] h-[90vh] max-h-[700px] p-0 gap-0 overflow-hidden">
+        <DialogTitle className="sr-only">Search Group Media</DialogTitle>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0 h-full">
           <TabsList className="mx-3 md:mx-4 mt-3 md:mt-4 grid w-auto grid-cols-2 h-8 md:h-9">
             <TabsTrigger value="search" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm px-2 md:px-3">

@@ -62,7 +62,12 @@ export function GroupChatHeader({
             <img 
               src={selectedGroup.icon} 
               alt={`${selectedGroup.name} icon`}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover pointer-events-none"
+              draggable={false}
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.parentElement!.textContent = '💬';
+              }}
             />
           ) : (
             selectedGroup.icon || '💬'

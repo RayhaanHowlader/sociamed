@@ -31,9 +31,11 @@ export function Stories() {
     editingStory,
     setEditingStory,
     handleFileChange,
+    handleVideoRecorded,
     removeMedia,
     resetForm,
     handleCreateStory,
+    handleEditStory,
     handleDeleteStory,
     openEditModal,
   } = useStoryInteractions(fetchStories);
@@ -48,6 +50,7 @@ export function Stories() {
     setActiveMediaIndex,
     progress,
     setProgress,
+    updateProgress,
     mediaDuration,
     setMediaDuration,
     openStoryViewer,
@@ -59,6 +62,13 @@ export function Stories() {
   const handleCreate = async () => {
     await handleCreateStory();
     setCreateModalOpen(false);
+    resetForm();
+  };
+
+  // Handle story editing
+  const handleEdit = async () => {
+    await handleEditStory();
+    setEditModalOpen(false);
     resetForm();
   };
 
@@ -110,7 +120,13 @@ export function Stories() {
 
       <StoryCreateModal
         open={createModalOpen}
-        onOpenChange={setCreateModalOpen}
+        onOpenChange={(open) => {
+          setCreateModalOpen(open);
+          if (!open) {
+            // Reset form when modal is closed
+            resetForm();
+          }
+        }}
         storyType={storyType}
         textContent={textContent}
         mediaFiles={mediaFiles}
@@ -121,6 +137,7 @@ export function Stories() {
         onFileChange={handleFileChange}
         onRemoveMedia={removeMedia}
         onCreateStory={handleCreate}
+        onVideoRecorded={handleVideoRecorded}
       />
 
       <StoryRateLimitModal
@@ -140,6 +157,7 @@ export function Stories() {
         onStoryIndexChange={setActiveStoryIndex}
         onMediaIndexChange={setActiveMediaIndex}
         onProgressReset={() => setProgress(0)}
+        onProgressUpdate={updateProgress}
         onNextStory={nextStory}
         onPrevStory={prevStory}
         onEditStory={(story) => {
@@ -152,22 +170,25 @@ export function Stories() {
 
       <StoryCreateModal
         open={editModalOpen}
-        onOpenChange={setEditModalOpen}
+        onOpenChange={(open) => {
+          setEditModalOpen(open);
+          if (!open) {
+            // Reset form when modal is closed
+            resetForm();
+          }
+        }}
         storyType={storyType}
         textContent={textContent}
         mediaFiles={mediaFiles}
         mediaPreviews={mediaPreviews}
         uploading={uploading}
+        isEditing={true}
         onStoryTypeChange={setStoryType}
         onTextContentChange={setTextContent}
         onFileChange={handleFileChange}
         onRemoveMedia={removeMedia}
-        onCreateStory={async () => {
-          // Handle edit logic here - for now just close modal
-          setEditModalOpen(false);
-          setEditingStory(null);
-          resetForm();
-        }}
+        onCreateStory={handleEdit}
+        onVideoRecorded={handleVideoRecorded}
       />
     </div>
   );

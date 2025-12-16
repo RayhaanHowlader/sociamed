@@ -41,7 +41,15 @@ export function useStoryViewer() {
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [progress, setProgress] = useState(0);
   const [mediaDuration, setMediaDuration] = useState(5);
+
+  console.log('useStoryViewer state:', { viewerOpen });
+
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const autoAdvanceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const updateProgress = (newProgress: number) => {
+    setProgress(newProgress);
+  };
 
   useEffect(() => {
     if (viewerOpen && activeStoryGroup) {
@@ -54,47 +62,37 @@ export function useStoryViewer() {
 
       const currentMedia = mediaItems[activeMediaIndex];
       const isVideo = currentMedia?.type === 'video';
-      const duration = isVideo ? mediaDuration : 5;
-      const intervalMs = duration * 1000;
-
-      // Auto-advance media items or stories based on duration
-      const interval = setInterval(() => {
-        if (mediaItems.length > 1 && activeMediaIndex < mediaItems.length - 1) {
-          setActiveMediaIndex((prev) => prev + 1);
-        } else {
-          setActiveStoryIndex((prev) => {
-            if (prev < activeStoryGroup.stories.length - 1) {
-              setActiveMediaIndex(0);
-              return prev + 1;
-            } else {
-              setViewerOpen(false);
-              return prev;
-            }
-          });
-        }
-      }, intervalMs);
-
-      // Progress bar - only update for images (videos use onTimeUpdate)
+      const duration = isVideo ? mediaDuration : 5; // 5 seconds for images, video duration for videos
+      
+      // Progress bar updates with auto-advance
       if (!isVideo) {
+        // For images: show progress bar that fills over 5 seconds
         const progressUpdateInterval = 50;
         const progressIncrement = (100 / duration) * (progressUpdateInterval / 1000);
 
         progressIntervalRef.current = setInterval(() => {
           setProgress((prev) => {
-            if (prev >= 100) {
-              return 0;
+            const newProgress = Math.min(prev + progressIncrement, 100);
+            if (newProgress >= 100) {
+              // Auto-advance to next story after a small delay
+              autoAdvanceTimeoutRef.current = setTimeout(() => {
+                nextStory();
+              }, 100);
             }
-            return Math.min(prev + progressIncrement, 100);
+            return newProgress;
           });
         }, progressUpdateInterval);
       } else {
+        // For videos: progress is handled by video onTimeUpdate
         progressIntervalRef.current = null;
       }
 
       return () => {
-        clearInterval(interval);
         if (progressIntervalRef.current) {
           clearInterval(progressIntervalRef.current);
+        }
+        if (autoAdvanceTimeoutRef.current) {
+          clearTimeout(autoAdvanceTimeoutRef.current);
         }
       };
     } else {
@@ -105,6 +103,15 @@ export function useStoryViewer() {
   }, [viewerOpen, activeStoryGroup, activeStoryIndex, activeMediaIndex, mediaDuration]);
 
   const openStoryViewer = (group: StoryGroup, index: number = 0) => {
+    console.log('Opening story viewer with auto-advance');
+    // Clear any existing intervals/timeouts
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+    }
+    if (autoAdvanceTimeoutRef.current) {
+      clearTimeout(autoAdvanceTimeoutRef.current);
+    }
+    
     setActiveStoryGroup(group);
     setActiveStoryIndex(index);
     setActiveMediaIndex(0);
@@ -128,6 +135,13 @@ export function useStoryViewer() {
         setActiveStoryIndex(activeStoryIndex + 1);
         setActiveMediaIndex(0);
         setProgress(0);
+      } else {
+        // Reached the end of all stories, close the viewer
+        setViewerOpen(false);
+        setProgress(0);
+        setActiveStoryGroup(null);
+        setActiveStoryIndex(0);
+        setActiveMediaIndex(0);
       }
     }
   };
@@ -168,6 +182,7 @@ export function useStoryViewer() {
     setActiveMediaIndex,
     progress,
     setProgress,
+    updateProgress,
     mediaDuration,
     setMediaDuration,
     openStoryViewer,

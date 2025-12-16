@@ -110,28 +110,34 @@ export function useSocketManagement({
 
 
     
-    const socketUrl = 'https://sociamed.onrender.com';
+    const socketUrl = process.env.NODE_ENV === 'production' 
+      ? 'https://sociamed.onrender.com' 
+      : 'http://localhost:4000';
     
     const socket = io(socketUrl, {
       timeout: 15000,
-      transports: ['websocket', 'polling'],
+      transports: ['websocket'], // Only WebSocket, no polling
       reconnection: true,
-      reconnectionAttempts: 3,
-      reconnectionDelay: 3000,
-      reconnectionDelayMax: 10000,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      forceNew: true, // Force new connection
     });
 
     socketRef.current = socket;
 
     socket.on('connect', () => {
+      console.log('[socket] Connected to:', socketUrl);
       setIsConnected(true);
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', (reason) => {
+      console.log('[socket] Disconnected:', reason);
       setIsConnected(false);
     });
 
-    socket.on('connect_error', () => {
+    socket.on('connect_error', (error) => {
+      console.error('[socket] Connection error:', error);
       setIsConnected(false);
     });
 

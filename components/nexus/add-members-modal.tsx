@@ -125,20 +125,33 @@ export function AddMembersModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="text-xl font-bold text-slate-900 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-xl">
-              {groupIcon}
+      <DialogContent className="w-[95vw] max-w-2xl h-[90vh] max-h-[600px] flex flex-col gap-0 p-0">
+        <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b border-slate-200">
+          <DialogTitle className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-3">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-lg sm:text-xl shadow-sm overflow-hidden flex-shrink-0">
+              {groupIcon?.startsWith('http') ? (
+                <img 
+                  src={groupIcon} 
+                  alt={`${groupName} icon`}
+                  className="w-full h-full object-cover pointer-events-none"
+                  draggable={false}
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.parentElement!.textContent = '💬';
+                  }}
+                />
+              ) : (
+                groupIcon || '💬'
+              )}
             </div>
-            <span>Add members to {groupName}</span>
+            <span className="truncate text-sm sm:text-lg">Add members to {groupName}</span>
           </DialogTitle>
-          <DialogDescription className="text-sm text-slate-600 mt-2">
+          <DialogDescription className="text-xs sm:text-sm text-slate-600 mt-2">
             Select friends to invite to this group. You can search and select multiple members at once.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 flex flex-col min-h-0 space-y-4 py-4">
+        <div className="flex-1 flex flex-col min-h-0 space-y-3 p-6 pt-4">
           {/* Search bar */}
           <div className="relative flex-shrink-0">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
@@ -146,21 +159,21 @@ export function AddMembersModal({
               placeholder="Search friends..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+              className="pl-10 border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-sm"
             />
           </div>
 
           {/* Selected count */}
           {selectedMemberIds.size > 0 && (
-            <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-              <span className="text-sm font-medium text-blue-900">
+            <div className="flex-shrink-0 flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <span className="text-xs sm:text-sm font-medium text-blue-900 truncate">
                 {selectedMemberIds.size} {selectedMemberIds.size === 1 ? 'member' : 'members'} selected
               </span>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setSelectedMemberIds(new Set())}
-                className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-100"
+                className="h-6 sm:h-7 px-2 sm:px-3 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-100 flex-shrink-0 ml-2"
               >
                 Clear
               </Button>
@@ -168,46 +181,47 @@ export function AddMembersModal({
           )}
 
           {/* Friends list */}
-          <div className="flex-1 min-h-0 border border-slate-200 rounded-lg bg-white">
+          <div className="flex-1 min-h-0 border border-slate-200 rounded-lg bg-white overflow-hidden">
             {loadingFriends ? (
               <div className="flex items-center justify-center h-full py-12">
                 <p className="text-sm text-slate-500">Loading friends…</p>
               </div>
             ) : filteredFriends.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
-                  <UserPlus className="w-8 h-8 text-slate-400" />
+              <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+                  <UserPlus className="w-6 h-6 sm:w-8 sm:h-8 text-slate-400" />
                 </div>
-                <p className="text-sm font-medium text-slate-900 mb-1">
+                <p className="text-sm font-medium text-slate-900 mb-2">
                   {availableFriends.length === 0 ? 'All friends are already in this group' : 'No friends found'}
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-slate-500 max-w-sm">
                   {availableFriends.length === 0
                     ? 'You have added all your friends to this group.'
-                    : 'Try adjusting your search terms.'}
+                    : 'Try adjusting your search terms to find more friends.'}
                 </p>
               </div>
             ) : (
-              <ScrollArea className="h-full">
-                <div className="p-2 space-y-1">
+              <div className="h-full overflow-auto custom-scrollbar">
+                <div className="p-2 sm:p-3 space-y-1 sm:space-y-2">
                   {filteredFriends.map((friend) => (
-                    <label
+                    <div
                       key={friend.id}
-                      className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
+                      className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg cursor-pointer transition-all border ${
                         selectedMemberIds.has(friend.id)
-                          ? 'bg-blue-50 border-2 border-blue-200'
-                          : 'hover:bg-slate-50 border-2 border-transparent'
+                          ? 'bg-blue-50 border-blue-300 shadow-sm'
+                          : 'hover:bg-slate-50 border-transparent hover:border-slate-200'
                       }`}
+                      onClick={() => toggleMember(friend.id)}
                     >
                       <Checkbox
                         checked={selectedMemberIds.has(friend.id)}
                         onCheckedChange={() => toggleMember(friend.id)}
-                        className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                        className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 flex-shrink-0"
                       />
-                      <Avatar className="w-10 h-10 flex-shrink-0">
+                      <Avatar className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0">
                         <AvatarImage src={friend.avatarUrl} />
-                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-cyan-500 text-white">
-                          {friend.name[0]}
+                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-cyan-500 text-white font-semibold text-xs sm:text-sm">
+                          {friend.name[0]?.toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
@@ -216,46 +230,54 @@ export function AddMembersModal({
                       </div>
                       {selectedMemberIds.has(friend.id) && (
                         <div className="flex-shrink-0">
-                          <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center">
-                            <Check className="w-4 h-4 text-white" />
+                          <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-blue-600 flex items-center justify-center shadow-sm">
+                            <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" />
                           </div>
                         </div>
                       )}
-                    </label>
+                    </div>
                   ))}
                 </div>
-              </ScrollArea>
+              </div>
             )}
           </div>
 
           {/* Error message */}
           {error && (
-            <div className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
-              <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
-              <p className="text-xs text-red-600">{error}</p>
+            <div className="flex-shrink-0 flex items-start gap-2 px-3 sm:px-4 py-2 sm:py-3 bg-red-50 border border-red-200 rounded-lg">
+              <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+              <p className="text-xs sm:text-sm text-red-600 break-words">{error}</p>
             </div>
           )}
         </div>
 
-        <DialogFooter className="flex-shrink-0 border-t border-slate-200 pt-4 mt-4">
-          <Button variant="ghost" type="button" onClick={() => onOpenChange(false)} disabled={adding} className="px-6">
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 px-6"
-            onClick={handleAdd}
-            disabled={adding || selectedMemberIds.size === 0}
-          >
-            {adding ? (
-              <span className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Adding...
-              </span>
-            ) : (
-              `Add ${selectedMemberIds.size > 0 ? `${selectedMemberIds.size} ` : ''}${selectedMemberIds.size === 1 ? 'Member' : 'Members'}`
-            )}
-          </Button>
+        <DialogFooter className="flex-shrink-0 border-t border-slate-200 p-6 pt-4 bg-white">
+          <div className="flex flex-col sm:flex-row gap-3 w-full">
+            <Button 
+              variant="ghost" 
+              type="button" 
+              onClick={() => onOpenChange(false)} 
+              disabled={adding} 
+              className="px-4 sm:px-6 order-2 sm:order-1 text-sm"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 px-4 sm:px-6 order-1 sm:order-2 text-sm"
+              onClick={handleAdd}
+              disabled={adding || selectedMemberIds.size === 0}
+            >
+              {adding ? (
+                <span className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Adding...
+                </span>
+              ) : (
+                `Add ${selectedMemberIds.size > 0 ? `${selectedMemberIds.size} ` : ''}${selectedMemberIds.size === 1 ? 'Member' : 'Members'}`
+              )}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

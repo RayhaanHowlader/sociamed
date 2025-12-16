@@ -1,6 +1,6 @@
 'use client';
 
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format } from 'date-fns';
 import { ExternalLink } from 'lucide-react';
@@ -33,6 +33,9 @@ export function ImageViewerModal({ open, onOpenChange, image }: ImageViewerModal
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-5xl p-0 overflow-hidden bg-slate-950 text-white border border-slate-800">
+        <DialogTitle className="sr-only">
+          {image.caption || image.fileName || 'Image Viewer'}
+        </DialogTitle>
         <div className="grid gap-0 md:grid-cols-[minmax(0,3fr)_minmax(0,1.2fr)] max-h-[85vh]">
           <div className="relative bg-black flex items-center justify-center">
             <img

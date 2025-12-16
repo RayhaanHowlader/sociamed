@@ -51,8 +51,21 @@ export function RemoveMemberModal({
         <div className="py-4 space-y-4">
           {/* Group info */}
           <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-sm">
-              {groupIcon}
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-sm overflow-hidden">
+              {groupIcon?.startsWith('http') ? (
+                <img 
+                  src={groupIcon} 
+                  alt={`${groupName} icon`}
+                  className="w-full h-full object-cover pointer-events-none"
+                  draggable={false}
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.parentElement!.textContent = '💬';
+                  }}
+                />
+              ) : (
+                groupIcon || '💬'
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-slate-900 truncate">{groupName}</p>

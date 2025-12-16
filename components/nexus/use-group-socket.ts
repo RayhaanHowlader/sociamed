@@ -38,17 +38,32 @@ export function useGroupSocket({
   useEffect(() => {
     if (!currentUserId) return;
  
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://sociamed.onrender.com';
-    const socket = io(socketUrl);
+    const socketUrl = process.env.NODE_ENV === 'production' 
+      ? (process.env.NEXT_PUBLIC_SOCKET_URL || 'https://sociamed.onrender.com')
+      : 'http://localhost:4000';
+    const socket = io(socketUrl, {
+      timeout: 15000,
+      transports: ['websocket'], // Only WebSocket, no polling
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      forceNew: true, // Force new connection
+    });
     socketRef.current = socket;
     
     socket.on('connect', () => {
-      console.log('[socket] connected to', socketUrl);
+      console.log('[group-socket] Connected to:', socketUrl);
       setSocketReadyState(true);
     });
 
-    socket.on('disconnect', () => {
-      console.log('[socket] disconnected');
+    socket.on('disconnect', (reason) => {
+      console.log('[group-socket] Disconnected:', reason);
+      setSocketReadyState(false);
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('[group-socket] Connection error:', error);
       setSocketReadyState(false);
     });
 
