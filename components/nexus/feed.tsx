@@ -1,32 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import {
-  Heart,
-  MessageCircle,
-  Share2,
-  Bookmark,
-  MoreHorizontal,
-  Image as ImageIcon,
-  Smile,
-  Loader2,
-  AlertCircle,
-  Trash2,
-  Pencil,
-} from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useEffect, useRef, useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { EmojiPicker } from './emoji-picker';
-import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
   Dialog,
   DialogContent,
@@ -35,8 +12,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { PostComposer } from './post-composer';
+import { PostCard } from './post-card';
 import { SharePostModal } from './share-post-modal';
 import { ImageViewerModal } from './image-viewer-modal';
+import { usePostData } from './use-post-data';
+import { useFeedInteractions } from './use-feed-interactions';
+import { useInfiniteScroll } from './use-infinite-scroll';
 
 interface Post {
   _id: string;
@@ -58,136 +40,55 @@ interface Post {
   liked?: boolean;
 }
 
-interface PostComment {
-  id: string;
-  userId: string;
-  content: string;
-  createdAt: string;
-  author: {
-    name: string;
-    username: string;
-  };
-}
-
-interface ProfileSummary {
-  name: string;
-  username: string;
-  avatarUrl?: string;
-}
-
 export function Feed() {
-  const [profile, setProfile] = useState<ProfileSummary | null>(null);
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [postContent, setPostContent] = useState('');
-  const [postImageUrl, setPostImageUrl] = useState('');
-  const [postImagePublicId, setPostImagePublicId] = useState('');
-  const [loadingPosts, setLoadingPosts] = useState(true);
-  const [hasMorePosts, setHasMorePosts] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [posting, setPosting] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [error, setError] = useState('');
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [editingPostId, setEditingPostId] = useState<string | null>(null);
-  const [editingContent, setEditingContent] = useState('');
-  const [deleteTarget, setDeleteTarget] = useState<Post | null>(null);
-  const [shareModalOpen, setShareModalOpen] = useState(false);
-  const [shareTarget, setShareTarget] = useState<Post | null>(null);
-  const [imageViewerOpen, setImageViewerOpen] = useState(false);
-  const [imageViewerData, setImageViewerData] = useState<{
-    url: string;
-    senderName?: string;
-    senderAvatar?: string;
-    senderUsername?: string;
-    timestamp?: string;
-    caption?: string;
-  } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const postsContainerRef = useRef<HTMLDivElement | null>(null);
-  const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null);
-  const [postComments, setPostComments] = useState<Record<string, PostComment[]>>({});
-  const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
-  const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
-  const [hasMoreComments, setHasMoreComments] = useState<Record<string, boolean>>({});
-  const [loadingMoreComments, setLoadingMoreComments] = useState<Record<string, boolean>>({});
   const [highlightedPostId, setHighlightedPostId] = useState<string | null>(null);
-  const commentsContainerRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const postRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const fetchProfile = async () => {
-    try {
-      const res = await fetch('/api/profile', { credentials: 'include' });
-      if (!res.ok) {
-        setProfile(null);
-        return;
-      }
-      const data = await res.json();
-      setProfile(data.profile);
-    } catch {
-      setProfile(null);
-    }
+  // Use custom hooks for data and interactions
+  const {
+    profile,
+    posts,
+    setPosts,
+    loadingPosts,
+    hasMorePosts,
+    loadingMore,
+    currentUserId,
+    postComments,
+    setPostComments,
+    hasMoreComments,
+    loadingMoreComments,
+    loadMorePosts,
+    loadComments,
+    loadMoreComments,
+  } = usePostData();
+
+  const {
+    commentInputs,
+    setCommentInputs,
+    openComments,
+    deleteTarget,
+    setDeleteTarget,
+    shareModalOpen,
+    shareTarget,
+    imageViewerOpen,
+    setImageViewerOpen,
+    imageViewerData,
+    toggleLike,
+    handleToggleComments,
+    addComment,
+    handleDeletePost,
+    handleSharePost,
+    handleShareSuccess,
+    handleShareModalChange,
+    handleImageClick,
+    handleViewProfile,
+  } = useFeedInteractions(posts, setPosts, postComments, setPostComments, loadComments);
+
+  const { loadMoreTriggerRef } = useInfiniteScroll(hasMorePosts, loadingMore, loadMorePosts);
+
+  const handlePostCreated = (newPost: Post) => {
+    setPosts((prev) => [newPost, ...prev]);
   };
-
-  const fetchPosts = async () => {
-    try {
-      setLoadingPosts(true);
-      const res = await fetch('/api/posts?limit=5');
-      const data = await res.json();
-      setPosts(data.posts ?? []);
-      setHasMorePosts(data.hasMore ?? false);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoadingPosts(false);
-    }
-  };
-
-  // Load more posts when scrolling down
-  const loadMorePosts = useCallback(async () => {
-    if (loadingMore || !hasMorePosts) return;
-
-    const oldestPost = posts[posts.length - 1];
-    if (!oldestPost) return;
-
-    setLoadingMore(true);
-    try {
-      const res = await fetch(
-        `/api/posts?limit=5&after=${oldestPost.createdAt}`,
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        console.error(data.error || 'Unable to load more posts');
-        return;
-      }
-
-      // Append newer posts to the end
-      setPosts((prev) => [...prev, ...(data.posts ?? [])]);
-      setHasMorePosts(data.hasMore ?? false);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [loadingMore, hasMorePosts, posts]);
-  const fetchCurrentUser = async () => {
-    try {
-      const res = await fetch('/api/auth/me', { credentials: 'include' });
-      if (!res.ok) {
-        setCurrentUserId(null);
-        return;
-      }
-      const data = await res.json();
-      setCurrentUserId(data.user?.sub ?? null);
-    } catch {
-      setCurrentUserId(null);
-    }
-  };
-
-  useEffect(() => {
-    fetchProfile();
-    fetchPosts();
-    fetchCurrentUser();
-  }, []);
 
   // Listen for post highlight events
   useEffect(() => {
@@ -218,456 +119,14 @@ export function Feed() {
     };
   }, []);
 
-  // Handle scroll to detect when user scrolls near bottom
-  useEffect(() => {
-    if (!hasMorePosts) return;
 
-    const handleScroll = () => {
-      if (loadingMore || !hasMorePosts) return;
-
-      // Check if scrolled near the bottom (within 300px for better UX)
-      const scrollTop = window.scrollY || document.documentElement.scrollTop;
-      const windowHeight = window.innerHeight;
-      const documentHeight = document.documentElement.scrollHeight;
-
-      if (documentHeight - (scrollTop + windowHeight) < 300) {
-        loadMorePosts();
-      }
-    };
-
-    // Throttle scroll events for better performance
-    let ticking = false;
-    const throttledHandleScroll = () => {
-      if (!ticking) {
-        requestAnimationFrame(() => {
-          handleScroll();
-          ticking = false;
-        });
-        ticking = true;
-      }
-    };
-
-    window.addEventListener('scroll', throttledHandleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', throttledHandleScroll);
-  }, [hasMorePosts, loadingMore, loadMorePosts]);
-
-  // Intersection Observer for more reliable lazy loading
-  useEffect(() => {
-    if (!hasMorePosts || !loadMoreTriggerRef.current) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const [entry] = entries;
-        if (entry.isIntersecting && !loadingMore && hasMorePosts) {
-          loadMorePosts();
-        }
-      },
-      {
-        rootMargin: '100px', // Trigger 100px before the element comes into view
-        threshold: 0.1,
-      }
-    );
-
-    const currentTrigger = loadMoreTriggerRef.current;
-    if (currentTrigger) {
-      observer.observe(currentTrigger);
-    }
-
-    return () => {
-      if (currentTrigger) {
-        observer.unobserve(currentTrigger);
-      }
-    };
-  }, [hasMorePosts, loadingMore, loadMorePosts]);
-
-  const handleImageUpload = async (file: File) => {
-    setUploadingImage(true);
-    setError('');
-    try {
-      const form = new FormData();
-      form.append('file', file);
-
-      const res = await fetch('/api/posts/upload', {
-        method: 'POST',
-        body: form,
-        credentials: 'include',
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Failed to upload image');
-        return;
-      }
-
-      setPostImageUrl(data.url);
-      setPostImagePublicId(data.publicId);
-    } catch (err) {
-      console.error(err);
-      setError('Failed to upload image');
-    } finally {
-      setUploadingImage(false);
-    }
-  };
-
-  const handleCreatePost = async () => {
-    if (!profile) {
-      setError('Complete your profile before posting.');
-      return;
-    }
-
-    if (!postContent.trim() && !postImageUrl) {
-      setError('Write something or add an image.');
-      return;
-    }
-
-    setPosting(true);
-    setError('');
-
-    try {
-      const res = await fetch('/api/posts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: postContent,
-          imageUrl: postImageUrl,
-          imagePublicId: postImagePublicId,
-        }),
-        credentials: 'include',
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Unable to publish post');
-        return;
-      }
-
-      setPosts((prev) => [data.post, ...prev]);
-      setPostContent('');
-      setPostImageUrl('');
-      setPostImagePublicId('');
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    } catch (err) {
-      console.error(err);
-      setError('Unable to publish post');
-    } finally {
-      setPosting(false);
-    }
-  };
-
-  const handleDeletePost = async (id: string) => {
-    try {
-      const res = await fetch(`/api/posts/${id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Unable to delete post');
-        return;
-      }
-
-      setPosts((prev) => prev.filter((p) => p._id !== id));
-      setDeleteTarget(null);
-    } catch (err) {
-      console.error(err);
-      setError('Unable to delete post');
-    }
-  };
-
-  const startEditing = (post: Post) => {
-    setEditingPostId(post._id);
-    setEditingContent(post.content);
-    setError('');
-  };
-
-  const cancelEditing = () => {
-    setEditingPostId(null);
-    setEditingContent('');
-  };
-
-  const saveEdit = async (post: Post) => {
-    if (!editingContent.trim()) {
-      setError('Post content cannot be empty.');
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/posts/${post._id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: editingContent }),
-        credentials: 'include',
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Unable to update post');
-        return;
-      }
-
-      setPosts((prev) => prev.map((p) => (p._id === post._id ? { ...(p as Post), ...data.post } : p)));
-      setEditingPostId(null);
-      setEditingContent('');
-    } catch (err) {
-      console.error(err);
-      setError('Unable to update post');
-    }
-  };
-
-  const toggleLike = async (postId: string) => {
-    try {
-      const res = await fetch('/api/posts/like', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ postId }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        console.error(data.error || 'Unable to like post');
-        return;
-      }
-
-      setPosts((prev) =>
-        prev.map((p) =>
-          p._id === postId
-            ? {
-                ...p,
-                stats: {
-                  ...(p.stats || { likes: 0, comments: 0, shares: 0 }),
-                  likes: data.likes,
-                },
-                liked: data.liked,
-              }
-            : p,
-        ),
-      );
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleToggleComments = async (postId: string) => {
-    // If already open, just close without refetching
-    if (openComments[postId]) {
-      setOpenComments((prev) => ({ ...prev, [postId]: false }));
-      return;
-    }
-
-    // Load initial 5 comments if not already loaded
-    if (!postComments[postId]) {
-      try {
-        const res = await fetch(`/api/posts/comments?postId=${postId}&limit=5`, {
-          credentials: 'include',
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          console.error(data.error || 'Unable to load comments');
-          return;
-        }
-        setPostComments((prev) => ({ ...prev, [postId]: data.comments ?? [] }));
-        setHasMoreComments((prev) => ({ ...prev, [postId]: data.hasMore ?? false }));
-      } catch (err) {
-        console.error(err);
-      }
-    }
-
-    setOpenComments((prev) => ({ ...prev, [postId]: true }));
-  };
-
-  // Load more comments for a specific post
-  const loadMoreComments = useCallback(async (postId: string) => {
-    if (loadingMoreComments[postId] || !hasMoreComments[postId]) return;
-
-    const currentComments = postComments[postId] || [];
-    if (currentComments.length === 0) return;
-
-    // Get the latest comment's timestamp
-    const latestComment = currentComments[currentComments.length - 1];
-    if (!latestComment) return;
-
-    setLoadingMoreComments((prev) => ({ ...prev, [postId]: true }));
-    try {
-      const res = await fetch(
-        `/api/posts/comments?postId=${postId}&limit=5&after=${latestComment.createdAt}`,
-        { credentials: 'include' }
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        console.error(data.error || 'Unable to load more comments');
-        return;
-      }
-
-      // Append newer comments to the end
-      setPostComments((prev) => ({
-        ...prev,
-        [postId]: [...(prev[postId] ?? []), ...(data.comments ?? [])],
-      }));
-      setHasMoreComments((prev) => ({ ...prev, [postId]: data.hasMore ?? false }));
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoadingMoreComments((prev) => ({ ...prev, [postId]: false }));
-    }
-  }, [loadingMoreComments, hasMoreComments, postComments]);
-
-  const addComment = async (postId: string) => {
-    const text = (commentInputs[postId] || '').trim();
-    if (!text) return;
-
-    try {
-      const res = await fetch('/api/posts/comments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ postId, content: text }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        console.error(data.error || 'Unable to add comment');
-        return;
-      }
-
-      setPostComments((prev) => ({
-        ...prev,
-        [postId]: [...(prev[postId] ?? []), data.comment],
-      }));
-      setCommentInputs((prev) => ({ ...prev, [postId]: '' }));
-      setPosts((prev) =>
-        prev.map((p) =>
-          p._id === postId
-            ? { ...p, stats: { ...(p.stats || { likes: 0, comments: 0, shares: 0 }), comments: (p.stats?.comments ?? 0) + 1 } }
-            : p,
-        ),
-      );
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleSharePost = (post: Post) => {
-    setShareTarget(post);
-    setShareModalOpen(true);
-  };
-
-  const handleEmojiSelect = (emoji: string) => {
-    setPostContent((prev) => prev + emoji);
-  };
-
-  const handleShareSuccess = (sharedCount: number) => {
-    if (shareTarget) {
-      setPosts((prev) =>
-        prev.map((p) =>
-          p._id === shareTarget._id
-            ? { ...p, stats: { ...(p.stats || { likes: 0, comments: 0, shares: 0 }), shares: (p.stats?.shares ?? 0) + sharedCount } }
-            : p,
-        ),
-      );
-    }
-    setShareModalOpen(false);
-    setShareTarget(null);
-  };
-
-  const handleImageClick = (post: Post) => {
-    if (!post.imageUrl) return;
-    
-    setImageViewerData({
-      url: post.imageUrl,
-      senderName: post.author.name,
-      senderAvatar: post.author.avatarUrl,
-      senderUsername: post.author.username,
-      timestamp: post.createdAt,
-      caption: post.content,
-    });
-    setImageViewerOpen(true);
-  };
-
-  const composerDisabled = !profile || posting || uploadingImage;
 
   return (
     <div className="h-full overflow-y-auto bg-slate-50">
       <div className="max-w-2xl mx-auto py-6 px-4 space-y-6">
-        <Card className="border-slate-200 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex gap-3">
-              <Avatar>
-                <AvatarImage src={profile?.avatarUrl} />
-                <AvatarFallback>{profile?.name?.[0] ?? 'N'}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                {!profile ? (
-                  <div className="text-sm text-slate-500">
-                    Complete your profile before sharing your first post.
-                  </div>
-                ) : (
-                  <>
-                <Textarea
-                  placeholder="What's on your mind?"
-                  value={postContent}
-                  onChange={(e) => setPostContent(e.target.value)}
-                  className="min-h-[80px] resize-none border-slate-200 focus:border-blue-500 transition-colors"
-                      disabled={posting}
-                />
-                    {postImageUrl && (
-                      <div className="mt-3 rounded-lg border border-slate-200 overflow-hidden">
-                        <img src={postImageUrl} alt="Selected" className="w-full object-cover" />
-                      </div>
-                    )}
-                <div className="flex items-center justify-between mt-3">
-                  <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="text-slate-600 hover:text-blue-600"
-                          onClick={() => fileInputRef.current?.click()}
-                          disabled={uploadingImage}
-                        >
-                          {uploadingImage ? (
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          ) : (
-                      <ImageIcon className="w-4 h-4 mr-2" />
-                          )}
-                      Photo
-                    </Button>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          ref={fileInputRef}
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleImageUpload(file);
-                          }}
-                        />
-                        <EmojiPicker onEmojiSelect={handleEmojiSelect}>
-                          <Button variant="ghost" size="sm" className="text-slate-600 hover:text-slate-900">
-                            <Smile className="w-4 h-4 mr-2" />
-                            Emoji
-                          </Button>
-                        </EmojiPicker>
-                  </div>
-                      <Button
-                        className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
-                        onClick={handleCreatePost}
-                        disabled={composerDisabled}
-                      >
-                        {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Post'}
-                  </Button>
-                </div>
-                  </>
-                )}
-                {error && (
-                  <div className="mt-3 flex items-center gap-2 text-sm text-red-600">
-                    <AlertCircle className="w-4 h-4" />
-                    {error}
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <PostComposer profile={profile} onPostCreated={handlePostCreated} />
 
-        <div ref={postsContainerRef}>
+        <div>
           {loadingPosts ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
@@ -681,255 +140,76 @@ export function Feed() {
           ) : (
             <>
               {posts.map((post) => {
-            const commentsForPost = postComments[post._id] ?? [];
-            const commentValue = commentInputs[post._id] ?? '';
-            return (
-            <Card 
-              key={post._id} 
-              ref={(el) => {
-                postRefs.current[post._id] = el;
-              }}
-              className={`border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 ${
-                highlightedPostId === post._id 
-                  ? 'ring-2 ring-blue-500 ring-offset-2 bg-blue-50/50' 
-                  : ''
-              }`}
-            >
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div 
-                  className="flex gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-                  onClick={() => {
-                    if (post.userId && post.userId !== currentUserId) {
-                      window.dispatchEvent(new CustomEvent('view-profile', { detail: { userId: post.userId } }));
-                    }
-                  }}
-                >
-                  <Avatar>
-                      <AvatarImage src={post.author.avatarUrl} />
-                      <AvatarFallback>{post.author.name?.[0]}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                      <p className="font-semibold text-slate-900">{post.author.name}</p>
-                      <p className="text-sm text-slate-500">
-                        {post.author.username} · {new Date(post.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                  {currentUserId && currentUserId === post.userId && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-slate-400 hover:text-slate-600">
-                  <MoreHorizontal className="w-5 h-5" />
-                </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => startEditing(post)} className="flex items-center gap-2">
-                          <Pencil className="w-4 h-4 text-slate-500" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-600 focus:text-red-600 flex items-center gap-2"
-                          onClick={() => setDeleteTarget(post)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-              </div>
-
-                {editingPostId === post._id ? (
-                  <div className="mb-4 space-y-2">
-                    <Textarea
-                      value={editingContent}
-                      onChange={(e) => setEditingContent(e.target.value)}
-                      rows={3}
-                    />
-                    <div className="flex justify-end gap-2">
-                      <Button type="button" variant="ghost" size="sm" onClick={cancelEditing}>
-                        Cancel
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="bg-gradient-to-r from-blue-600 to-cyan-600"
-                        onClick={() => saveEdit(post)}
-                      >
-                        Save
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  post.content && <p className="text-slate-700 mb-4 leading-relaxed">{post.content}</p>
-                )}
-
-                {post.imageUrl && (
-                <div 
-                  className="rounded-xl overflow-hidden mb-4 cursor-pointer hover:opacity-95 transition-opacity"
-                  onClick={() => handleImageClick(post)}
-                >
-                    <img src={post.imageUrl} alt="Post content" className="w-full object-cover" />
-                </div>
-              )}
-
-              <Separator className="mb-4" />
-
-              <div className="flex items-center justify-between text-slate-600">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="hover:text-rose-600 hover:bg-rose-50"
-                  onClick={() => toggleLike(post._id)}
-                >
-                  <Heart
-                    className="w-5 h-5 mr-2"
-                    fill={post.liked ? '#fb7185' : 'none'}
-                  />
-                  {post.stats?.likes ?? 0}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="hover:text-blue-600 hover:bg-blue-50"
-                  onClick={() => handleToggleComments(post._id)}
-                >
-                  <MessageCircle className="w-5 h-5 mr-2" />
-                  {post.stats?.comments ?? 0}
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="hover:text-green-600 hover:bg-green-50"
-                  onClick={() => handleSharePost(post)}
-                >
-                  <Share2 className="w-5 h-5 mr-2" />
-                  {post.stats?.shares ?? 0}
-                </Button>
-                <Button variant="ghost" size="icon" className="hover:text-amber-600 hover:bg-amber-50">
-                  <Bookmark className="w-5 h-5" />
-                </Button>
-              </div>
-              {openComments[post._id] && commentsForPost.length > 0 && (
-                <div className="mt-3 border-t border-slate-100 pt-3">
+                const commentsForPost = postComments[post._id] ?? [];
+                const commentValue = commentInputs[post._id] ?? '';
+                return (
                   <div
+                    key={post._id}
                     ref={(el) => {
-                      commentsContainerRefs.current[post._id] = el;
+                      postRefs.current[post._id] = el;
                     }}
-                    className="max-h-[300px] overflow-y-auto space-y-2 text-sm pr-2"
-                    onScroll={(e) => {
-                      const container = e.currentTarget;
-                      const { scrollTop, scrollHeight, clientHeight } = container;
-                      // Load more when scrolled near bottom (within 50px)
-                      if (
-                        scrollHeight - (scrollTop + clientHeight) < 50 &&
-                        hasMoreComments[post._id] &&
-                        !loadingMoreComments[post._id]
-                      ) {
-                        loadMoreComments(post._id);
+                  >
+                    <PostCard
+                      post={post}
+                      comments={commentsForPost}
+                      commentValue={commentValue}
+                      isCommentsOpen={openComments[post._id] ?? false}
+                      hasMoreComments={hasMoreComments[post._id] ?? false}
+                      loadingMoreComments={loadingMoreComments[post._id] ?? false}
+                      currentUserId={currentUserId}
+                      highlightedPostId={highlightedPostId}
+                      onEdit={() => {}} // Edit functionality moved to PostCard
+                      onDelete={setDeleteTarget}
+                      onLike={toggleLike}
+                      onToggleComments={handleToggleComments}
+                      onShare={handleSharePost}
+                      onImageClick={handleImageClick}
+                      onCommentChange={(postId, value) => 
+                        setCommentInputs((prev) => ({ ...prev, [postId]: value }))
                       }
-                    }}
-                  >
-                    {commentsForPost.map((c) => (
-                      <div key={c.id} className="text-slate-700">
-                        <span 
-                          className="font-semibold cursor-pointer hover:underline"
-                          onClick={() => {
-                            if (c.userId && c.userId !== currentUserId) {
-                              window.dispatchEvent(new CustomEvent('view-profile', { detail: { userId: c.userId } }));
-                            }
-                          }}
-                        >
-                          {c.author.name}
-                        </span>{' '}
-                        <span className="text-slate-500 text-xs">{c.author.username}</span>
-                        <div>{c.content}</div>
-                      </div>
-                    ))}
-                    {/* Load more button or loading indicator */}
-                    {hasMoreComments[post._id] && !loadingMoreComments[post._id] && (
-                      <div className="flex justify-center py-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => loadMoreComments(post._id)}
-                          className="text-xs"
-                        >
-                          Load more comments
-                        </Button>
-                      </div>
-                    )}
-                    {loadingMoreComments[post._id] && (
-                      <div className="flex justify-center py-2">
-                        <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                      </div>
-                    )}
+                      onAddComment={addComment}
+                      onLoadMoreComments={loadMoreComments}
+                      onViewProfile={handleViewProfile}
+                    />
                   </div>
-                </div>
+                );
+              })}
+          
+              {/* Intersection observer trigger for automatic loading */}
+              {hasMorePosts && (
+                <div 
+                  ref={loadMoreTriggerRef}
+                  className="h-4 w-full"
+                />
               )}
-              {openComments[post._id] && (
-                <div className="mt-2 flex items-center gap-2">
-                  <Input
-                    value={commentValue}
-                    onChange={(e) =>
-                      setCommentInputs((prev) => ({
-                        ...prev,
-                        [post._id]: e.target.value,
-                      }))
-                    }
-                    placeholder="Add a comment..."
-                    className="h-8 text-xs"
-                  />
+
+              {/* Load more button or loading indicator */}
+              {hasMorePosts && !loadingMore && (
+                <div className="flex justify-center py-4">
                   <Button
-                    type="button"
+                    variant="outline"
                     size="sm"
-                    className="h-8 px-3 bg-gradient-to-r from-blue-600 to-cyan-600"
-                    onClick={() => addComment(post._id)}
+                    onClick={() => loadMorePosts()}
+                    className="text-xs"
                   >
-                    Post
+                    Load more posts
                   </Button>
                 </div>
               )}
-            </CardContent>
-          </Card>
-          )})}
-          
-          {/* Intersection observer trigger for automatic loading */}
-          {hasMorePosts && (
-            <div 
-              ref={loadMoreTriggerRef}
-              className="h-4 w-full"
-            />
-          )}
+              {loadingMore && (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                </div>
+              )}
 
-          {/* Load more button or loading indicator */}
-          {hasMorePosts && !loadingMore && (
-            <div className="flex justify-center py-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => loadMorePosts()}
-                className="text-xs"
-              >
-                Load more posts
-              </Button>
-            </div>
+              {/* End of posts indicator */}
+              {!hasMorePosts && posts.length > 0 && (
+                <div className="flex justify-center py-8">
+                  <p className="text-sm text-slate-500">You've reached the end of the feed</p>
+                </div>
+              )}
+            </>
           )}
-          {loadingMore && (
-            <div className="flex justify-center py-4">
-              <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-            </div>
-          )}
-
-          {/* End of posts indicator */}
-          {!hasMorePosts && posts.length > 0 && (
-            <div className="flex justify-center py-8">
-              <p className="text-sm text-slate-500">You've reached the end of the feed</p>
-            </div>
-          )}
-        </>
-        )}
         </div>
       </div>
 
@@ -958,12 +238,7 @@ export function Feed() {
 
       <SharePostModal
         open={shareModalOpen}
-        onOpenChange={(open) => {
-          setShareModalOpen(open);
-          if (!open) {
-            setShareTarget(null);
-          }
-        }}
+        onOpenChange={handleShareModalChange}
         post={shareTarget}
         onShareSuccess={handleShareSuccess}
       />
