@@ -40,7 +40,7 @@ export function useGroupSocket({
  
     const socketUrl = process.env.NODE_ENV === 'production' 
       ? (process.env.NEXT_PUBLIC_SOCKET_URL || 'https://sociamed.onrender.com')
-      : 'http://localhost:4000';
+      : 'https://sociamed.onrender.com';
     const socket = io(socketUrl, {
       timeout: 15000,
       transports: ['websocket'], // Only WebSocket, no polling

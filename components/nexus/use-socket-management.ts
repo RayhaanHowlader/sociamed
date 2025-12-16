@@ -112,7 +112,7 @@ export function useSocketManagement({
     
     const socketUrl = process.env.NODE_ENV === 'production' 
       ? 'https://sociamed.onrender.com' 
-      : 'http://localhost:4000';
+      : 'https://sociamed.onrender.com';
     
     const socket = io(socketUrl, {
       timeout: 15000,

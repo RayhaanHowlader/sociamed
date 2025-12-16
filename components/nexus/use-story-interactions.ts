@@ -39,22 +39,63 @@ export function useStoryInteractions(fetchStories: () => void) {
   const [editingStory, setEditingStory] = useState<Story | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Handle story type changes with media compatibility
+  const handleStoryTypeChange = (newType: 'text' | 'image' | 'video') => {
+    setStoryType(newType);
+
+    // In edit mode, allow switching between any types without restrictions
+    if (editingStory) {
+      // Keep all existing media when editing - no restrictions
+      return;
+    }
+
+    // Handle media compatibility only for new stories
+    if (newType === 'text') {
+      // Clear all media when switching to text (only for new stories)
+      setMediaFiles([]);
+      setMediaPreviews([]);
+    }
+    // For new stories switching between image/video, keep existing logic but no restrictions in edit mode
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    const validFiles = files.filter(
-      (file) => file.type.startsWith('image/') || file.type.startsWith('video/')
-    );
+    // Filter files based on current story type and edit mode
+    let validFiles: File[] = [];
+    
+    if (editingStory) {
+      // In edit mode, allow any media type regardless of story type
+      validFiles = files.filter(
+        (file) => file.type.startsWith('image/') || file.type.startsWith('video/')
+      );
+    } else if (storyType === 'image') {
+      validFiles = files.filter(file => file.type.startsWith('image/'));
+    } else if (storyType === 'video') {
+      validFiles = files.filter(file => file.type.startsWith('video/'));
+    } else {
+      // For text type (new stories), accept any media and determine type from first file
+      validFiles = files.filter(
+        (file) => file.type.startsWith('image/') || file.type.startsWith('video/')
+      );
+      
+      if (validFiles.length > 0) {
+        const firstFile = validFiles[0];
+        if (firstFile.type.startsWith('image/')) {
+          setStoryType('image');
+        } else if (firstFile.type.startsWith('video/')) {
+          setStoryType('video');
+        }
+      }
+    }
 
-    if (validFiles.length === 0) return;
-
-    // Determine story type based on first file
-    const firstFile = validFiles[0];
-    if (firstFile.type.startsWith('image/')) {
-      if (storyType === 'text') setStoryType('image');
-    } else if (firstFile.type.startsWith('video/')) {
-      if (storyType === 'text') setStoryType('video');
+    if (validFiles.length === 0) {
+      const expectedType = editingStory ? 'media' : 
+                          storyType === 'image' ? 'image' : 
+                          storyType === 'video' ? 'video' : 'media';
+      alert(`Please select ${expectedType} files only.`);
+      return;
     }
 
     // Add files to state
@@ -313,8 +354,8 @@ export function useStoryInteractions(fetchStories: () => void) {
   const handleEditStory = async () => {
     if (!editingStory) return;
 
-    if (storyType === 'text' && !textContent.trim()) {
-      alert('Please enter text for your story');
+    if (storyType === 'text' && !textContent.trim() && mediaPreviews.length === 0) {
+      alert('Please enter text or add media for your story');
       return;
     }
 
@@ -326,21 +367,120 @@ export function useStoryInteractions(fetchStories: () => void) {
     try {
       setUploading(true);
 
-      // Handle text story
+      // Handle text story with or without media
       if (storyType === 'text') {
-        const res = await fetch(`/api/stories/${editingStory._id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            type: 'text',
-            content: textContent,
-          }),
-        });
+        // Text stories can now have media in edit mode
+        if (mediaPreviews.length === 0) {
+          // Pure text story
+          const res = await fetch(`/api/stories/${editingStory._id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              type: 'text',
+              content: textContent,
+            }),
+          });
 
-        if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.error || 'Failed to update story');
+          if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.error || 'Failed to update story');
+          }
+        } else {
+          // Text story with media - treat as mixed media story
+          const newFiles = mediaFiles;
+          const existingMedia = mediaPreviews.filter(p => !p.file);
+
+          let uploadResults: Array<{ url: string; publicId: string; type: 'image' | 'video' }> = [];
+
+          // Keep existing media
+          uploadResults = existingMedia.map((media) => {
+            const originalMediaItems = editingStory.mediaItems || (editingStory.mediaUrl ? [{
+              url: editingStory.mediaUrl,
+              publicId: editingStory.mediaPublicId,
+              type: editingStory.type as 'image' | 'video'
+            }] : []);
+            
+            const originalMedia = originalMediaItems.find(item => item.url === media.url);
+            
+            return {
+              url: media.url,
+              publicId: originalMedia?.publicId || '',
+              type: media.type,
+            };
+          });
+
+          // Upload new files if any
+          if (newFiles.length > 0) {
+            const uploadPromises = newFiles.map(async (file, index) => {
+              console.log(`Uploading new file ${index + 1}:`, { name: file.name, size: file.size, type: file.type });
+              
+              if (file.size === 0) {
+                throw new Error(`File ${file.name} is empty (0 bytes)`);
+              }
+
+              const formData = new FormData();
+              formData.append('file', file);
+
+              const uploadRes = await fetch('/api/stories/upload', {
+                method: 'POST',
+                credentials: 'include',
+                body: formData,
+              });
+
+              if (!uploadRes.ok) {
+                const errorData = await uploadRes.json();
+                console.error('Upload failed:', {
+                  status: uploadRes.status,
+                  statusText: uploadRes.statusText,
+                  errorData,
+                  file: { name: file.name, size: file.size, type: file.type }
+                });
+                
+                let errorMessage = 'Upload failed';
+                if (errorData.details) {
+                  errorMessage = errorData.details;
+                } else if (errorData.error) {
+                  errorMessage = errorData.error;
+                }
+                
+                throw new Error(errorMessage);
+              }
+
+              const uploadData = await uploadRes.json();
+              console.log(`New file ${index + 1} uploaded successfully:`, uploadData);
+              
+              return {
+                url: uploadData.url,
+                publicId: uploadData.publicId,
+                type: file.type.startsWith('image/') ? 'image' : 'video' as 'image' | 'video',
+              };
+            });
+
+            const newUploads = await Promise.all(uploadPromises);
+            uploadResults = [...uploadResults, ...newUploads];
+          }
+
+          // Determine the primary type based on media content
+          const hasImages = uploadResults.some(item => item.type === 'image');
+          const hasVideos = uploadResults.some(item => item.type === 'video');
+          const primaryType = hasVideos ? 'video' : hasImages ? 'image' : 'text';
+
+          const res = await fetch(`/api/stories/${editingStory._id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              type: primaryType,
+              content: textContent.trim(),
+              mediaItems: uploadResults,
+            }),
+          });
+
+          if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.error || 'Failed to update story');
+          }
         }
       } else {
         // Handle media stories
@@ -350,7 +490,7 @@ export function useStoryInteractions(fetchStories: () => void) {
         let uploadResults: Array<{ url: string; publicId: string; type: 'image' | 'video' }> = [];
 
         // Keep existing media - get publicId from original story
-        uploadResults = existingMedia.map((media, index) => {
+        uploadResults = existingMedia.map((media) => {
           const originalMediaItems = editingStory.mediaItems || (editingStory.mediaUrl ? [{
             url: editingStory.mediaUrl,
             publicId: editingStory.mediaPublicId,
@@ -469,7 +609,7 @@ export function useStoryInteractions(fetchStories: () => void) {
 
   return {
     storyType,
-    setStoryType,
+    setStoryType: handleStoryTypeChange,
     textContent,
     setTextContent,
     mediaFiles,

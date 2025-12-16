@@ -14,6 +14,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { PostActions } from './post-actions';
 import { PostComments } from './post-comments';
+import { ProfilePhotoViewer } from './profile-photo-viewer';
+import { useProfilePhotoViewer } from './use-profile-photo-viewer';
 
 interface Post {
   _id: string;
@@ -89,6 +91,7 @@ export function PostCard({
 }: PostCardProps) {
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState('');
+  const { isOpen, photoData, openPhotoViewer, closePhotoViewer } = useProfilePhotoViewer();
 
   const startEditing = (post: Post) => {
     setEditingPostId(post._id);
@@ -128,7 +131,8 @@ export function PostCard({
   };
 
   return (
-    <Card 
+    <>
+      <Card 
       className={`border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 ${
         highlightedPostId === post._id 
           ? 'ring-2 ring-blue-500 ring-offset-2 bg-blue-50/50' 
@@ -137,19 +141,30 @@ export function PostCard({
     >
       <CardContent className="p-6">
         <div className="flex items-start justify-between mb-4">
-          <div 
-            className="flex gap-3 cursor-pointer hover:opacity-80 transition-opacity"
-            onClick={() => {
-              if (post.userId && post.userId !== currentUserId) {
-                onViewProfile(post.userId);
-              }
-            }}
-          >
-            <Avatar>
+          <div className="flex gap-3">
+            <Avatar 
+              className="cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={(e) => {
+                e.stopPropagation();
+                openPhotoViewer({
+                  photoUrl: post.author.avatarUrl,
+                  userName: post.author.name,
+                  userUsername: post.author.username,
+                  fallbackText: post.author.name?.[0]?.toUpperCase() || 'U',
+                });
+              }}
+            >
               <AvatarImage src={post.author.avatarUrl} />
               <AvatarFallback>{post.author.name?.[0]}</AvatarFallback>
             </Avatar>
-            <div>
+            <div 
+              className="cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => {
+                if (post.userId && post.userId !== currentUserId) {
+                  onViewProfile(post.userId);
+                }
+              }}
+            >
               <p className="font-semibold text-slate-900">{post.author.name}</p>
               <p className="text-sm text-slate-500">
                 {post.author.username} · {new Date(post.createdAt).toLocaleString()}
@@ -235,5 +250,15 @@ export function PostCard({
         />
       </CardContent>
     </Card>
+
+    <ProfilePhotoViewer
+      open={isOpen}
+      onOpenChange={closePhotoViewer}
+      photoUrl={photoData?.photoUrl}
+      userName={photoData?.userName || ''}
+      userUsername={photoData?.userUsername || ''}
+      fallbackText={photoData?.fallbackText || 'U'}
+    />
+    </>
   );
 }

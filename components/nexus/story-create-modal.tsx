@@ -51,10 +51,14 @@ export function StoryCreateModal({
 
   const handleTypeChange = (type: 'text' | 'image' | 'video') => {
     onStoryTypeChange(type);
-    if (type === 'image') {
-      fileInputRef.current?.click();
-    } else if (type === 'video') {
-      // Don't auto-open file picker for video, let user choose between file or camera
+    
+    // Only auto-open file picker for new stories, not when editing
+    if (!isEditing) {
+      if (type === 'image') {
+        fileInputRef.current?.click();
+      } else if (type === 'video') {
+        // Don't auto-open file picker for video, let user choose between file or camera
+      }
     }
   };
 
@@ -84,7 +88,6 @@ export function StoryCreateModal({
               variant={storyType === 'text' ? 'default' : 'outline'}
               className="flex-1"
               onClick={() => handleTypeChange('text')}
-              disabled={isEditing}
             >
               <Type className="w-4 h-4 mr-2" />
               Text
@@ -93,7 +96,6 @@ export function StoryCreateModal({
               variant={storyType === 'image' ? 'default' : 'outline'}
               className="flex-1"
               onClick={() => handleTypeChange('image')}
-              disabled={isEditing}
             >
               <ImageIcon className="w-4 h-4 mr-2" />
               Image{mediaFiles.length > 0 && ` (${mediaFiles.length})`}
@@ -102,32 +104,72 @@ export function StoryCreateModal({
               variant={storyType === 'video' ? 'default' : 'outline'}
               className="flex-1"
               onClick={() => handleTypeChange('video')}
-              disabled={isEditing}
             >
               <Video className="w-4 h-4 mr-2" />
               Video{mediaFiles.length > 0 && ` (${mediaFiles.length})`}
             </Button>
           </div>
-          
+
           {isEditing && (
             <p className="text-xs text-slate-500 text-center">
-              Story type cannot be changed when editing
+              You can switch between any story types and add any media without restrictions.
             </p>
           )}
 
           {/* Text Story */}
           {storyType === 'text' && (
-            <Textarea
-              placeholder="What's on your mind?"
-              value={textContent}
-              onChange={(e) => onTextContentChange(e.target.value)}
-              className="min-h-[200px]"
-              maxLength={500}
-            />
+            <div className="space-y-3">
+              <Textarea
+                placeholder="What's on your mind?"
+                value={textContent}
+                onChange={(e) => onTextContentChange(e.target.value)}
+                className="min-h-[200px]"
+                maxLength={500}
+              />
+              
+              {/* Media options for text stories during editing */}
+              {isEditing && (
+                <div className="space-y-3">
+                  <p className="text-sm text-slate-600">Add media to your text story:</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    <Button
+                      variant="outline"
+                      className="h-16 flex flex-col items-center gap-1"
+                      onClick={() => {
+                        fileInputRef.current?.setAttribute('accept', 'image/*');
+                        fileInputRef.current?.click();
+                      }}
+                    >
+                      <ImageIcon className="w-5 h-5" />
+                      <span className="text-xs">Images</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-16 flex flex-col items-center gap-1"
+                      onClick={() => {
+                        fileInputRef.current?.setAttribute('accept', 'video/*');
+                        fileInputRef.current?.click();
+                      }}
+                    >
+                      <Video className="w-5 h-5" />
+                      <span className="text-xs">Videos</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-16 flex flex-col items-center gap-1"
+                      onClick={() => setVideoRecorderOpen(true)}
+                    >
+                      <Camera className="w-5 h-5" />
+                      <span className="text-xs">Record</span>
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Video Recording Options */}
-          {storyType === 'video' && mediaPreviews.length === 0 && !isEditing && (
+          {storyType === 'video' && (
             <div className="space-y-3">
               <p className="text-sm text-slate-600">Choose how to add video:</p>
               <div className="grid grid-cols-2 gap-3">
@@ -151,32 +193,22 @@ export function StoryCreateModal({
             </div>
           )}
 
-          {/* Add Media Options for Editing */}
-          {isEditing && (storyType === 'image' || storyType === 'video') && (
+          {/* Image Upload Options */}
+          {storyType === 'image' && (
             <div className="space-y-3">
-              <p className="text-sm text-slate-600">Add more media:</p>
-              <div className="flex gap-3">
-                {storyType === 'video' && (
-                  <Button
-                    variant="outline"
-                    className="flex-1 h-12 flex items-center gap-2"
-                    onClick={() => setVideoRecorderOpen(true)}
-                  >
-                    <Camera className="w-4 h-4" />
-                    <span className="text-sm">Record Video</span>
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  className="flex-1 h-12 flex items-center gap-2"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {storyType === 'image' ? <ImageIcon className="w-4 h-4" /> : <Video className="w-4 h-4" />}
-                  <span className="text-sm">Upload {storyType === 'image' ? 'Image' : 'Video'}</span>
-                </Button>
-              </div>
+              <p className="text-sm text-slate-600">Add images to your story:</p>
+              <Button
+                variant="outline"
+                className="w-full h-16 flex items-center gap-2"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <ImageIcon className="w-5 h-5" />
+                <span className="text-sm">Upload Images</span>
+              </Button>
             </div>
           )}
+
+
 
           {/* Media Previews - Multiple */}
           {mediaPreviews.length > 0 && (
@@ -234,7 +266,7 @@ export function StoryCreateModal({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*,video/*"
+            accept={isEditing ? 'image/*,video/*' : storyType === 'image' ? 'image/*' : storyType === 'video' ? 'video/*' : 'image/*,video/*'}
             multiple
             onChange={onFileChange}
             className="hidden"
@@ -242,7 +274,7 @@ export function StoryCreateModal({
 
           <Button
             onClick={onCreateStory}
-            disabled={uploading || (storyType === 'text' && !textContent.trim()) || (storyType !== 'text' && mediaPreviews.length === 0)}
+            disabled={uploading || (storyType === 'text' && !textContent.trim() && mediaPreviews.length === 0) || (storyType !== 'text' && mediaPreviews.length === 0)}
             className="w-full bg-gradient-to-r from-blue-600 to-cyan-600"
           >
             {uploading ? (
