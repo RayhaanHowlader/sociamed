@@ -17,6 +17,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { VideoTestComponent } from './video-test-component';
 
 interface FriendConversation {
   userId: string;
@@ -66,17 +67,115 @@ export function VideoCallUI({
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
-  // Set up video streams
+  // Set up video streams with multiple retry attempts
   useEffect(() => {
-    if (localVideoRef.current && callState.localStream) {
-      localVideoRef.current.srcObject = callState.localStream;
-    }
+    const setupLocalVideo = async () => {
+      if (localVideoRef.current && callState.localStream) {
+        console.log('Setting local stream:', callState.localStream);
+        console.log('Local stream tracks:', callState.localStream.getTracks());
+        
+        const videoElement = localVideoRef.current;
+        
+        try {
+          // Clear any existing source
+          videoElement.srcObject = null;
+          videoElement.load();
+          
+          // Set the new stream
+          videoElement.srcObject = callState.localStream;
+          
+          // Set video properties for better compatibility
+          videoElement.muted = true; // Local video should always be muted
+          videoElement.playsInline = true;
+          videoElement.autoplay = true;
+          videoElement.controls = false;
+          
+          // Multiple play attempts
+          const attemptPlay = async (attempt = 1) => {
+            try {
+              console.log(`Local video play attempt ${attempt}`);
+              await videoElement.play();
+              console.log('Local video playing successfully');
+            } catch (e) {
+              console.error(`Local video play attempt ${attempt} failed:`, e);
+              if (attempt < 3) {
+                setTimeout(() => attemptPlay(attempt + 1), 500);
+              }
+            }
+          };
+          
+          // Wait for metadata
+          videoElement.addEventListener('loadedmetadata', () => {
+            console.log('Local video metadata loaded');
+            attemptPlay();
+          }, { once: true });
+          
+          // Immediate attempt
+          setTimeout(() => attemptPlay(), 100);
+          
+          console.log('Local video setup completed');
+        } catch (e) {
+          console.error('Local video setup failed:', e);
+        }
+      }
+    };
+    
+    setupLocalVideo();
   }, [callState.localStream]);
 
   useEffect(() => {
-    if (remoteVideoRef.current && callState.remoteStream) {
-      remoteVideoRef.current.srcObject = callState.remoteStream;
-    }
+    const setupRemoteVideo = async () => {
+      if (remoteVideoRef.current && callState.remoteStream) {
+        console.log('Setting remote stream:', callState.remoteStream);
+        console.log('Remote stream tracks:', callState.remoteStream.getTracks());
+        
+        const videoElement = remoteVideoRef.current;
+        
+        try {
+          // Clear any existing source
+          videoElement.srcObject = null;
+          videoElement.load();
+          
+          // Set the new stream
+          videoElement.srcObject = callState.remoteStream;
+          
+          // Set video properties for better compatibility
+          videoElement.muted = false; // Remote video should not be muted
+          videoElement.playsInline = true;
+          videoElement.autoplay = true;
+          videoElement.controls = false;
+          
+          // Multiple play attempts
+          const attemptPlay = async (attempt = 1) => {
+            try {
+              console.log(`Remote video play attempt ${attempt}`);
+              await videoElement.play();
+              console.log('Remote video playing successfully');
+            } catch (e) {
+              console.error(`Remote video play attempt ${attempt} failed:`, e);
+              if (attempt < 3) {
+                setTimeout(() => attemptPlay(attempt + 1), 500);
+              }
+            }
+          };
+          
+          // Wait for metadata
+          videoElement.addEventListener('loadedmetadata', () => {
+            console.log('Remote video metadata loaded');
+            attemptPlay();
+          }, { once: true });
+          
+          // Immediate attempt
+          setTimeout(() => attemptPlay(), 100);
+          
+          console.log('Remote video setup completed');
+        } catch (e) {
+          console.error('Remote video setup failed:', e);
+        }
+      }
+    };
+    
+    setupRemoteVideo();
   }, [callState.remoteStream]);
 
   // Incoming Video Call Dialog
@@ -162,7 +261,27 @@ export function VideoCallUI({
                 ref={remoteVideoRef}
                 autoPlay
                 playsInline
-                className="w-full h-full object-cover"
+                controls={false}
+                muted={false}
+                className="w-full h-full object-cover bg-black border-2 border-green-500"
+                style={{ 
+                  width: '100%', 
+                  height: '100%',
+                  minWidth: '100px',
+                  minHeight: '100px',
+                  display: 'block'
+                }}
+                onLoadedMetadata={() => {
+                  console.log('Remote video metadata loaded');
+                  remoteVideoRef.current?.play().catch(e => console.error('Remote video play error:', e));
+                }}
+                onCanPlay={() => {
+                  console.log('Remote video can play');
+                  remoteVideoRef.current?.play().catch(e => console.error('Remote video play error:', e));
+                }}
+                onPlay={() => console.log('Remote video started playing')}
+                onPause={() => console.log('Remote video paused')}
+                onError={(e) => console.error('Remote video error:', e)}
               />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center">
@@ -181,7 +300,25 @@ export function VideoCallUI({
                   autoPlay
                   playsInline
                   muted
-                  className="w-full h-full object-cover"
+                  controls={false}
+                  className="w-full h-full object-cover bg-gray-800 border-2 border-yellow-500"
+                  style={{ 
+                    width: '100%', 
+                    height: '100%',
+                    minWidth: '50px',
+                    minHeight: '50px',
+                    display: 'block'
+                  }}
+                  onLoadedMetadata={() => {
+                    console.log('Local video metadata loaded (minimized)');
+                    localVideoRef.current?.play().catch(e => console.error('Local video play error:', e));
+                  }}
+                  onCanPlay={() => {
+                    console.log('Local video can play (minimized)');
+                    localVideoRef.current?.play().catch(e => console.error('Local video play error:', e));
+                  }}
+                  onPlay={() => console.log('Local video started playing (minimized)')}
+                  onError={(e) => console.error('Local video error (minimized):', e)}
                 />
               </div>
             )}
@@ -224,7 +361,27 @@ export function VideoCallUI({
               ref={remoteVideoRef}
               autoPlay
               playsInline
-              className="w-full h-full object-cover"
+              controls={false}
+              muted={false}
+              className="w-full h-full object-cover bg-black border-2 border-red-500"
+              style={{ 
+                width: '100%', 
+                height: '100%',
+                minWidth: '100px',
+                minHeight: '100px',
+                display: 'block'
+              }}
+              onLoadedMetadata={() => {
+                console.log('Main remote video metadata loaded');
+                remoteVideoRef.current?.play().catch(e => console.error('Main remote video play error:', e));
+              }}
+              onCanPlay={() => {
+                console.log('Main remote video can play');
+                remoteVideoRef.current?.play().catch(e => console.error('Main remote video play error:', e));
+              }}
+              onPlay={() => console.log('Main remote video started playing')}
+              onPause={() => console.log('Main remote video paused')}
+              onError={(e) => console.error('Main remote video error:', e)}
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-blue-600 to-purple-600 flex flex-col items-center justify-center text-white">
@@ -247,7 +404,24 @@ export function VideoCallUI({
                 autoPlay
                 playsInline
                 muted
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover bg-gray-800 border-2 border-purple-500"
+                style={{ 
+                  width: '100%', 
+                  height: '100%',
+                  minWidth: '100px',
+                  minHeight: '100px',
+                  display: 'block'
+                }}
+                onLoadedMetadata={() => {
+                  console.log('Main local video metadata loaded');
+                  localVideoRef.current?.play().catch(e => console.error('Main local video play error:', e));
+                }}
+                onCanPlay={() => {
+                  console.log('Main local video can play');
+                  localVideoRef.current?.play().catch(e => console.error('Main local video play error:', e));
+                }}
+                onPlay={() => console.log('Main local video started playing')}
+                onError={(e) => console.error('Main local video error:', e)}
               />
             </div>
           )}
@@ -272,6 +446,44 @@ export function VideoCallUI({
               {callState.isCalling ? 'Calling...' : callState.isInCall ? 'Connected' : 'Connecting...'}
             </p>
           </div>
+
+          {/* Debug video test components */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="absolute bottom-20 left-4 flex gap-2 bg-white/90 p-2 rounded">
+              <VideoTestComponent 
+                stream={callState.localStream} 
+                label="Local" 
+                muted={true}
+              />
+              <VideoTestComponent 
+                stream={callState.remoteStream} 
+                label="Remote" 
+                muted={false}
+              />
+              <div className="flex flex-col gap-2">
+                <Button 
+                  size="sm" 
+                  onClick={() => {
+                    if (localVideoRef.current) {
+                      localVideoRef.current.play().catch(console.error);
+                    }
+                  }}
+                >
+                  Play Local
+                </Button>
+                <Button 
+                  size="sm" 
+                  onClick={() => {
+                    if (remoteVideoRef.current) {
+                      remoteVideoRef.current.play().catch(console.error);
+                    }
+                  }}
+                >
+                  Play Remote
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Bottom controls */}

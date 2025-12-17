@@ -378,6 +378,27 @@ export function DirectMessages() {
         onToggleSpeaker={toggleSpeaker}
       />
 
+      {/* Debug video call state */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed bottom-4 left-4 bg-black text-white p-2 text-xs z-50 max-w-xs">
+          <div>Video Call Debug:</div>
+          <div>isInCall: {videoCallState.isInCall.toString()}</div>
+          <div>isCalling: {videoCallState.isCalling.toString()}</div>
+          <div>isVideoCall: {videoCallState.isVideoCall.toString()}</div>
+          <div>isVideoEnabled: {videoCallState.isVideoEnabled.toString()}</div>
+          <div>localStream: {videoCallState.localStream ? 'Yes' : 'No'}</div>
+          <div>remoteStream: {videoCallState.remoteStream ? 'Yes' : 'No'}</div>
+          <div>localTracks: {videoCallState.localStream?.getTracks().length || 0}</div>
+          <div>remoteTracks: {videoCallState.remoteStream?.getTracks().length || 0}</div>
+          {videoCallState.localStream && (
+            <div>localVideo: {videoCallState.localStream.getVideoTracks().length > 0 ? 'Yes' : 'No'}</div>
+          )}
+          {videoCallState.remoteStream && (
+            <div>remoteVideo: {videoCallState.remoteStream.getVideoTracks().length > 0 ? 'Yes' : 'No'}</div>
+          )}
+        </div>
+      )}
+
       <CallAudioElements
         localAudioRef={localAudioRef}
         remoteAudioRef={remoteAudioRef}

@@ -149,16 +149,28 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('call-answer', { callId, callerId, calleeId })
   })
 
-  socket.on('call-answer-sdp', ({ callId, answer }) => {
+  socket.on('call-answer-sdp', ({ callId, answer, callerId, calleeId }) => {
     if (!callId || !answer) return
-    // Broadcast to all sockets in the call
-    socket.broadcast.emit('call-answer-sdp', { callId, answer })
+    // If we have caller and callee IDs, use room-based routing
+    if (callerId && calleeId) {
+      const roomId = getRoomId(callerId, calleeId)
+      socket.to(roomId).emit('call-answer-sdp', { callId, answer })
+    } else {
+      // Fallback to broadcast
+      socket.broadcast.emit('call-answer-sdp', { callId, answer })
+    }
   })
 
-  socket.on('ice-candidate', ({ candidate, callId }) => {
+  socket.on('ice-candidate', ({ candidate, callId, callerId, calleeId }) => {
     if (!candidate || !callId) return
-    // Broadcast to all sockets in the call
-    socket.broadcast.emit('ice-candidate', { candidate, callId })
+    // If we have caller and callee IDs, use room-based routing
+    if (callerId && calleeId) {
+      const roomId = getRoomId(callerId, calleeId)
+      socket.to(roomId).emit('ice-candidate', { candidate, callId })
+    } else {
+      // Fallback to broadcast
+      socket.broadcast.emit('ice-candidate', { candidate, callId })
+    }
   })
 
   socket.on('call-reject', ({ callId, callerId, calleeId }) => {
@@ -167,10 +179,16 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('call-reject', { callId, callerId, calleeId })
   })
 
-  socket.on('call-end', ({ callId, userId }) => {
+  socket.on('call-end', ({ callId, userId, callerId, calleeId }) => {
     if (!callId || !userId) return
-    // Broadcast to all sockets
-    socket.broadcast.emit('call-end', { callId, userId })
+    // If we have caller and callee IDs, use room-based routing
+    if (callerId && calleeId) {
+      const roomId = getRoomId(callerId, calleeId)
+      socket.to(roomId).emit('call-end', { callId, userId })
+    } else {
+      // Fallback to broadcast
+      socket.broadcast.emit('call-end', { callId, userId })
+    }
   })
 
   // Notification events
