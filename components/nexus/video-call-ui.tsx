@@ -178,6 +178,8 @@ export function VideoCallUI({
     setupRemoteVideo();
   }, [callState.remoteStream]);
 
+
+
   // Incoming Video Call Dialog
   const IncomingVideoCallDialog = () => {
     const caller = friends.find((f) => f.userId === callState.callerId);
@@ -354,35 +356,28 @@ export function VideoCallUI({
     
     return (
       <div className="fixed inset-0 z-50 bg-black flex flex-col">
-        {/* Video Area */}
+        {/* Video Area - Simplified approach */}
         <div className="flex-1 relative">
           {callState.isVideoCall && callState.remoteStream ? (
-            <video
-              ref={remoteVideoRef}
-              autoPlay
-              playsInline
-              controls={false}
-              muted={false}
-              className="w-full h-full object-cover bg-black border-2 border-red-500"
-              style={{ 
-                width: '100%', 
-                height: '100%',
-                minWidth: '100px',
-                minHeight: '100px',
-                display: 'block'
-              }}
-              onLoadedMetadata={() => {
-                console.log('Main remote video metadata loaded');
-                remoteVideoRef.current?.play().catch(e => console.error('Main remote video play error:', e));
-              }}
-              onCanPlay={() => {
-                console.log('Main remote video can play');
-                remoteVideoRef.current?.play().catch(e => console.error('Main remote video play error:', e));
-              }}
-              onPlay={() => console.log('Main remote video started playing')}
-              onPause={() => console.log('Main remote video paused')}
-              onError={(e) => console.error('Main remote video error:', e)}
-            />
+            <div className="w-full h-full absolute inset-0">
+              <video
+                ref={(el) => {
+                  if (el && callState.remoteStream) {
+                    el.srcObject = callState.remoteStream;
+                    el.play().catch(console.error);
+                  }
+                }}
+                autoPlay
+                playsInline
+                muted={false}
+                className="w-full h-full object-cover"
+                style={{ 
+                  width: '100vw',
+                  height: '100vh',
+                  objectFit: 'cover'
+                }}
+              />
+            </div>
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-blue-600 to-purple-600 flex flex-col items-center justify-center text-white">
               <Avatar className="w-32 h-32 mb-4">
@@ -398,30 +393,23 @@ export function VideoCallUI({
           
           {/* Local video (overlay) */}
           {callState.isVideoCall && callState.localStream && callState.isVideoEnabled && (
-            <div className="absolute top-4 right-4 w-32 h-24 bg-black rounded-lg overflow-hidden shadow-lg">
+            <div className="absolute top-4 right-4 w-32 h-24 bg-black rounded-lg overflow-hidden shadow-lg z-10">
               <video
-                ref={localVideoRef}
+                ref={(el) => {
+                  if (el && callState.localStream) {
+                    el.srcObject = callState.localStream;
+                    el.play().catch(console.error);
+                  }
+                }}
                 autoPlay
                 playsInline
                 muted
-                className="w-full h-full object-cover bg-gray-800 border-2 border-purple-500"
+                className="w-full h-full object-cover"
                 style={{ 
-                  width: '100%', 
+                  width: '100%',
                   height: '100%',
-                  minWidth: '100px',
-                  minHeight: '100px',
-                  display: 'block'
+                  objectFit: 'cover'
                 }}
-                onLoadedMetadata={() => {
-                  console.log('Main local video metadata loaded');
-                  localVideoRef.current?.play().catch(e => console.error('Main local video play error:', e));
-                }}
-                onCanPlay={() => {
-                  console.log('Main local video can play');
-                  localVideoRef.current?.play().catch(e => console.error('Main local video play error:', e));
-                }}
-                onPlay={() => console.log('Main local video started playing')}
-                onError={(e) => console.error('Main local video error:', e)}
               />
             </div>
           )}
@@ -464,22 +452,17 @@ export function VideoCallUI({
                 <Button 
                   size="sm" 
                   onClick={() => {
-                    if (localVideoRef.current) {
-                      localVideoRef.current.play().catch(console.error);
-                    }
+                    // Force refresh main video elements
+                    const videos = document.querySelectorAll('.fixed.inset-0 video');
+                    videos.forEach(video => {
+                      const videoEl = video as HTMLVideoElement;
+                      if (videoEl.srcObject) {
+                        videoEl.play().catch(console.error);
+                      }
+                    });
                   }}
                 >
-                  Play Local
-                </Button>
-                <Button 
-                  size="sm" 
-                  onClick={() => {
-                    if (remoteVideoRef.current) {
-                      remoteVideoRef.current.play().catch(console.error);
-                    }
-                  }}
-                >
-                  Play Remote
+                  Play Main Videos
                 </Button>
               </div>
             </div>
