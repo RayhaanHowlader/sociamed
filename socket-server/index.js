@@ -105,7 +105,7 @@ io.on('connection', (socket) => {
     io.to(`group:${groupId}`).emit('group:poll:vote', { pollId, optionIds, voterId })
   })
 
-  // Voice call events
+  // Voice and Video call events
   socket.on('call:offer', ({ fromUserId, toUserId, offer, callId }) => {
     if (!fromUserId || !toUserId || !offer || !callId) return
     const roomId = getRoomId(fromUserId, toUserId)
@@ -134,6 +134,43 @@ io.on('connection', (socket) => {
     if (!fromUserId || !toUserId || !callId) return
     const roomId = getRoomId(fromUserId, toUserId)
     socket.to(roomId).emit('call:reject', { fromUserId, toUserId, callId })
+  })
+
+  // Video call specific events
+  socket.on('call-offer', ({ callId, callerId, calleeId, offer, isVideoCall }) => {
+    if (!callId || !callerId || !calleeId || !offer) return
+    const roomId = getRoomId(callerId, calleeId)
+    socket.to(roomId).emit('call-offer', { callId, callerId, calleeId, offer, isVideoCall })
+  })
+
+  socket.on('call-answer', ({ callId, callerId, calleeId }) => {
+    if (!callId || !callerId || !calleeId) return
+    const roomId = getRoomId(callerId, calleeId)
+    socket.to(roomId).emit('call-answer', { callId, callerId, calleeId })
+  })
+
+  socket.on('call-answer-sdp', ({ callId, answer }) => {
+    if (!callId || !answer) return
+    // Broadcast to all sockets in the call
+    socket.broadcast.emit('call-answer-sdp', { callId, answer })
+  })
+
+  socket.on('ice-candidate', ({ candidate, callId }) => {
+    if (!candidate || !callId) return
+    // Broadcast to all sockets in the call
+    socket.broadcast.emit('ice-candidate', { candidate, callId })
+  })
+
+  socket.on('call-reject', ({ callId, callerId, calleeId }) => {
+    if (!callId || !callerId || !calleeId) return
+    const roomId = getRoomId(callerId, calleeId)
+    socket.to(roomId).emit('call-reject', { callId, callerId, calleeId })
+  })
+
+  socket.on('call-end', ({ callId, userId }) => {
+    if (!callId || !userId) return
+    // Broadcast to all sockets
+    socket.broadcast.emit('call-end', { callId, userId })
   })
 
   // Notification events

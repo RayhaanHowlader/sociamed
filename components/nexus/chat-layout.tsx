@@ -93,6 +93,7 @@ interface ChatLayoutProps {
   onBackClick: () => void;
   onProfileClick: (userId: string) => void;
   onCallClick: () => void;
+  onVideoCallClick: () => void;
   onEndCall: () => void;
   onSearchMediaClick: () => void;
   onSelectModeToggle: () => void;
@@ -151,6 +152,7 @@ export function ChatLayout({
   onBackClick,
   onProfileClick,
   onCallClick,
+  onVideoCallClick,
   onEndCall,
   onSearchMediaClick,
   onSelectModeToggle,
@@ -206,6 +208,7 @@ export function ChatLayout({
           onBackClick={onBackClick}
           onProfileClick={onProfileClick}
           onCallClick={onCallClick}
+          onVideoCallClick={onVideoCallClick}
           onEndCall={onEndCall}
           onSearchMediaClick={onSearchMediaClick}
           onSelectModeToggle={onSelectModeToggle}

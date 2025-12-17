@@ -4,6 +4,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ProfileAvatarActions } from './profile-header-actions';
 import { ProfilePhotoViewer } from './profile-photo-viewer';
 import { useProfilePhotoViewer } from './use-profile-photo-viewer';
+import { BannerImageViewer } from './banner-image-viewer';
+import { useBannerImageViewer } from './use-banner-image-viewer';
 
 interface ProfileHeaderProps {
   profile: {
@@ -18,6 +20,12 @@ interface ProfileHeaderProps {
 
 export function ProfileHeader({ profile, isOwnProfile, onEditProfile }: ProfileHeaderProps) {
   const { isOpen, photoData, openPhotoViewer, closePhotoViewer } = useProfilePhotoViewer();
+  const { 
+    isOpen: isBannerOpen, 
+    bannerData, 
+    openBannerViewer, 
+    closeBannerViewer 
+  } = useBannerImageViewer();
 
   if (!profile) return null;
 
@@ -30,6 +38,16 @@ export function ProfileHeader({ profile, isOwnProfile, onEditProfile }: ProfileH
     });
   };
 
+  const handleBannerClick = () => {
+    if (profile.coverUrl) {
+      openBannerViewer({
+        imageUrl: profile.coverUrl,
+        userName: profile.name,
+        userUsername: profile.username || 'user',
+      });
+    }
+  };
+
   return (
     <div className="relative">
       <div className="h-64 bg-gradient-to-r from-blue-600 to-cyan-600 relative">
@@ -37,8 +55,9 @@ export function ProfileHeader({ profile, isOwnProfile, onEditProfile }: ProfileH
           <img 
             src={profile.coverUrl} 
             alt="Cover" 
-            className="w-full h-full object-cover pointer-events-none"
+            className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity duration-200"
             draggable={false}
+            onClick={handleBannerClick}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-white/80 text-sm uppercase tracking-[0.3em]">
@@ -74,6 +93,15 @@ export function ProfileHeader({ profile, isOwnProfile, onEditProfile }: ProfileH
         userName={photoData?.userName || ''}
         userUsername={photoData?.userUsername || ''}
         fallbackText={photoData?.fallbackText || 'N'}
+      />
+
+      <BannerImageViewer
+        open={isBannerOpen}
+        onOpenChange={closeBannerViewer}
+        imageUrl={bannerData?.imageUrl}
+        userName={bannerData?.userName}
+        userUsername={bannerData?.userUsername}
+        userAvatarUrl={profile.avatarUrl}
       />
     </div>
   );

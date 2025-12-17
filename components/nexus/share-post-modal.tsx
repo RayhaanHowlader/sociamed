@@ -61,7 +61,7 @@ export function SharePostModal({ open, onOpenChange, post, onShareSuccess }: Sha
       setError('');
       
       // Initialize socket connection
-      const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://sociamed.onrender.com';
+      const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
       socketRef.current = io(socketUrl);
     } else {
       // Disconnect socket when modal closes

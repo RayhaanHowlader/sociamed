@@ -26,6 +26,7 @@ interface ChatHeaderProps {
   onBackClick: () => void;
   onProfileClick: (userId: string) => void;
   onCallClick: () => void;
+  onVideoCallClick: () => void;
   onEndCall: () => void;
   onSearchMediaClick: () => void;
   onSelectModeToggle: () => void;
@@ -41,6 +42,7 @@ export function ChatHeader({
   onBackClick,
   onProfileClick,
   onCallClick,
+  onVideoCallClick,
   onEndCall,
   onSearchMediaClick,
   onSelectModeToggle,
@@ -110,7 +112,13 @@ export function ChatHeader({
             <Phone className="w-5 h-5" />
           )}
         </Button>
-        <Button variant="ghost" size="icon" className="text-slate-600 hover:text-blue-600">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="text-slate-600 hover:text-blue-600"
+          onClick={onVideoCallClick}
+          disabled={!selectedChat || callState.isReceivingCall}
+        >
           <Video className="w-5 h-5" />
         </Button>
 

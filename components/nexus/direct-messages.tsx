@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useVoiceCall } from './use-voice-call';
+import { useVideoCall } from './use-video-call';
 import { useFriendsManagement } from './use-friends-management';
 import { useMessagesManagement } from './use-messages-management';
 import { useFileUpload } from './use-file-upload';
@@ -9,6 +10,7 @@ import { useSocketManagement } from './use-socket-management';
 import { useMessageHandlers } from './use-message-handlers';
 import { ChatLayout } from './chat-layout';
 import { CallUI } from './call-ui';
+import { VideoCallUI } from './video-call-ui';
 import { CallAudioElements } from './call-audio-elements';
 import { ChatSearchMedia } from './chat-search-media';
 import { ImageViewerModal } from './image-viewer-modal';
@@ -139,6 +141,23 @@ export function DirectMessages() {
     socket,
     currentUserId,
     friendId: selectedChat?.userId || null,
+  });
+
+  // Video call hook
+  const {
+    callState: videoCallState,
+    startCall: startVideoCall,
+    answerCall: answerVideoCall,
+    rejectCall: rejectVideoCall,
+    endCall: endVideoCall,
+    toggleMute: toggleVideoMute,
+    toggleVideo,
+    toggleSpeaker,
+    localVideoRef,
+    remoteVideoRef,
+  } = useVideoCall({
+    socket,
+    currentUserId: currentUserId || '',
   });
 
   // Message handlers hook
@@ -315,6 +334,7 @@ export function DirectMessages() {
           }));
         }}
         onCallClick={initiateCall}
+        onVideoCallClick={() => selectedChat && startVideoCall(selectedChat.userId, true)}
         onEndCall={endCall}
         onSearchMediaClick={() => setSearchMediaOpen(true)}
         onSelectModeToggle={() => messagesManagement.setSelectMode(true)}
@@ -344,6 +364,18 @@ export function DirectMessages() {
         onRejectCall={rejectCall}
         onEndCall={endCall}
         onToggleMute={toggleMute}
+      />
+
+      <VideoCallUI
+        callState={videoCallState}
+        selectedChat={selectedChat}
+        friends={friendsManagement.friends}
+        onAnswerCall={answerVideoCall}
+        onRejectCall={rejectVideoCall}
+        onEndCall={endVideoCall}
+        onToggleMute={toggleVideoMute}
+        onToggleVideo={toggleVideo}
+        onToggleSpeaker={toggleSpeaker}
       />
 
       <CallAudioElements
