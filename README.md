@@ -4,6 +4,7 @@ A beautiful, modern social media platform built with Next.js, featuring direct m
 
 ## Features
 
+
 ### 🏠 Feed
 - Create and share posts with text and images
 - Like, comment, and share functionality
