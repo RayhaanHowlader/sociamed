@@ -52,6 +52,7 @@ export function Profile({ userId }: ProfileProps = {}) {
     following,
     fetchShorts,
     fetchLikedContent,
+    loadMorePosts,
   } = profileData;
 
   const {
@@ -128,13 +129,7 @@ export function Profile({ userId }: ProfileProps = {}) {
                     loadingPosts={loadingPosts}
                     hasMorePosts={hasMorePosts}
                     loadingMorePosts={loadingMorePosts}
-                    postComments={postComments}
-                    commentInputs={commentInputs}
-                    onToggleLike={(postId) => toggleLike(postId, posts, setPosts)}
-                    onLoadComments={loadComments}
-                    onAddComment={(postId) => addComment(postId, posts, setPosts)}
-                    onLoadMorePosts={() => {}} // TODO: Implement in hook
-                    onCommentInputChange={handleCommentInputChange}
+                    onLoadMorePosts={loadMorePosts}
                   />
                 </TabsContent>
 

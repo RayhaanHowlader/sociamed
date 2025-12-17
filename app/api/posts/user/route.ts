@@ -44,6 +44,18 @@ export async function GET(req: NextRequest) {
     userPosts.pop() // Remove the extra post
   }
 
+  // Check which posts the current user has liked
+  const postLikes = db.collection("postLikes")
+  const postIds = userPosts.map(p => p._id.toString())
+  const userLikes = await postLikes
+    .find({
+      postId: { $in: postIds },
+      userId: String(user.sub)
+    })
+    .toArray()
+  
+  const likedPostIds = new Set(userLikes.map(like => like.postId))
+
   // Transform posts data to match expected format
   const transformedPosts = userPosts.map((post: any) => ({
     id: post._id.toString(),
@@ -51,11 +63,11 @@ export async function GET(req: NextRequest) {
     imageUrl: post.imageUrl,
     createdAt: post.createdAt,
     stats: {
-      likes: post.likes?.length || 0,
-      comments: post.comments?.length || 0,
-      shares: post.shares?.length || 0
+      likes: post.stats?.likes || 0,
+      comments: post.stats?.comments || 0,
+      shares: post.stats?.shares || 0
     },
-    liked: post.likes?.includes(user.sub) || false
+    liked: likedPostIds.has(post._id.toString())
   }))
 
   return NextResponse.json({ 

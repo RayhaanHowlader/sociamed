@@ -76,8 +76,8 @@ export function ProfilePhotoViewer({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-[95vw] h-[90vh] p-0 bg-black/95 border-none">
-        <div className="relative w-full h-full flex flex-col">
+      <DialogContent className="max-w-2xl w-[90vw] max-h-[85vh] p-0 bg-black/95 border-none overflow-hidden">
+        <div className="relative w-full flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between p-4 bg-black/50 backdrop-blur-sm">
             <div className="flex items-center gap-3">
@@ -128,9 +128,9 @@ export function ProfilePhotoViewer({
           </div>
 
           {/* Photo Content */}
-          <div className="flex-1 flex items-center justify-center p-4">
+          <div className="flex items-center justify-center p-4 min-h-[300px] max-h-[60vh]">
             {photoUrl && !imageError ? (
-              <div className="relative max-w-full max-h-full">
+              <div className="relative w-full h-full flex items-center justify-center">
                 {imageLoading && (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -139,7 +139,7 @@ export function ProfilePhotoViewer({
                 <img
                   src={photoUrl}
                   alt={`${userName}'s profile photo`}
-                  className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                  className="w-full h-auto max-h-[60vh] object-contain rounded-lg shadow-2xl"
                   onLoad={() => setImageLoading(false)}
                   onError={() => {
                     setImageLoading(false);

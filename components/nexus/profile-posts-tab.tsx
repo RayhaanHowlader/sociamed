@@ -1,10 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { Heart, MessageCircle, Loader2 } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 
 interface UserPost {
   id: string;
@@ -19,29 +18,12 @@ interface UserPost {
   liked?: boolean;
 }
 
-interface PostComment {
-  id: string;
-  userId: string;
-  content: string;
-  createdAt: string;
-  author: {
-    name: string;
-    username: string;
-  };
-}
-
 interface ProfilePostsTabProps {
   posts: UserPost[];
   loadingPosts: boolean;
   hasMorePosts: boolean;
   loadingMorePosts: boolean;
-  postComments: Record<string, PostComment[]>;
-  commentInputs: Record<string, string>;
-  onToggleLike: (postId: string) => void;
-  onLoadComments: (postId: string) => void;
-  onAddComment: (postId: string) => void;
   onLoadMorePosts: () => void;
-  onCommentInputChange: (postId: string, value: string) => void;
 }
 
 export function ProfilePostsTab({
@@ -49,14 +31,32 @@ export function ProfilePostsTab({
   loadingPosts,
   hasMorePosts,
   loadingMorePosts,
-  postComments,
-  commentInputs,
-  onToggleLike,
-  onLoadComments,
-  onAddComment,
   onLoadMorePosts,
-  onCommentInputChange,
 }: ProfilePostsTabProps) {
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  // Infinite scroll using IntersectionObserver
+  useEffect(() => {
+    if (!loadMoreRef.current || !hasMorePosts || loadingMorePosts) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMorePosts && !loadingMorePosts) {
+          onLoadMorePosts();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(loadMoreRef.current);
+
+    return () => {
+      if (loadMoreRef.current) {
+        observer.unobserve(loadMoreRef.current);
+      }
+    };
+  }, [hasMorePosts, loadingMorePosts, onLoadMorePosts]);
+
   if (loadingPosts) {
     return (
       <div className="text-center py-12 text-slate-500">
@@ -74,10 +74,7 @@ export function ProfilePostsTab({
   }
   return (
     <div className="space-y-4">
-      {posts.map((post) => {
-        const commentsForPost = postComments[post.id] ?? [];
-        const commentValue = commentInputs[post.id] ?? '';
-        return (
+      {posts.map((post) => (
           <Card
             key={post.id}
             className="border-slate-200 shadow-sm hover:shadow-md transition-shadow"
@@ -109,78 +106,26 @@ export function ProfilePostsTab({
                   {post.stats.likes} likes · {post.stats.comments} comments
                 </span>
               </div>
-
-              <div className="flex items-center gap-4 pt-2 text-sm">
-                <button
-                  type="button"
-                  onClick={() => onToggleLike(post.id)}
-                  className="inline-flex items-center gap-1 text-slate-600 hover:text-rose-600"
-                >
-                  <Heart
-                    className="w-4 h-4"
-                    fill={post.liked ? '#fb7185' : 'none'}
-                  />
-                  <span>{post.liked ? 'Liked' : 'Like'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onLoadComments(post.id)}
-                  className="inline-flex items-center gap-1 text-slate-600 hover:text-blue-600"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  <span>Comments</span>
-                </button>
-              </div>
-
-              {commentsForPost.length > 0 && (
-                <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
-                  {commentsForPost.map((c) => (
-                    <div key={c.id} className="text-xs text-slate-700">
-                      <span className="font-semibold">{c.author.name}</span>{' '}
-                      <span className="text-slate-500">{c.author.username}</span>
-                      <div>{c.content}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {postComments[post.id] && (
-                <div className="mt-2 flex items-center gap-2">
-                  <Input
-                    value={commentValue}
-                    onChange={(e) => onCommentInputChange(post.id, e.target.value)}
-                    placeholder="Add a comment..."
-                    className="h-8 text-xs"
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="h-8 px-3 bg-gradient-to-r from-blue-600 to-cyan-600"
-                    onClick={() => onAddComment(post.id)}
-                  >
-                    Post
-                  </Button>
-                </div>
-              )}
             </CardContent>
           </Card>
-        );
-      })}
+        ))}
       
-      {/* Load more posts button */}
+      {/* Infinite scroll trigger and loading indicator */}
       {hasMorePosts && (
-        <div className="flex justify-center py-4">
-          <Button
-            variant="outline"
-            onClick={onLoadMorePosts}
-            disabled={loadingMorePosts}
-            className="text-sm"
-          >
-            {loadingMorePosts ? (
-              <Loader2 className="w-4 h-4 animate-spin mr-2" />
-            ) : null}
-            Load more posts
-          </Button>
+        <div ref={loadMoreRef} className="flex justify-center py-4">
+          {loadingMorePosts && (
+            <div className="flex items-center gap-2 text-slate-500 text-sm">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Loading more posts...
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* End message */}
+      {!hasMorePosts && posts.length > 0 && (
+        <div className="text-center py-6 text-slate-400 text-sm">
+          You've reached the end
         </div>
       )}
     </div>

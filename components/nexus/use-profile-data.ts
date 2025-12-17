@@ -185,6 +185,32 @@ export function useProfileData(userId?: string) {
     }
   };
 
+  const loadMorePosts = async () => {
+    if (loadingMorePosts || !hasMorePosts) return;
+    
+    try {
+      setLoadingMorePosts(true);
+      const lastPost = posts[posts.length - 1];
+      const url = viewedUserId 
+        ? `/api/posts/user?userId=${viewedUserId}&limit=5&after=${lastPost.createdAt}` 
+        : `/api/posts/user?limit=5&after=${lastPost.createdAt}`;
+
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) {
+        setHasMorePosts(false);
+        return;
+      }
+      const data = await res.json();
+      setPosts([...posts, ...(data.posts ?? [])]);
+      setHasMorePosts(data.hasMore ?? false);
+    } catch (err) {
+      console.error('Error loading more posts:', err);
+      setHasMorePosts(false);
+    } finally {
+      setLoadingMorePosts(false);
+    }
+  };
+
   const fetchLikedContent = async () => {
     if (likedPosts.length > 0 || likedShorts.length > 0) return;
     
@@ -307,5 +333,6 @@ export function useProfileData(userId?: string) {
     // Functions
     fetchShorts,
     fetchLikedContent,
+    loadMorePosts,
   };
 }
