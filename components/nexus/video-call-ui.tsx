@@ -18,6 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { VideoTestComponent } from './video-test-component';
+import { useAudioManagement } from './use-audio-management';
 
 interface FriendConversation {
   userId: string;
@@ -66,6 +67,9 @@ export function VideoCallUI({
   const [isMinimized, setIsMinimized] = useState(false);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  
+  // Use audio management to prevent echo
+  const { configureAudioElement } = useAudioManagement();
 
   // Set up video streams with multiple retry attempts
   useEffect(() => {
@@ -84,11 +88,8 @@ export function VideoCallUI({
           // Set the new stream
           videoElement.srcObject = callState.localStream;
           
-          // Set video properties for better compatibility
-          videoElement.muted = true; // Local video should always be muted
-          videoElement.playsInline = true;
-          videoElement.autoplay = true;
-          videoElement.controls = false;
+          // Configure audio element to prevent echo
+          configureAudioElement(videoElement, true); // true = isLocal
           
           // Multiple play attempts
           const attemptPlay = async (attempt = 1) => {
@@ -139,11 +140,8 @@ export function VideoCallUI({
           // Set the new stream
           videoElement.srcObject = callState.remoteStream;
           
-          // Set video properties for better compatibility
-          videoElement.muted = false; // Remote video should not be muted
-          videoElement.playsInline = true;
-          videoElement.autoplay = true;
-          videoElement.controls = false;
+          // Configure audio element to prevent echo
+          configureAudioElement(videoElement, false); // false = isRemote
           
           // Multiple play attempts
           const attemptPlay = async (attempt = 1) => {
@@ -364,6 +362,8 @@ export function VideoCallUI({
                 ref={(el) => {
                   if (el && callState.remoteStream) {
                     el.srcObject = callState.remoteStream;
+                    el.muted = false; // Remote audio should be heard
+                    el.volume = callState.isSpeakerEnabled ? 1.0 : 0.8; // Adjust volume based on speaker setting
                     el.play().catch(console.error);
                   }
                 }}
@@ -398,12 +398,14 @@ export function VideoCallUI({
                 ref={(el) => {
                   if (el && callState.localStream) {
                     el.srcObject = callState.localStream;
+                    el.muted = true; // CRITICAL: Always mute local video to prevent echo
+                    el.volume = 0; // Extra safety
                     el.play().catch(console.error);
                   }
                 }}
                 autoPlay
                 playsInline
-                muted
+                muted={true}
                 className="w-full h-full object-cover"
                 style={{ 
                   width: '100%',

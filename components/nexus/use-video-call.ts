@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Socket } from 'socket.io-client';
+import { useAudioManagement } from './use-audio-management';
 
 interface VideoCallState {
   isInCall: boolean;
@@ -40,6 +41,15 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
   const peerConnection = useRef<RTCPeerConnection | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  
+  // Use audio management hook to prevent echo
+  const { processLocalAudio, processRemoteAudio, configureAudioElement, cleanup: cleanupAudio } = useAudioManagement({
+    enableEchoCancellation: true,
+    enableNoiseSuppression: true,
+    enableAutoGainControl: true,
+    localAudioGain: 0.6, // Reduce local gain to prevent echo
+    remoteAudioGain: 1.0,
+  });
 
   // End call
   const endCall = useCallback(() => {
@@ -60,6 +70,9 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
     if (callState.localStream) {
       callState.localStream.getTracks().forEach(track => track.stop());
     }
+
+    // Clean up audio processing
+    cleanupAudio();
 
     // Close peer connection
     if (peerConnection.current) {
@@ -119,7 +132,7 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
     peerConnection.current = new RTCPeerConnection(configuration);
 
     // Handle remote stream
-    peerConnection.current.ontrack = (event) => {
+    peerConnection.current.ontrack = async (event) => {
       console.log('Received remote stream:', event);
       const [remoteStream] = event.streams;
       console.log('Remote stream tracks:', remoteStream.getTracks());
@@ -135,7 +148,10 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
         });
       });
       
-      setCallState(prev => ({ ...prev, remoteStream }));
+      // Process remote audio to prevent echo
+      const processedRemoteStream = await processRemoteAudio(remoteStream);
+      
+      setCallState(prev => ({ ...prev, remoteStream: processedRemoteStream }));
     };
 
     // Handle ICE candidates
@@ -180,6 +196,15 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
+          sampleRate: 48000,
+          channelCount: 1,
+          volume: 0.8,
+          // Advanced echo cancellation settings
+          googEchoCancellation: true,
+          googAutoGainControl: true,
+          googNoiseSuppression: true,
+          googHighpassFilter: true,
+          googTypingNoiseDetection: true,
         },
         video: isVideoCall ? {
           width: { ideal: 1280, max: 1920 },
@@ -210,8 +235,20 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
         track.enabled = true;
       });
       
-      setCallState(prev => ({ ...prev, localStream: stream, isVideoCall }));
-      return stream;
+      // Ensure video tracks are enabled
+      if (isVideoCall) {
+        const videoTracks = stream.getVideoTracks();
+        videoTracks.forEach(track => {
+          console.log('Video track enabled:', track.enabled, 'readyState:', track.readyState);
+          track.enabled = true;
+        });
+      }
+      
+      // Process audio to prevent echo
+      const processedStream = await processLocalAudio(stream);
+      
+      setCallState(prev => ({ ...prev, localStream: processedStream, isVideoCall }));
+      return processedStream;
     } catch (error) {
       console.error('Error accessing media devices:', error);
       throw error;
@@ -328,7 +365,16 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
 
   // Toggle speaker
   const toggleSpeaker = useCallback(() => {
-    setCallState(prev => ({ ...prev, isSpeakerEnabled: !prev.isSpeakerEnabled }));
+    setCallState(prev => {
+      const newSpeakerState = !prev.isSpeakerEnabled;
+      
+      // Update remote video element volume if it exists
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.volume = newSpeakerState ? 1.0 : 0.8;
+      }
+      
+      return { ...prev, isSpeakerEnabled: newSpeakerState };
+    });
   }, []);
 
   // Socket event listeners
