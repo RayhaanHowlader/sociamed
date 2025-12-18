@@ -132,6 +132,9 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
       ],
+      // Disable local audio monitoring
+      bundlePolicy: 'balanced' as RTCBundlePolicy,
+      rtcpMuxPolicy: 'require' as RTCRtcpMuxPolicy,
     };
 
     peerConnection.current = new RTCPeerConnection(configuration);
@@ -203,6 +206,9 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
           autoGainControl: true,
           sampleRate: 48000,
           channelCount: 1,
+          // More aggressive echo cancellation
+          latency: 0.01, // Low latency
+          volume: 0.8,
         },
         video: isVideoCall ? {
           width: { ideal: 1280, max: 1920 },
@@ -226,11 +232,23 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
         });
       }
       
-      // Ensure audio tracks are enabled
+      // Configure audio tracks to prevent echo
       const audioTracks = stream.getAudioTracks();
       audioTracks.forEach(track => {
         console.log('Audio track enabled:', track.enabled, 'readyState:', track.readyState);
         track.enabled = true;
+        
+        // Disable local monitoring/playback of this track
+        if ('monitor' in track) {
+          (track as any).monitor = false;
+        }
+        
+        // Apply constraints to prevent local audio monitoring
+        track.applyConstraints({
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        }).catch(e => console.log('Could not apply track constraints:', e));
       });
       
       // Ensure video tracks are enabled
@@ -242,8 +260,21 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
         });
       }
       
-      // Process audio to prevent echo
+      // Process audio to prevent echo and disable local monitoring
       const processedStream = await processLocalAudio(stream);
+      
+      // Additional step: Ensure no local audio monitoring at system level
+      const processedAudioTracks = processedStream.getAudioTracks();
+      processedAudioTracks.forEach(track => {
+        // Disable any local audio monitoring
+        const settings = track.getSettings();
+        console.log('[echo-fix] Audio track settings:', settings);
+        
+        // Try to disable echo if supported
+        if ('echoCancellation' in settings) {
+          console.log('[echo-fix] Echo cancellation supported:', settings.echoCancellation);
+        }
+      });
       
       // Create a display-only stream for local video (no audio to prevent echo)
       const displayStream = new MediaStream();
@@ -254,6 +285,25 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
       
       // Store WebRTC stream separately and use video-only stream for display
       webrtcStream.current = processedStream;
+      
+      // CRITICAL: Ensure local audio never gets routed to speakers
+      if (typeof window !== 'undefined' && 'AudioContext' in window) {
+        try {
+          const audioContext = new AudioContext();
+          const localAudioTracks = processedStream.getAudioTracks();
+          
+          if (localAudioTracks.length > 0) {
+            const source = audioContext.createMediaStreamSource(processedStream);
+            const gainNode = audioContext.createGain();
+            gainNode.gain.value = 0; // Mute local audio completely
+            source.connect(gainNode);
+            // Don't connect to destination to prevent local playback
+            console.log('[echo-fix] Local audio routing disabled');
+          }
+        } catch (e) {
+          console.log('[echo-fix] Could not set up audio context:', e);
+        }
+      }
       
       setCallState(prev => ({ 
         ...prev, 

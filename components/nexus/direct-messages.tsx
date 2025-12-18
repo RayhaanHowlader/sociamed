@@ -10,7 +10,7 @@ import { useSocketManagement } from './use-socket-management';
 import { useMessageHandlers } from './use-message-handlers';
 import { ChatLayout } from './chat-layout';
 import { CallUI } from './call-ui';
-import { VideoCallUI } from './video-call-ui';
+import { EchoFreeCallUI } from './echo-free-call-ui';
 import { CallAudioElements } from './call-audio-elements';
 import { ChatSearchMedia } from './chat-search-media';
 import { ImageViewerModal } from './image-viewer-modal';
@@ -376,7 +376,7 @@ export function DirectMessages() {
         onToggleMute={toggleMute}
       />
 
-      <VideoCallUI
+      <EchoFreeCallUI
         callState={videoCallState}
         selectedChat={selectedChat}
         friends={friendsManagement.friends}
