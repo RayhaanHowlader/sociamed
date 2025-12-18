@@ -68,29 +68,7 @@ export async function POST(request: NextRequest) {
       ? `${message}\n\n📎 Shared a post by ${postAuthor?.name || 'Unknown'}: ${post.content ? post.content.substring(0, 100) + (post.content.length > 100 ? '...' : '') : 'View post'}\n${postUrl}`
       : `📎 Shared a post by ${postAuthor?.name || 'Unknown'}: ${post.content ? post.content.substring(0, 100) + (post.content.length > 100 ? '...' : '') : 'View post'}\n${postUrl}`;
 
-    // Create chat messages for each friend - format for chat_history (ObjectIds)
-    const chatHistoryMessages = filteredFriendIds.map((friendId: string) => ({
-      fromUserId: new ObjectId(currentUserId),
-      toUserId: new ObjectId(friendId),
-      content: shareContent,
-      sharedPostId: new ObjectId(postId),
-      sharedPostData: {
-        content: post.content,
-        imageUrl: post.imageUrl,
-        author: {
-          userId: post.userId,
-          name: postAuthor?.name || 'Unknown',
-          username: postAuthor?.username || 'unknown',
-          avatarUrl: postAuthor?.avatarUrl || ''
-        },
-        createdAt: post.createdAt
-      },
-      createdAt: new Date(),
-      status: 'sent',
-      deleted: false
-    }));
-
-    // Create chat messages for chatMessages collection (strings)
+    // Create chat messages for chatMessages collection (primary)
     const chatMessages = filteredFriendIds.map((friendId: string) => ({
       fromUserId: currentUserId,
       toUserId: friendId,
@@ -117,11 +95,8 @@ export async function POST(request: NextRequest) {
       filePublicId: ''
     }));
 
-    // Insert all chat messages to both collections for compatibility
-    const [result, historyResult] = await Promise.all([
-      db.collection('chatMessages').insertMany(chatMessages),
-      db.collection('chat_history').insertMany(chatHistoryMessages)
-    ]);
+    // Insert chat messages to primary collection only
+    const result = await db.collection('chatMessages').insertMany(chatMessages);
 
     // Update post share count
     await db.collection('posts').updateOne(

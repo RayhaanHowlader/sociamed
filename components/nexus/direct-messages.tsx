@@ -72,14 +72,24 @@ export function DirectMessages() {
 
   // Stable callback functions to prevent socket re-initialization
   const handleMessageReceived = useCallback((message: ChatMessage) => {
+    console.log('[direct-messages] Received message:', {
+      id: message.id,
+      fromUserId: message.fromUserId,
+      hasSharedPost: !!message.sharedPostData,
+      selectedChatUserId: selectedChat?.userId
+    });
+
     messagesManagement.setMessages((prev) => {
       const exists = prev.some(m => m.id === message.id);
       if (exists) {
+        console.log('[direct-messages] Message already exists, skipping');
         return prev;
       }
+      
+      console.log('[direct-messages] Adding new message to state');
       return [...prev, message];
     });
-  }, [messagesManagement.setMessages]);
+  }, [messagesManagement.setMessages, selectedChat?.userId]);
 
   const handleMessageSeen = useCallback((messageId: string) => {
     messagesManagement.setMessages((prev) =>

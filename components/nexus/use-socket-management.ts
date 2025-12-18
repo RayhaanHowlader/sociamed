@@ -71,13 +71,41 @@ export function useSocketManagement({
     };
   }, [onMessageReceived, onMessageSeen, onMessageIdUpdated, onMessagesDeleted, onRefreshChat]);
 
+  // Track processed message IDs to prevent duplicates
+  const processedMessageIds = useRef(new Set<string>());
+
   // Stable event handlers that use refs
   const handleMessageReceived = useCallback((payload: ChatMessage) => {
+    console.log('[socket] Message received:', {
+      id: payload.id,
+      fromUserId: payload.fromUserId,
+      toUserId: payload.toUserId,
+      hasSharedPost: !!payload.sharedPostData,
+      currentUserId
+    });
+
     // Don't show our own messages (they're already shown optimistically)
     if (payload.fromUserId === currentUserId) {
+      console.log('[socket] Ignoring own message');
+      return;
+    }
+
+    // Prevent duplicate messages
+    if (processedMessageIds.current.has(payload.id)) {
+      console.log('[socket] Duplicate message ignored:', payload.id);
       return;
     }
     
+    // Mark message as processed
+    processedMessageIds.current.add(payload.id);
+    
+    // Clean up old message IDs (keep only last 1000)
+    if (processedMessageIds.current.size > 1000) {
+      const ids = Array.from(processedMessageIds.current);
+      processedMessageIds.current = new Set(ids.slice(-500));
+    }
+    
+    console.log('[socket] Processing message:', payload.id, payload.sharedPostData ? 'with shared post' : 'regular message');
     callbacksRef.current.onMessageReceived(payload);
 
     // Immediately acknowledge as seen back to the sender
@@ -108,26 +136,25 @@ export function useSocketManagement({
   useEffect(() => {
     if (!currentUserId) return;
 
-
-    
     const socketUrl = process.env.NODE_ENV === 'production' 
-      ? 'https://sociamed.onrender.com' 
+      ? (process.env.NEXT_PUBLIC_SOCKET_URL || 'https://sociamed.onrender.com')
       : 'https://sociamed.onrender.com';
+    console.log('[socket] Connecting to:', socketUrl, '(env:', process.env.NODE_ENV + ')');
     
     const socket = io(socketUrl, {
-      timeout: 15000,
+      timeout: 10000,
       transports: ['websocket'], // Only WebSocket, no polling
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      forceNew: true, // Force new connection
+      forceNew: false, // Don't force new connection unnecessarily
     });
 
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      console.log('[socket] Connected to:', socketUrl);
+      console.log('[socket] Connected successfully to:', socketUrl);
       setIsConnected(true);
     });
 
@@ -137,8 +164,17 @@ export function useSocketManagement({
     });
 
     socket.on('connect_error', (error) => {
-      console.error('[socket] Connection error:', error);
+      console.error('[socket] Connection error:', error.message);
       setIsConnected(false);
+    });
+
+    socket.on('reconnect', (attemptNumber) => {
+      console.log('[socket] Reconnected after', attemptNumber, 'attempts');
+      setIsConnected(true);
+    });
+
+    socket.on('reconnect_error', (error) => {
+      console.error('[socket] Reconnection error:', error.message);
     });
 
     // Set up message event handlers
@@ -163,12 +199,16 @@ export function useSocketManagement({
   useEffect(() => {
     if (!socketRef.current || !currentUserId || !isConnected) return;
     
+    console.log('[socket] Joining chat rooms for user:', currentUserId);
+    
     // Join room for selected chat
     if (selectedChat) {
+      console.log('[socket] Joining room for selected chat:', selectedChat.userId);
       socketRef.current.emit('chat:join', { userId: currentUserId, friendId: selectedChat.userId });
     }
     
-    // Join rooms for all friends so we can receive calls from any friend
+    // Join rooms for all friends so we can receive messages from any friend
+    console.log('[socket] Joining rooms for', friends.length, 'friends');
     friends.forEach((friend) => {
       socketRef.current?.emit('chat:join', { userId: currentUserId, friendId: friend.userId });
     });

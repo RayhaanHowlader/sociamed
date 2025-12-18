@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { Search, Send, X, AlertCircle, Loader2 } from 'lucide-react';
+import { Search, Send, AlertCircle, Loader2 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -41,9 +41,11 @@ interface SharePostModalProps {
   onOpenChange: (open: boolean) => void;
   post: Post | null;
   onShareSuccess?: (sharedCount: number) => void;
+  socket?: Socket | null; // Use existing socket instead of creating new one
+  isSocketConnected?: boolean;
 }
 
-export function SharePostModal({ open, onOpenChange, post, onShareSuccess }: SharePostModalProps) {
+export function SharePostModal({ open, onOpenChange, post, onShareSuccess, socket, isSocketConnected }: SharePostModalProps) {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFriends, setSelectedFriends] = useState<Set<string>>(new Set());
@@ -51,7 +53,6 @@ export function SharePostModal({ open, onOpenChange, post, onShareSuccess }: Sha
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [sharing, setSharing] = useState(false);
-  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -59,16 +60,6 @@ export function SharePostModal({ open, onOpenChange, post, onShareSuccess }: Sha
       setSelectedFriends(new Set());
       setMessage('');
       setError('');
-      
-      // Initialize socket connection
-      const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://sociamed.onrender.com';
-      socketRef.current = io(socketUrl);
-    } else {
-      // Disconnect socket when modal closes
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
     }
   }, [open]);
 
@@ -126,13 +117,26 @@ export function SharePostModal({ open, onOpenChange, post, onShareSuccess }: Sha
         return;
       }
 
-      // Emit socket events for real-time delivery
-      if (socketRef.current && data.messages) {
+      // Emit socket events for real-time delivery using existing socket
+      if (socket && data.messages) {
+        console.log('[share] Using existing socket, connected:', isSocketConnected);
         console.log('[share] Emitting socket messages:', data.messages.length);
-        data.messages.forEach((message: any) => {
-          console.log('[share] Emitting message to:', message.toUserId, 'with shared post:', !!message.sharedPostData);
-          socketRef.current?.emit('chat:message', message);
-        });
+        console.log('[share] Messages to emit:', data.messages);
+        
+        if (isSocketConnected) {
+          data.messages.forEach((message: any, index: number) => {
+            console.log(`[share] Emitting message ${index + 1}/${data.messages.length}:`, {
+              id: message.id,
+              fromUserId: message.fromUserId,
+              toUserId: message.toUserId,
+              hasSharedPost: !!message.sharedPostData,
+              content: message.content?.substring(0, 50) + '...'
+            });
+            socket.emit('chat:message', message);
+          });
+        } else {
+          console.log('[share] Socket not connected, messages will be delivered on next refresh');
+        }
       }
 
       // Call success callback and close modal

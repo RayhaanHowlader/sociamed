@@ -19,6 +19,7 @@ import { ImageViewerModal } from './image-viewer-modal';
 import { usePostData } from './use-post-data';
 import { useFeedInteractions } from './use-feed-interactions';
 import { useInfiniteScroll } from './use-infinite-scroll';
+import { useSocketManagement } from './use-socket-management';
 
 interface Post {
   _id: string;
@@ -85,6 +86,18 @@ export function Feed() {
   } = useFeedInteractions(posts, setPosts, postComments, setPostComments, loadComments);
 
   const { loadMoreTriggerRef } = useInfiniteScroll(hasMorePosts, loadingMore, loadMorePosts);
+
+  // Socket management for real-time features (like shared posts)
+  const { socket, isConnected } = useSocketManagement({
+    currentUserId,
+    selectedChat: null, // Feed doesn't have selected chat
+    friends: [], // Feed doesn't need friends list
+    onMessageReceived: () => {}, // Feed doesn't handle messages
+    onMessageSeen: () => {},
+    onMessageIdUpdated: () => {},
+    onMessagesDeleted: () => {},
+    onRefreshChat: () => {},
+  });
 
   const handlePostCreated = (newPost: Post) => {
     setPosts((prev) => [newPost, ...prev]);
@@ -241,6 +254,8 @@ export function Feed() {
         onOpenChange={handleShareModalChange}
         post={shareTarget}
         onShareSuccess={handleShareSuccess}
+        socket={socket}
+        isSocketConnected={isConnected}
       />
 
       <ImageViewerModal
