@@ -282,61 +282,19 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
         }
       });
       
-      // Create a display-only stream for local video (no audio to prevent echo)
-      const displayStream = new MediaStream();
-      if (isVideoCall) {
-        const videoTracks = processedStream.getVideoTracks();
-        videoTracks.forEach(track => displayStream.addTrack(track.clone()));
-      }
-      
-      // Store WebRTC stream separately and use video-only stream for display
+      // Store the processed stream for WebRTC transmission
       webrtcStream.current = processedStream;
       
-      // AGGRESSIVE ECHO ELIMINATION: Completely isolate microphone
-      if (typeof window !== 'undefined' && 'AudioContext' in window) {
-        try {
-          const audioContext = new AudioContext();
-          const localAudioTracks = processedStream.getAudioTracks();
-          
-          if (localAudioTracks.length > 0) {
-            // Create isolated audio processing chain
-            const source = audioContext.createMediaStreamSource(processedStream);
-            const gainNode = audioContext.createGain();
-            const compressor = audioContext.createDynamicsCompressor();
-            const filter = audioContext.createBiquadFilter();
-            
-            // Configure aggressive echo suppression
-            gainNode.gain.value = 0; // NEVER route to speakers
-            compressor.threshold.value = -24;
-            compressor.knee.value = 30;
-            compressor.ratio.value = 12;
-            compressor.attack.value = 0.003;
-            compressor.release.value = 0.25;
-            
-            // High-pass filter to remove low-frequency echo
-            filter.type = 'highpass';
-            filter.frequency.value = 200;
-            
-            // Connect processing chain (but NOT to destination)
-            source.connect(filter);
-            filter.connect(compressor);
-            compressor.connect(gainNode);
-            // CRITICAL: Do NOT connect to audioContext.destination
-            
-            console.log('[echo-fix] Aggressive local audio isolation enabled');
-          }
-        } catch (e) {
-          console.log('[echo-fix] Could not set up audio context:', e);
-        }
-      }
-      
+      // Use the same stream for display (video elements will be muted to prevent echo)
       setCallState(prev => ({ 
         ...prev, 
-        localStream: displayStream.getTracks().length > 0 ? displayStream : null, // Use video-only stream for display
+        localStream: processedStream, // Use full stream for display
         isVideoCall 
       }));
       
-      return processedStream; // Return original stream for WebRTC
+      console.log('[echo-fix] Stream configured - tracks:', processedStream.getTracks().length);
+      
+      return processedStream; // Return stream for WebRTC
     } catch (error) {
       console.error('Error accessing media devices:', error);
       throw error;

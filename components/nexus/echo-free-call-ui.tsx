@@ -87,136 +87,22 @@ export function EchoFreeCallUI({
     }
   }, []);
 
-  // Set up local video (video only, no audio)
-  useEffect(() => {
-    if (localVideoRef.current && callState.localStream) {
-      console.log('[echo-free] Setting up LOCAL video (video only)');
-      
-      // Create video-only stream
-      const videoOnlyStream = new MediaStream();
-      const videoTracks = callState.localStream.getVideoTracks();
-      videoTracks.forEach(track => videoOnlyStream.addTrack(track.clone()));
-      
-      const videoElement = localVideoRef.current;
-      videoElement.srcObject = videoOnlyStream;
-      videoElement.muted = true; // Always muted
-      videoElement.volume = 0; // Extra safety
-      videoElement.playsInline = true;
-      videoElement.autoplay = true;
-      
-      console.log('[echo-free] Local video setup - tracks:', videoOnlyStream.getTracks().length);
-      videoElement.play().catch(console.error);
-    }
-  }, [callState.localStream]);
+  // Video setup is now handled by inline ref callbacks for better reliability
 
-  // Set up remote video (video only)
-  useEffect(() => {
-    if (remoteVideoRef.current && callState.remoteStream) {
-      console.log('[echo-free] Setting up REMOTE video (video only)');
-      
-      // Create video-only stream for video element
-      const videoOnlyStream = new MediaStream();
-      const videoTracks = callState.remoteStream.getVideoTracks();
-      videoTracks.forEach(track => videoOnlyStream.addTrack(track.clone()));
-      
-      const videoElement = remoteVideoRef.current;
-      videoElement.srcObject = videoOnlyStream;
-      videoElement.muted = true; // Video element is muted (audio handled separately)
-      videoElement.volume = 0;
-      videoElement.playsInline = true;
-      videoElement.autoplay = true;
-      
-      console.log('[echo-free] Remote video setup - tracks:', videoOnlyStream.getTracks().length);
-      videoElement.play().catch(console.error);
-    }
-  }, [callState.remoteStream]);
-
-  // Set up remote audio (audio only, separate element) with aggressive echo prevention
+  // Set up remote audio (simplified and reliable)
   useEffect(() => {
     if (remoteAudioRef.current && callState.remoteStream) {
-      console.log('[echo-free] Setting up REMOTE audio with aggressive echo prevention');
-      
-      // Create audio-only stream for audio element
-      const audioOnlyStream = new MediaStream();
-      const audioTracks = callState.remoteStream.getAudioTracks();
-      audioTracks.forEach(track => {
-        const clonedTrack = track.clone();
-        audioOnlyStream.addTrack(clonedTrack);
-      });
+      console.log('[echo-free] Setting up REMOTE audio');
       
       const audioElement = remoteAudioRef.current;
-      
-      // AGGRESSIVE ECHO PREVENTION
-      audioElement.srcObject = audioOnlyStream;
+      audioElement.srcObject = callState.remoteStream; // Use full stream
       audioElement.muted = false; // Audio element plays sound
-      // Adjust volume based on headphone detection and speaker setting
-      const baseVolume = hasHeadphones ? 0.8 : 0.4; // Much lower volume for speakers
-      audioElement.volume = callState.isSpeakerEnabled ? Math.min(baseVolume + 0.2, 1.0) : baseVolume;
+      
+      // Simple volume control based on speaker setting
+      audioElement.volume = callState.isSpeakerEnabled ? 0.8 : 0.6;
       audioElement.autoplay = true;
       
-      // Try to set audio output device to prevent feedback
-      if ('setSinkId' in audioElement) {
-        // Try to use a specific audio output device
-        navigator.mediaDevices.enumerateDevices().then(devices => {
-          const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
-          console.log('[echo-free] Available audio outputs:', audioOutputs.length);
-          
-          if (audioOutputs.length > 0) {
-            // Use the first available audio output (usually speakers/headphones)
-            (audioElement as any).setSinkId(audioOutputs[0].deviceId).then(() => {
-              console.log('[echo-free] Audio output device set to:', audioOutputs[0].label);
-            }).catch((e: any) => {
-              console.log('[echo-free] Could not set audio output device:', e);
-            });
-          }
-        }).catch(e => {
-          console.log('[echo-free] Could not enumerate devices:', e);
-        });
-      }
-      
-      // Add additional audio processing
-      if (typeof window !== 'undefined' && 'AudioContext' in window) {
-        try {
-          const audioContext = new AudioContext();
-          const source = audioContext.createMediaStreamSource(audioOnlyStream);
-          const gainNode = audioContext.createGain();
-          const compressor = audioContext.createDynamicsCompressor();
-          const delayNode = audioContext.createDelay(0.1);
-          const filterNode = audioContext.createBiquadFilter();
-          
-          // Configure aggressive audio processing to prevent echo
-          const baseGain = hasHeadphones ? 0.7 : 0.3; // Much lower gain for speakers
-          gainNode.gain.value = callState.isSpeakerEnabled ? Math.min(baseGain + 0.2, 0.9) : baseGain;
-          
-          // Aggressive compression to prevent feedback
-          compressor.threshold.value = -30;
-          compressor.knee.value = 40;
-          compressor.ratio.value = 12;
-          compressor.attack.value = 0.001;
-          compressor.release.value = 0.1;
-          
-          // Small delay to break feedback loops
-          delayNode.delayTime.value = 0.01; // 10ms delay
-          
-          // High-pass filter to remove low frequencies that cause echo
-          filterNode.type = 'highpass';
-          filterNode.frequency.value = hasHeadphones ? 100 : 300; // More aggressive for speakers
-          filterNode.Q.value = 1;
-          
-          // Connect comprehensive processing chain
-          source.connect(filterNode);
-          filterNode.connect(compressor);
-          compressor.connect(delayNode);
-          delayNode.connect(gainNode);
-          gainNode.connect(audioContext.destination);
-          
-          console.log('[echo-free] Remote audio processing chain configured');
-        } catch (e) {
-          console.log('[echo-free] Could not set up remote audio processing:', e);
-        }
-      }
-      
-      console.log('[echo-free] Remote audio setup - tracks:', audioOnlyStream.getTracks().length);
+      console.log('[echo-free] Remote audio setup - stream tracks:', callState.remoteStream.getTracks().length);
       audioElement.play().catch(console.error);
     }
   }, [callState.remoteStream, callState.isSpeakerEnabled]);
@@ -310,10 +196,37 @@ export function EchoFreeCallUI({
           {callState.isVideoCall && callState.remoteStream ? (
             <div className="w-full h-full absolute inset-0">
               <video
-                ref={remoteVideoRef}
+                ref={(el) => {
+                  if (el && callState.remoteStream) {
+                    console.log('[video-fix] Setting up remote video element');
+                    console.log('[video-fix] Remote stream tracks:', callState.remoteStream.getTracks());
+                    console.log('[video-fix] Remote video tracks:', callState.remoteStream.getVideoTracks());
+                    
+                    el.srcObject = callState.remoteStream;
+                    el.muted = true; // Muted to prevent echo (audio handled separately)
+                    el.playsInline = true;
+                    el.autoplay = true;
+                    
+                    // Add event listeners for debugging
+                    el.addEventListener('loadedmetadata', () => {
+                      console.log('[video-fix] Remote video metadata loaded');
+                    });
+                    
+                    el.addEventListener('canplay', () => {
+                      console.log('[video-fix] Remote video can play');
+                    });
+                    
+                    // Force play
+                    el.play().then(() => {
+                      console.log('[video-fix] Remote video playing successfully');
+                    }).catch(e => {
+                      console.error('[video-fix] Remote video play failed:', e);
+                    });
+                  }
+                }}
                 autoPlay
                 playsInline
-                muted={true} // Video element is muted (audio handled by separate audio element)
+                muted={true}
                 className="w-full h-full object-cover"
                 style={{ 
                   width: '100vw',
@@ -339,10 +252,38 @@ export function EchoFreeCallUI({
           {callState.isVideoCall && callState.localStream && callState.isVideoEnabled && (
             <div className="absolute top-4 right-4 w-32 h-24 bg-black rounded-lg overflow-hidden shadow-lg z-10">
               <video
-                ref={localVideoRef}
+                ref={(el) => {
+                  if (el && callState.localStream) {
+                    console.log('[video-fix] Setting up local video element');
+                    console.log('[video-fix] Local stream tracks:', callState.localStream.getTracks());
+                    console.log('[video-fix] Local video tracks:', callState.localStream.getVideoTracks());
+                    
+                    el.srcObject = callState.localStream;
+                    el.muted = true; // CRITICAL: Always muted to prevent echo
+                    el.volume = 0;
+                    el.playsInline = true;
+                    el.autoplay = true;
+                    
+                    // Add event listeners for debugging
+                    el.addEventListener('loadedmetadata', () => {
+                      console.log('[video-fix] Local video metadata loaded');
+                    });
+                    
+                    el.addEventListener('canplay', () => {
+                      console.log('[video-fix] Local video can play');
+                    });
+                    
+                    // Force play
+                    el.play().then(() => {
+                      console.log('[video-fix] Local video playing successfully');
+                    }).catch(e => {
+                      console.error('[video-fix] Local video play failed:', e);
+                    });
+                  }
+                }}
                 autoPlay
                 playsInline
-                muted={true} // Always muted
+                muted={true}
                 className="w-full h-full object-cover"
                 style={{ 
                   width: '100%',
