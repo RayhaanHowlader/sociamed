@@ -14,7 +14,7 @@ interface VideoCallState {
   isMuted: boolean;
   isVideoEnabled: boolean;
   isSpeakerEnabled: boolean;
-  localStream: MediaStream | null;
+  localStream: MediaStream | null; // Display stream (video only)
   remoteStream: MediaStream | null;
 }
 
@@ -41,6 +41,7 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
   const peerConnection = useRef<RTCPeerConnection | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const webrtcStream = useRef<MediaStream | null>(null); // Actual stream for WebRTC (with audio)
   
   // Use audio management hook to prevent echo
   const { processLocalAudio, processRemoteAudio, configureAudioElement, cleanup: cleanupAudio } = useAudioManagement({
@@ -69,6 +70,10 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
     // Clean up streams
     if (callState.localStream) {
       callState.localStream.getTracks().forEach(track => track.stop());
+    }
+    if (webrtcStream.current) {
+      webrtcStream.current.getTracks().forEach(track => track.stop());
+      webrtcStream.current = null;
     }
 
     // Clean up audio processing
@@ -240,8 +245,23 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
       // Process audio to prevent echo
       const processedStream = await processLocalAudio(stream);
       
-      setCallState(prev => ({ ...prev, localStream: processedStream, isVideoCall }));
-      return processedStream;
+      // Create a display-only stream for local video (no audio to prevent echo)
+      const displayStream = new MediaStream();
+      if (isVideoCall) {
+        const videoTracks = processedStream.getVideoTracks();
+        videoTracks.forEach(track => displayStream.addTrack(track.clone()));
+      }
+      
+      // Store WebRTC stream separately and use video-only stream for display
+      webrtcStream.current = processedStream;
+      
+      setCallState(prev => ({ 
+        ...prev, 
+        localStream: displayStream.getTracks().length > 0 ? displayStream : null, // Use video-only stream for display
+        isVideoCall 
+      }));
+      
+      return processedStream; // Return original stream for WebRTC
     } catch (error) {
       console.error('Error accessing media devices:', error);
       throw error;
@@ -256,11 +276,13 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
       const stream = await getUserMedia(isVideoCall);
       const pc = initializePeerConnection();
 
-      // Add local stream to peer connection
-      stream.getTracks().forEach(track => {
-        console.log('Adding track to peer connection (startCall):', track);
-        pc.addTrack(track, stream);
-      });
+      // Add WebRTC stream to peer connection (not the display stream)
+      if (webrtcStream.current) {
+        webrtcStream.current.getTracks().forEach(track => {
+          console.log('Adding track to peer connection (startCall):', track.kind, track.enabled);
+          pc.addTrack(track, webrtcStream.current!);
+        });
+      }
 
       // Create offer
       const offer = await pc.createOffer();
@@ -298,11 +320,13 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
       const stream = await getUserMedia(callState.isVideoCall);
       const pc = peerConnection.current;
 
-      // Add local stream to peer connection
-      stream.getTracks().forEach(track => {
-        console.log('Adding track to peer connection (answerCall):', track);
-        pc.addTrack(track, stream);
-      });
+      // Add WebRTC stream to peer connection (not the display stream)
+      if (webrtcStream.current) {
+        webrtcStream.current.getTracks().forEach(track => {
+          console.log('Adding track to peer connection (answerCall):', track.kind, track.enabled);
+          pc.addTrack(track, webrtcStream.current!);
+        });
+      }
 
       // Create and send answer
       const answer = await pc.createAnswer();
@@ -336,24 +360,31 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
 
   // Toggle mute
   const toggleMute = useCallback(() => {
-    if (callState.localStream) {
-      const audioTrack = callState.localStream.getAudioTracks()[0];
+    if (webrtcStream.current) {
+      const audioTrack = webrtcStream.current.getAudioTracks()[0];
       if (audioTrack) {
         audioTrack.enabled = callState.isMuted;
         setCallState(prev => ({ ...prev, isMuted: !prev.isMuted }));
       }
     }
-  }, [callState.localStream, callState.isMuted]);
+  }, [callState.isMuted]);
 
   // Toggle video
   const toggleVideo = useCallback(() => {
+    // Toggle video in both streams
+    if (webrtcStream.current) {
+      const videoTrack = webrtcStream.current.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !callState.isVideoEnabled;
+      }
+    }
     if (callState.localStream) {
       const videoTrack = callState.localStream.getVideoTracks()[0];
       if (videoTrack) {
         videoTrack.enabled = !callState.isVideoEnabled;
-        setCallState(prev => ({ ...prev, isVideoEnabled: !prev.isVideoEnabled }));
       }
     }
+    setCallState(prev => ({ ...prev, isVideoEnabled: !prev.isVideoEnabled }));
   }, [callState.localStream, callState.isVideoEnabled]);
 
   // Toggle speaker

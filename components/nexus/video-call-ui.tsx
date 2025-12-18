@@ -88,8 +88,15 @@ export function VideoCallUI({
           // Set the new stream
           videoElement.srcObject = callState.localStream;
           
-          // Configure audio element to prevent echo
-          configureAudioElement(videoElement, true); // true = isLocal
+          // Configure audio element to prevent echo - CRITICAL for local video
+          videoElement.muted = true; // ALWAYS mute local video
+          videoElement.volume = 0; // Set volume to 0 as extra safety
+          if (videoElement instanceof HTMLVideoElement) {
+            videoElement.playsInline = true;
+          }
+          videoElement.autoplay = true;
+          
+          console.log('[setup] Local video configured - muted:', videoElement.muted, 'volume:', videoElement.volume);
           
           // Multiple play attempts
           const attemptPlay = async (attempt = 1) => {
@@ -140,8 +147,15 @@ export function VideoCallUI({
           // Set the new stream
           videoElement.srcObject = callState.remoteStream;
           
-          // Configure audio element to prevent echo
-          configureAudioElement(videoElement, false); // false = isRemote
+          // Configure remote video element
+          videoElement.muted = false; // Remote video should play audio
+          videoElement.volume = callState.isSpeakerEnabled ? 1.0 : 0.8;
+          if (videoElement instanceof HTMLVideoElement) {
+            videoElement.playsInline = true;
+          }
+          videoElement.autoplay = true;
+          
+          console.log('[setup] Remote video configured - muted:', videoElement.muted, 'volume:', videoElement.volume);
           
           // Multiple play attempts
           const attemptPlay = async (attempt = 1) => {
@@ -361,9 +375,21 @@ export function VideoCallUI({
               <video
                 ref={(el) => {
                   if (el && callState.remoteStream) {
+                    console.log('[video] Setting up REMOTE video element');
                     el.srcObject = callState.remoteStream;
                     el.muted = false; // Remote audio should be heard
-                    el.volume = callState.isSpeakerEnabled ? 1.0 : 0.8; // Adjust volume based on speaker setting
+                    el.volume = callState.isSpeakerEnabled ? 1.0 : 0.8;
+                    
+                    // Ensure only audio tracks from remote stream are played
+                    const audioTracks = callState.remoteStream.getAudioTracks();
+                    const videoTracks = callState.remoteStream.getVideoTracks();
+                    console.log('[remote-video] Remote stream - Audio tracks:', audioTracks.length, 'Video tracks:', videoTracks.length);
+                    
+                    // Log track details
+                    audioTracks.forEach((track, i) => {
+                      console.log(`[remote-video] Audio track ${i}:`, track.enabled, track.muted, track.readyState);
+                    });
+                    
                     el.play().catch(console.error);
                   }
                 }}
@@ -397,9 +423,31 @@ export function VideoCallUI({
               <video
                 ref={(el) => {
                   if (el && callState.localStream) {
-                    el.srcObject = callState.localStream;
-                    el.muted = true; // CRITICAL: Always mute local video to prevent echo
+                    console.log('[video] Setting up LOCAL video element - MUTING COMPLETELY');
+                    
+                    // Create a completely clean video-only stream
+                    const videoOnlyStream = new MediaStream();
+                    const videoTracks = callState.localStream.getVideoTracks();
+                    console.log('[local-video] Creating video-only stream with', videoTracks.length, 'video tracks');
+                    
+                    videoTracks.forEach(track => {
+                      const clonedTrack = track.clone();
+                      videoOnlyStream.addTrack(clonedTrack);
+                    });
+                    
+                    // Verify no audio tracks
+                    const audioTracks = videoOnlyStream.getAudioTracks();
+                    console.log('[local-video] Audio tracks in video-only stream:', audioTracks.length);
+                    
+                    el.srcObject = videoOnlyStream; // Use completely clean video-only stream
+                    el.muted = true; // CRITICAL: Always mute local video
                     el.volume = 0; // Extra safety
+                    
+                    // Disable any audio context for this element
+                    if ('audioTracks' in el) {
+                      (el as any).audioTracks = [];
+                    }
+                    
                     el.play().catch(console.error);
                   }
                 }}
