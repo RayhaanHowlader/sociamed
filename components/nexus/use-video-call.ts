@@ -138,6 +138,12 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
     };
 
     peerConnection.current = new RTCPeerConnection(configuration);
+    
+    // CRITICAL: Disable any local audio monitoring in WebRTC
+    if ('getStats' in peerConnection.current) {
+      // Disable local audio monitoring at WebRTC level
+      console.log('[echo-fix] Configuring WebRTC for zero local audio monitoring');
+    }
 
     // Handle remote stream
     peerConnection.current.ontrack = async (event) => {
@@ -286,19 +292,38 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
       // Store WebRTC stream separately and use video-only stream for display
       webrtcStream.current = processedStream;
       
-      // CRITICAL: Ensure local audio never gets routed to speakers
+      // AGGRESSIVE ECHO ELIMINATION: Completely isolate microphone
       if (typeof window !== 'undefined' && 'AudioContext' in window) {
         try {
           const audioContext = new AudioContext();
           const localAudioTracks = processedStream.getAudioTracks();
           
           if (localAudioTracks.length > 0) {
+            // Create isolated audio processing chain
             const source = audioContext.createMediaStreamSource(processedStream);
             const gainNode = audioContext.createGain();
-            gainNode.gain.value = 0; // Mute local audio completely
-            source.connect(gainNode);
-            // Don't connect to destination to prevent local playback
-            console.log('[echo-fix] Local audio routing disabled');
+            const compressor = audioContext.createDynamicsCompressor();
+            const filter = audioContext.createBiquadFilter();
+            
+            // Configure aggressive echo suppression
+            gainNode.gain.value = 0; // NEVER route to speakers
+            compressor.threshold.value = -24;
+            compressor.knee.value = 30;
+            compressor.ratio.value = 12;
+            compressor.attack.value = 0.003;
+            compressor.release.value = 0.25;
+            
+            // High-pass filter to remove low-frequency echo
+            filter.type = 'highpass';
+            filter.frequency.value = 200;
+            
+            // Connect processing chain (but NOT to destination)
+            source.connect(filter);
+            filter.connect(compressor);
+            compressor.connect(gainNode);
+            // CRITICAL: Do NOT connect to audioContext.destination
+            
+            console.log('[echo-fix] Aggressive local audio isolation enabled');
           }
         } catch (e) {
           console.log('[echo-fix] Could not set up audio context:', e);

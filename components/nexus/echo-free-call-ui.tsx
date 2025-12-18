@@ -63,9 +63,29 @@ export function EchoFreeCallUI({
   onToggleSpeaker,
 }: EchoFreeCallUIProps) {
   const [isMinimized, setIsMinimized] = useState(false);
+  const [hasHeadphones, setHasHeadphones] = useState(false);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null); // Separate audio element
+
+  // Detect headphones/speakers to adjust echo prevention
+  useEffect(() => {
+    if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+      navigator.mediaDevices.enumerateDevices().then(devices => {
+        const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
+        const hasHeadphoneDevice = audioOutputs.some(device => 
+          device.label.toLowerCase().includes('headphone') ||
+          device.label.toLowerCase().includes('headset') ||
+          device.label.toLowerCase().includes('earphone')
+        );
+        setHasHeadphones(hasHeadphoneDevice);
+        console.log('[echo-free] Headphones detected:', hasHeadphoneDevice);
+      }).catch(e => {
+        console.log('[echo-free] Could not detect audio devices:', e);
+        setHasHeadphones(false); // Assume speakers (more aggressive echo prevention)
+      });
+    }
+  }, []);
 
   // Set up local video (video only, no audio)
   useEffect(() => {
@@ -111,21 +131,90 @@ export function EchoFreeCallUI({
     }
   }, [callState.remoteStream]);
 
-  // Set up remote audio (audio only, separate element)
+  // Set up remote audio (audio only, separate element) with aggressive echo prevention
   useEffect(() => {
     if (remoteAudioRef.current && callState.remoteStream) {
-      console.log('[echo-free] Setting up REMOTE audio (audio only)');
+      console.log('[echo-free] Setting up REMOTE audio with aggressive echo prevention');
       
       // Create audio-only stream for audio element
       const audioOnlyStream = new MediaStream();
       const audioTracks = callState.remoteStream.getAudioTracks();
-      audioTracks.forEach(track => audioOnlyStream.addTrack(track.clone()));
+      audioTracks.forEach(track => {
+        const clonedTrack = track.clone();
+        audioOnlyStream.addTrack(clonedTrack);
+      });
       
       const audioElement = remoteAudioRef.current;
+      
+      // AGGRESSIVE ECHO PREVENTION
       audioElement.srcObject = audioOnlyStream;
       audioElement.muted = false; // Audio element plays sound
-      audioElement.volume = callState.isSpeakerEnabled ? 1.0 : 0.8;
+      // Adjust volume based on headphone detection and speaker setting
+      const baseVolume = hasHeadphones ? 0.8 : 0.4; // Much lower volume for speakers
+      audioElement.volume = callState.isSpeakerEnabled ? Math.min(baseVolume + 0.2, 1.0) : baseVolume;
       audioElement.autoplay = true;
+      
+      // Try to set audio output device to prevent feedback
+      if ('setSinkId' in audioElement) {
+        // Try to use a specific audio output device
+        navigator.mediaDevices.enumerateDevices().then(devices => {
+          const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
+          console.log('[echo-free] Available audio outputs:', audioOutputs.length);
+          
+          if (audioOutputs.length > 0) {
+            // Use the first available audio output (usually speakers/headphones)
+            (audioElement as any).setSinkId(audioOutputs[0].deviceId).then(() => {
+              console.log('[echo-free] Audio output device set to:', audioOutputs[0].label);
+            }).catch((e: any) => {
+              console.log('[echo-free] Could not set audio output device:', e);
+            });
+          }
+        }).catch(e => {
+          console.log('[echo-free] Could not enumerate devices:', e);
+        });
+      }
+      
+      // Add additional audio processing
+      if (typeof window !== 'undefined' && 'AudioContext' in window) {
+        try {
+          const audioContext = new AudioContext();
+          const source = audioContext.createMediaStreamSource(audioOnlyStream);
+          const gainNode = audioContext.createGain();
+          const compressor = audioContext.createDynamicsCompressor();
+          const delayNode = audioContext.createDelay(0.1);
+          const filterNode = audioContext.createBiquadFilter();
+          
+          // Configure aggressive audio processing to prevent echo
+          const baseGain = hasHeadphones ? 0.7 : 0.3; // Much lower gain for speakers
+          gainNode.gain.value = callState.isSpeakerEnabled ? Math.min(baseGain + 0.2, 0.9) : baseGain;
+          
+          // Aggressive compression to prevent feedback
+          compressor.threshold.value = -30;
+          compressor.knee.value = 40;
+          compressor.ratio.value = 12;
+          compressor.attack.value = 0.001;
+          compressor.release.value = 0.1;
+          
+          // Small delay to break feedback loops
+          delayNode.delayTime.value = 0.01; // 10ms delay
+          
+          // High-pass filter to remove low frequencies that cause echo
+          filterNode.type = 'highpass';
+          filterNode.frequency.value = hasHeadphones ? 100 : 300; // More aggressive for speakers
+          filterNode.Q.value = 1;
+          
+          // Connect comprehensive processing chain
+          source.connect(filterNode);
+          filterNode.connect(compressor);
+          compressor.connect(delayNode);
+          delayNode.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          console.log('[echo-free] Remote audio processing chain configured');
+        } catch (e) {
+          console.log('[echo-free] Could not set up remote audio processing:', e);
+        }
+      }
       
       console.log('[echo-free] Remote audio setup - tracks:', audioOnlyStream.getTracks().length);
       audioElement.play().catch(console.error);
