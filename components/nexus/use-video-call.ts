@@ -3,6 +3,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Socket } from 'socket.io-client';
 import { useAudioManagement } from './use-audio-management';
+import { useVoiceActivityDetection } from './use-voice-activity-detection';
+import { useLocalAudioIsolation } from './use-local-audio-isolation';
 
 interface VideoCallState {
   isInCall: boolean;
@@ -16,6 +18,10 @@ interface VideoCallState {
   isSpeakerEnabled: boolean;
   localStream: MediaStream | null; // Display stream (video only)
   remoteStream: MediaStream | null;
+  // Voice activity detection states
+  isLocalSpeaking: boolean;
+  isRemoteSpeaking: boolean;
+  shouldMuteRemote: boolean;
 }
 
 interface UseVideoCallProps {
@@ -36,6 +42,9 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
     isSpeakerEnabled: false,
     localStream: null,
     remoteStream: null,
+    isLocalSpeaking: false,
+    isRemoteSpeaking: false,
+    shouldMuteRemote: false,
   });
 
   const peerConnection = useRef<RTCPeerConnection | null>(null);
@@ -52,6 +61,29 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
     remoteAudioGain: 1.0,
   });
 
+  // Use voice activity detection for automatic muting
+  const { 
+    isLocalSpeaking, 
+    isRemoteSpeaking, 
+    shouldMuteRemote, 
+    startDetection, 
+    stopDetection 
+  } = useVoiceActivityDetection({
+    threshold: 20, // Lower threshold for better detection
+    silenceDelay: 600, // Faster unmuting
+    enabled: true, // Enable voice activity detection
+  });
+
+  // Use local audio isolation to prevent self-hearing
+  const { 
+    isolateLocalAudio, 
+    ensureLocalMuting, 
+    cleanup: cleanupLocalIsolation 
+  } = useLocalAudioIsolation({
+    enabled: true,
+    debugLogging: true, // Enable detailed logging
+  });
+
   // End call
   const endCall = useCallback(() => {
     if (socket && callState.callId) {
@@ -66,6 +98,12 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
         calleeId: calleeId,
       });
     }
+
+    // Stop voice activity detection
+    stopDetection();
+
+    // Clean up local audio isolation
+    cleanupLocalIsolation();
 
     // Clean up streams
     if (callState.localStream) {
@@ -97,6 +135,9 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
       isSpeakerEnabled: false,
       localStream: null,
       remoteStream: null,
+      isLocalSpeaking: false,
+      isRemoteSpeaking: false,
+      shouldMuteRemote: false,
     });
   }, [socket, callState.callId, callState.localStream, callState.callerId, currentUserId]);
 
@@ -122,6 +163,9 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
       isSpeakerEnabled: false,
       localStream: null,
       remoteStream: null,
+      isLocalSpeaking: false,
+      isRemoteSpeaking: false,
+      shouldMuteRemote: false,
     });
   }, [socket, callState.callId, callState.callerId, currentUserId]);
 
@@ -166,6 +210,12 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
       const processedRemoteStream = await processRemoteAudio(remoteStream);
       
       setCallState(prev => ({ ...prev, remoteStream: processedRemoteStream }));
+
+      // Start voice activity detection if we have both streams
+      if (webrtcStream.current && processedRemoteStream) {
+        console.log('[VAD] Both streams available, starting voice activity detection');
+        startDetection(webrtcStream.current, processedRemoteStream);
+      }
     };
 
     // Handle ICE candidates
@@ -266,35 +316,26 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
         });
       }
       
-      // Process audio to prevent echo and disable local monitoring
+      // Process audio to prevent echo
       const processedStream = await processLocalAudio(stream);
       
-      // Additional step: Ensure no local audio monitoring at system level
-      const processedAudioTracks = processedStream.getAudioTracks();
-      processedAudioTracks.forEach(track => {
-        // Disable any local audio monitoring
-        const settings = track.getSettings();
-        console.log('[echo-fix] Audio track settings:', settings);
-        
-        // Try to disable echo if supported
-        if ('echoCancellation' in settings) {
-          console.log('[echo-fix] Echo cancellation supported:', settings.echoCancellation);
-        }
-      });
+      // CRITICAL: Isolate local audio to prevent self-hearing
+      const isolatedStream = isolateLocalAudio(processedStream);
+      console.log('[SELF-HEARING-PREVENTION] ✅ Local audio isolated - you will NOT hear yourself');
       
-      // Store the processed stream for WebRTC transmission
-      webrtcStream.current = processedStream;
+      // Store the isolated stream for WebRTC transmission
+      webrtcStream.current = isolatedStream;
       
       // Use the same stream for display (video elements will be muted to prevent echo)
       setCallState(prev => ({ 
         ...prev, 
-        localStream: processedStream, // Use full stream for display
+        localStream: isolatedStream, // Use isolated stream for display
         isVideoCall 
       }));
       
-      console.log('[echo-fix] Stream configured - tracks:', processedStream.getTracks().length);
+      console.log('[SELF-HEARING-PREVENTION] ✅ Stream configured with isolation - tracks:', isolatedStream.getTracks().length);
       
-      return processedStream; // Return stream for WebRTC
+      return isolatedStream; // Return isolated stream for WebRTC
     } catch (error) {
       console.error('Error accessing media devices:', error);
       throw error;
@@ -514,6 +555,16 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
       socket.off('call-end', handleCallEnd);
     };
   }, [socket, endCall, initializePeerConnection]);
+
+  // Update call state with voice activity detection states
+  useEffect(() => {
+    setCallState(prev => ({
+      ...prev,
+      isLocalSpeaking,
+      isRemoteSpeaking,
+      shouldMuteRemote,
+    }));
+  }, [isLocalSpeaking, isRemoteSpeaking, shouldMuteRemote]);
 
   return {
     callState,

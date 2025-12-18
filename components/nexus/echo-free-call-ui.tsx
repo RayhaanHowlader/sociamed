@@ -17,6 +17,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { useLocalAudioIsolation } from './use-local-audio-isolation';
 
 interface FriendConversation {
   userId: string;
@@ -37,6 +38,9 @@ interface VideoCallState {
   isSpeakerEnabled: boolean;
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
+  isLocalSpeaking: boolean;
+  isRemoteSpeaking: boolean;
+  shouldMuteRemote: boolean;
 }
 
 interface EchoFreeCallUIProps {
@@ -68,6 +72,12 @@ export function EchoFreeCallUI({
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null); // Separate audio element
 
+  // Use local audio isolation to prevent self-hearing
+  const { ensureLocalMuting } = useLocalAudioIsolation({
+    enabled: true,
+    debugLogging: true,
+  });
+
   // Detect headphones/speakers to adjust echo prevention
   useEffect(() => {
     if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
@@ -89,23 +99,43 @@ export function EchoFreeCallUI({
 
   // Video setup is now handled by inline ref callbacks for better reliability
 
-  // Set up remote audio (simplified and reliable)
+  // Set up remote audio with voice activity detection
   useEffect(() => {
     if (remoteAudioRef.current && callState.remoteStream) {
-      console.log('[echo-free] Setting up REMOTE audio');
+      console.log('[REMOTE-AUDIO] 🔊 Setting up REMOTE audio with VAD');
       
       const audioElement = remoteAudioRef.current;
       audioElement.srcObject = callState.remoteStream; // Use full stream
-      audioElement.muted = false; // Audio element plays sound
       
-      // Simple volume control based on speaker setting
-      audioElement.volume = callState.isSpeakerEnabled ? 0.8 : 0.6;
+      // Auto-mute based on voice activity detection
+      if (callState.shouldMuteRemote) {
+        audioElement.muted = true;
+        console.log('[VAD-UI] 🔇 Remote audio MUTED (you are speaking - preventing echo)');
+      } else {
+        audioElement.muted = false;
+        console.log('[VAD-UI] 🔊 Remote audio UNMUTED (you are silent - can hear remote person)');
+      }
+      
+      // Volume control based on speaker setting
+      const volume = callState.isSpeakerEnabled ? 0.8 : 0.6;
+      audioElement.volume = volume;
       audioElement.autoplay = true;
       
-      console.log('[echo-free] Remote audio setup - stream tracks:', callState.remoteStream.getTracks().length);
-      audioElement.play().catch(console.error);
+      console.log('[REMOTE-AUDIO] 📊 Remote audio config:', {
+        muted: audioElement.muted,
+        volume: audioElement.volume,
+        speakerEnabled: callState.isSpeakerEnabled,
+        shouldMuteRemote: callState.shouldMuteRemote,
+        streamTracks: callState.remoteStream.getTracks().length
+      });
+      
+      audioElement.play().then(() => {
+        console.log('[REMOTE-AUDIO] ✅ Remote audio playing successfully');
+      }).catch(e => {
+        console.error('[REMOTE-AUDIO] ❌ Remote audio play failed:', e);
+      });
     }
-  }, [callState.remoteStream, callState.isSpeakerEnabled]);
+  }, [callState.remoteStream, callState.isSpeakerEnabled, callState.shouldMuteRemote]);
 
   // Incoming Call Dialog
   const IncomingCallDialog = () => {
@@ -254,30 +284,42 @@ export function EchoFreeCallUI({
               <video
                 ref={(el) => {
                   if (el && callState.localStream) {
-                    console.log('[video-fix] Setting up local video element');
-                    console.log('[video-fix] Local stream tracks:', callState.localStream.getTracks());
-                    console.log('[video-fix] Local video tracks:', callState.localStream.getVideoTracks());
+                    console.log('[SELF-HEARING-PREVENTION] 🎥 Setting up LOCAL video element');
+                    console.log('[SELF-HEARING-PREVENTION] 📊 Local stream tracks:', callState.localStream.getTracks());
+                    console.log('[SELF-HEARING-PREVENTION] 🎬 Local video tracks:', callState.localStream.getVideoTracks());
                     
                     el.srcObject = callState.localStream;
-                    el.muted = true; // CRITICAL: Always muted to prevent echo
-                    el.volume = 0;
+                    
+                    // CRITICAL: Use local audio isolation to prevent self-hearing
+                    ensureLocalMuting(el);
+                    console.log('[SELF-HEARING-PREVENTION] 🔇 Local video element muting enforced');
+                    
                     el.playsInline = true;
                     el.autoplay = true;
                     
                     // Add event listeners for debugging
                     el.addEventListener('loadedmetadata', () => {
-                      console.log('[video-fix] Local video metadata loaded');
+                      console.log('[SELF-HEARING-PREVENTION] 📺 Local video metadata loaded');
                     });
                     
                     el.addEventListener('canplay', () => {
-                      console.log('[video-fix] Local video can play');
+                      console.log('[SELF-HEARING-PREVENTION] ▶️ Local video can play');
+                    });
+                    
+                    el.addEventListener('play', () => {
+                      console.log('[SELF-HEARING-PREVENTION] ✅ Local video started playing (MUTED)');
+                      // Double-check muting
+                      if (!el.muted || el.volume > 0) {
+                        console.log('[SELF-HEARING-PREVENTION] ⚠️ WARNING: Local video not muted - fixing!');
+                        ensureLocalMuting(el);
+                      }
                     });
                     
                     // Force play
                     el.play().then(() => {
-                      console.log('[video-fix] Local video playing successfully');
+                      console.log('[SELF-HEARING-PREVENTION] ✅ Local video playing successfully (you will NOT hear yourself)');
                     }).catch(e => {
-                      console.error('[video-fix] Local video play failed:', e);
+                      console.error('[SELF-HEARING-PREVENTION] ❌ Local video play failed:', e);
                     });
                   }
                 }}
@@ -294,12 +336,36 @@ export function EchoFreeCallUI({
             </div>
           )}
 
-          {/* Call info overlay */}
+          {/* Call info overlay with voice activity indicators */}
           <div className="absolute top-4 left-1/2 transform -translate-x-1/2 text-center text-white">
             <p className="text-lg font-semibold">{callPartner.name}</p>
             <p className="text-sm opacity-80">
               {callState.isCalling ? 'Calling...' : callState.isInCall ? 'Connected' : 'Connecting...'}
             </p>
+            
+            {/* Voice Activity Indicators */}
+            {callState.isInCall && (
+              <div className="flex items-center justify-center gap-4 mt-2 text-xs">
+                <div className={`flex items-center gap-1 px-2 py-1 rounded ${
+                  callState.isLocalSpeaking ? 'bg-green-600' : 'bg-gray-600/50'
+                }`}>
+                  <div className={`w-2 h-2 rounded-full ${
+                    callState.isLocalSpeaking ? 'bg-green-300 animate-pulse' : 'bg-gray-400'
+                  }`} />
+                  <span>You</span>
+                </div>
+                
+                <div className={`flex items-center gap-1 px-2 py-1 rounded ${
+                  callState.isRemoteSpeaking ? 'bg-blue-600' : 'bg-gray-600/50'
+                } ${callState.shouldMuteRemote ? 'opacity-50' : ''}`}>
+                  <div className={`w-2 h-2 rounded-full ${
+                    callState.isRemoteSpeaking && !callState.shouldMuteRemote ? 'bg-blue-300 animate-pulse' : 'bg-gray-400'
+                  }`} />
+                  <span>{callPartner.name}</span>
+                  {callState.shouldMuteRemote && <span className="ml-1">🔇</span>}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
