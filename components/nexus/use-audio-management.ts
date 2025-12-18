@@ -74,12 +74,6 @@ export function useAudioManagement(options: AudioManagementOptions = {}) {
           echoCancellation: enableEchoCancellation,
           noiseSuppression: enableNoiseSuppression,
           autoGainControl: enableAutoGainControl,
-          // Additional constraints to prevent echo
-          googEchoCancellation: enableEchoCancellation,
-          googAutoGainControl: enableAutoGainControl,
-          googNoiseSuppression: enableNoiseSuppression,
-          googHighpassFilter: true,
-          googTypingNoiseDetection: true,
         }).catch(e => console.log('Could not apply audio constraints:', e));
       });
 
@@ -132,7 +126,9 @@ export function useAudioManagement(options: AudioManagementOptions = {}) {
     element.muted = isLocal;
     
     // Set additional properties
-    element.playsInline = true;
+    if (element instanceof HTMLVideoElement) {
+      element.playsInline = true;
+    }
     element.autoplay = true;
     
     // Try to set audio output device

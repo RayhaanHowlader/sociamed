@@ -198,13 +198,6 @@ export function useVideoCall({ socket, currentUserId }: UseVideoCallProps) {
           autoGainControl: true,
           sampleRate: 48000,
           channelCount: 1,
-          volume: 0.8,
-          // Advanced echo cancellation settings
-          googEchoCancellation: true,
-          googAutoGainControl: true,
-          googNoiseSuppression: true,
-          googHighpassFilter: true,
-          googTypingNoiseDetection: true,
         },
         video: isVideoCall ? {
           width: { ideal: 1280, max: 1920 },
