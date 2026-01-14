@@ -74,20 +74,20 @@ export function Stories() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+      <div className="flex items-center justify-center h-full bg-slate-50 dark:bg-slate-950">
+        <Loader2 className="w-6 h-6 animate-spin text-slate-400 dark:text-slate-500" />
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-50 p-4 md:p-6">
+    <div className="h-full overflow-y-auto bg-slate-50 dark:bg-slate-950 p-4 md:p-6">
       <div className="max-w-4xl mx-auto">
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
             Stories
           </h1>
-          <p className="text-sm text-slate-500 mt-1">Share moments that disappear after 24 hours</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Share moments that disappear after 24 hours</p>
         </div>
 
         {/* Stories Row */}
@@ -113,7 +113,7 @@ export function Stories() {
         {/* Empty State */}
         {storyGroups.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-slate-500">No stories available. Create one to get started!</p>
+            <p className="text-slate-500 dark:text-slate-400">No stories available. Create one to get started!</p>
           </div>
         )}
       </div>

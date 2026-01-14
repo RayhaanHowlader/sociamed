@@ -50,10 +50,10 @@ export function CallUI({
         open={callState.isReceivingCall && !callState.isInCall} 
         onOpenChange={(open) => !open && !callState.isInCall && onRejectCall()}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
           <DialogHeader>
-            <DialogTitle>Incoming Call</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-slate-900 dark:text-white">Incoming Call</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">
               {caller ? `${caller.name} is calling you...` : 'Someone is calling you...'}
             </DialogDescription>
           </DialogHeader>
@@ -64,8 +64,8 @@ export function CallUI({
                 <AvatarFallback className="text-3xl">{caller.name[0]}</AvatarFallback>
               </Avatar>
               <div className="text-center">
-                <p className="text-xl font-semibold">{caller.name}</p>
-                <p className="text-sm text-slate-500">@{caller.username}</p>
+                <p className="text-xl font-semibold text-slate-900 dark:text-white">{caller.name}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">@{caller.username}</p>
               </div>
               <div className="flex gap-4">
                 <Button
@@ -103,11 +103,11 @@ export function CallUI({
     
     if (!callPartner) {
       return (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+        <div className="fixed inset-0 z-50 bg-black/80 dark:bg-black/90 flex items-center justify-center">
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-8 max-w-md w-full mx-4">
             <div className="flex flex-col items-center gap-6">
               <div className="text-center">
-                <p className="text-2xl font-semibold">Connecting...</p>
+                <p className="text-2xl font-semibold text-slate-900 dark:text-white">Connecting...</p>
               </div>
             </div>
           </div>
@@ -116,16 +116,16 @@ export function CallUI({
     }
     
     return (
-      <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center">
-        <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+      <div className="fixed inset-0 z-50 bg-black/80 dark:bg-black/90 flex items-center justify-center">
+        <div className="bg-white dark:bg-slate-800 rounded-lg p-8 max-w-md w-full mx-4">
           <div className="flex flex-col items-center gap-6">
             <Avatar className="w-32 h-32">
               <AvatarImage src={callPartner.avatarUrl} />
               <AvatarFallback className="text-4xl">{callPartner.name[0]}</AvatarFallback>
             </Avatar>
             <div className="text-center">
-              <p className="text-2xl font-semibold">{callPartner.name}</p>
-              <p className="text-sm text-slate-500 mt-1">
+              <p className="text-2xl font-semibold text-slate-900 dark:text-white">{callPartner.name}</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                 {callState.isCalling ? 'Calling...' : callState.isInCall ? (callState.remoteStream ? 'Connected' : 'Connecting...') : ''}
               </p>
             </div>
@@ -133,7 +133,7 @@ export function CallUI({
               <Button
                 variant="outline"
                 size="lg"
-                className="rounded-full w-14 h-14"
+                className="rounded-full w-14 h-14 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
                 onClick={onToggleMute}
               >
                 {callState.isMuted ? (

@@ -47,19 +47,19 @@ export function GroupMembersSidebar({
   if (!show) return null;
 
   return (
-    <div className="w-72 border-l border-slate-200 bg-white">
-      <div className="p-4 border-b border-slate-200">
-        <h3 className="font-semibold text-slate-900">Members</h3>
-        <p className="text-sm text-slate-500">
+    <div className="w-72 border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+      <div className="p-4 border-b border-slate-200 dark:border-slate-700">
+        <h3 className="font-semibold text-slate-900 dark:text-white">Members</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           {selectedGroup.memberIds?.length ?? 0} total
         </p>
       </div>
       <ScrollArea className="h-[calc(100%-80px)]">
         <div className="p-4 space-y-3">
           {loadingMembers ? (
-            <p className="text-xs text-slate-500">Loading members…</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Loading members…</p>
           ) : groupMembers.length === 0 ? (
-            <p className="text-xs text-slate-500">No members found for this group.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">No members found for this group.</p>
           ) : (
             groupMembers.map((member) => {
               const isAdmin = selectedGroup.ownerId === member.id;
@@ -73,10 +73,10 @@ export function GroupMembersSidebar({
                     <AvatarFallback>{member.name[0]}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-slate-900">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
                       {member.name}
                     </p>
-                    <p className="text-xs text-slate-500">@{member.username}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">@{member.username}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge
@@ -88,7 +88,7 @@ export function GroupMembersSidebar({
                     {canRemove && (
                       <button
                         onClick={() => onRemoveMember(member)}
-                        className="inline-flex items-center justify-center rounded-md p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        className="inline-flex items-center justify-center rounded-md p-1.5 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                         title="Remove member"
                       >
                         <X className="w-4 h-4" />

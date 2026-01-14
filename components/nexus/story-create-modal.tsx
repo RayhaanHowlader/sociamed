@@ -77,9 +77,9 @@ export function StoryCreateModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md dark:bg-slate-900 dark:border-slate-700">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Edit Story' : 'Create Story'}</DialogTitle>
+          <DialogTitle className="dark:text-white">{isEditing ? 'Edit Story' : 'Create Story'}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           {/* Story Type Selection */}
@@ -111,7 +111,7 @@ export function StoryCreateModal({
           </div>
 
           {isEditing && (
-            <p className="text-xs text-slate-500 text-center">
+            <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
               You can switch between any story types and add any media without restrictions.
             </p>
           )}
@@ -123,14 +123,14 @@ export function StoryCreateModal({
                 placeholder="What's on your mind?"
                 value={textContent}
                 onChange={(e) => onTextContentChange(e.target.value)}
-                className="min-h-[200px]"
+                className="min-h-[200px] dark:bg-slate-800 dark:border-slate-700 dark:text-white"
                 maxLength={500}
               />
               
               {/* Media options for text stories during editing */}
               {isEditing && (
                 <div className="space-y-3">
-                  <p className="text-sm text-slate-600">Add media to your text story:</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300">Add media to your text story:</p>
                   <div className="grid grid-cols-3 gap-3">
                     <Button
                       variant="outline"
@@ -171,7 +171,7 @@ export function StoryCreateModal({
           {/* Video Recording Options */}
           {storyType === 'video' && (
             <div className="space-y-3">
-              <p className="text-sm text-slate-600">Choose how to add video:</p>
+              <p className="text-sm text-slate-600 dark:text-slate-300">Choose how to add video:</p>
               <div className="grid grid-cols-2 gap-3">
                 <Button
                   variant="outline"
@@ -196,7 +196,7 @@ export function StoryCreateModal({
           {/* Image Upload Options */}
           {storyType === 'image' && (
             <div className="space-y-3">
-              <p className="text-sm text-slate-600">Add images to your story:</p>
+              <p className="text-sm text-slate-600 dark:text-slate-300">Add images to your story:</p>
               <Button
                 variant="outline"
                 className="w-full h-16 flex items-center gap-2"
@@ -213,7 +213,7 @@ export function StoryCreateModal({
           {/* Media Previews - Multiple */}
           {mediaPreviews.length > 0 && (
             <div className="space-y-3">
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-slate-600 dark:text-slate-300">
                 {mediaPreviews.length} {mediaPreviews.length === 1 ? 'file' : 'files'} selected
               </p>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -223,10 +223,10 @@ export function StoryCreateModal({
                       <img
                         src={preview.url}
                         alt={`Preview ${index + 1}`}
-                        className="w-full h-32 md:h-40 object-cover rounded-lg border border-slate-200"
+                        className="w-full h-32 md:h-40 object-cover rounded-lg border border-slate-200 dark:border-slate-700"
                       />
                     ) : (
-                      <div className="relative w-full h-32 md:h-40 rounded-lg border border-slate-200 overflow-hidden bg-black">
+                      <div className="relative w-full h-32 md:h-40 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-black">
                         <video
                           src={preview.url}
                           className="w-full h-full object-cover"

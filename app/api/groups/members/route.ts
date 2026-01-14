@@ -132,6 +132,24 @@ export async function DELETE(req: NextRequest) {
 
   const notificationResult = await notifications.insertOne(notificationDoc)
 
+  // Emit socket event for real-time browser notification
+  // Note: The socket server should be running and the client should be listening
+  // This will be handled by the socket.io server
+  const socketPayload = {
+    userId: memberId,
+    groupId: String(groupId),
+    groupName: group.name || "Group",
+    removedBy: user.sub,
+    removedByProfile: {
+      name: adminProfile?.name || "Admin",
+      username: adminProfile?.username || "",
+      avatarUrl: adminProfile?.avatarUrl || "",
+    },
+  }
+
+  // The socket emission will be handled by the client calling the socket server
+  // We'll return this data so the client can emit it
+
   return NextResponse.json(
     {
       success: true,
@@ -140,6 +158,7 @@ export async function DELETE(req: NextRequest) {
         ...notificationDoc,
         createdAt: notificationDoc.createdAt.toISOString(),
       },
+      socketPayload, // Include this for client to emit
     },
     { status: 200 }
   )

@@ -146,12 +146,12 @@ export function EchoFreeCallUI({
         open={callState.isReceivingCall && !callState.isInCall} 
         onOpenChange={(open) => !open && !callState.isInCall && onRejectCall()}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-slate-900 dark:text-white">
               {callState.isVideoCall ? 'Incoming Video Call' : 'Incoming Call'}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">
               {caller ? `${caller.name} is ${callState.isVideoCall ? 'video ' : ''}calling you...` : `Someone is ${callState.isVideoCall ? 'video ' : ''}calling you...`}
             </DialogDescription>
           </DialogHeader>
@@ -162,9 +162,9 @@ export function EchoFreeCallUI({
                 <AvatarFallback className="text-3xl">{caller.name[0]}</AvatarFallback>
               </Avatar>
               <div className="text-center">
-                <p className="text-xl font-semibold">{caller.name}</p>
-                <p className="text-sm text-slate-500">@{caller.username}</p>
-                <p className="text-xs text-blue-600 mt-1">
+                <p className="text-xl font-semibold text-slate-900 dark:text-white">{caller.name}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">@{caller.username}</p>
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
                   {callState.isVideoCall ? 'Video Call' : 'Voice Call'}
                 </p>
               </div>

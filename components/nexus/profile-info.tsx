@@ -68,13 +68,13 @@ export function ProfileInfo({
 
       <div className="space-y-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{profile.name}</h1>
-          <p className="text-slate-600">{profile.username}</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{profile.name}</h1>
+          <p className="text-slate-600 dark:text-slate-400">{profile.username}</p>
         </div>
 
-        {profile.bio && <p className="text-slate-700">{profile.bio}</p>}
+        {profile.bio && <p className="text-slate-700 dark:text-slate-300">{profile.bio}</p>}
 
-        <div className="flex flex-wrap gap-4 text-sm text-slate-600">
+        <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
           {profile.location && (
             <div className="flex items-center gap-1">
               <MapPin className="w-4 h-4" />
@@ -102,16 +102,16 @@ export function ProfileInfo({
 
         <div className="flex gap-6 pt-1">
           <button className="hover:underline">
-            <span className="font-bold text-slate-900">{posts.length}</span>
-            <span className="text-slate-600 ml-1">Posts</span>
+            <span className="font-bold text-slate-900 dark:text-white">{posts.length}</span>
+            <span className="text-slate-600 dark:text-slate-400 ml-1">Posts</span>
           </button>
           <button className="hover:underline">
-            <span className="font-bold text-slate-900">{followers}</span>
-            <span className="text-slate-600 ml-1">Followers</span>
+            <span className="font-bold text-slate-900 dark:text-white">{followers}</span>
+            <span className="text-slate-600 dark:text-slate-400 ml-1">Followers</span>
           </button>
           <button className="hover:underline">
-            <span className="font-bold text-slate-900">{following}</span>
-            <span className="text-slate-600 ml-1">Following</span>
+            <span className="font-bold text-slate-900 dark:text-white">{following}</span>
+            <span className="text-slate-600 dark:text-slate-400 ml-1">Following</span>
           </button>
         </div>
       </div>

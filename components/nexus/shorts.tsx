@@ -246,15 +246,15 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-50">
+    <div className="h-full overflow-y-auto bg-slate-50 dark:bg-slate-950">
       <div className="max-w-5xl mx-auto py-6 px-4 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-              <Video className="w-6 h-6 text-blue-600" />
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <Video className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               Shorts
             </h1>
-            <p className="text-sm text-slate-500">Share quick updates with short vertical videos.</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Share quick updates with short vertical videos.</p>
           </div>
           <Button
             className="bg-gradient-to-r from-blue-600 to-cyan-600"
@@ -267,13 +267,13 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+            <Loader2 className="w-6 h-6 animate-spin text-blue-600 dark:text-blue-400" />
           </div>
         ) : shorts.length === 0 ? (
-          <Card className="border-dashed border-2 border-slate-200">
+          <Card className="border-dashed border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-900">
             <CardContent className="py-16 text-center space-y-3">
-              <Video className="w-10 h-10 text-blue-500 mx-auto" />
-              <p className="text-slate-500">No shorts yet. Be the first to share a short video!</p>
+              <Video className="w-10 h-10 text-blue-500 dark:text-blue-400 mx-auto" />
+              <p className="text-slate-500 dark:text-slate-400">No shorts yet. Be the first to share a short video!</p>
             </CardContent>
           </Card>
         ) : (

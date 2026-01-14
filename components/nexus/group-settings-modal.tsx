@@ -88,17 +88,18 @@ export function GroupSettingsModal({
         {selectedGroup && (
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                <Hash className="w-4 h-4 text-slate-400" />
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                <Hash className="w-4 h-4 text-slate-400 dark:text-slate-500" />
                 Group name
               </label>
               <Input
                 value={settingsName}
                 onChange={(e) => onSettingsNameChange(e.target.value)}
                 disabled={!canEditGroupMeta}
+                className="dark:bg-slate-800 dark:border-slate-700 dark:text-white"
               />
               {!canEditGroupMeta && (
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
                   Only the admin or when allowed by admin can change the group name.
                 </p>
               )}
@@ -106,16 +107,16 @@ export function GroupSettingsModal({
 
             {isCurrentUserAdmin && (
               <div className="space-y-2">
-                <p className="text-sm font-medium text-slate-700">Permissions</p>
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Permissions</p>
                 <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
                     <Checkbox
                       checked={settingsAllowEdit}
                       onCheckedChange={(v) => onSettingsAllowEditChange(Boolean(v))}
                     />
                     <span>Allow members to edit group name &amp; icon</span>
                   </label>
-                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
                     <Checkbox
                       checked={settingsAllowInvite}
                       onCheckedChange={(v) => onSettingsAllowInviteChange(Boolean(v))}
@@ -128,19 +129,19 @@ export function GroupSettingsModal({
 
             {(isCurrentUserAdmin || canInviteMembers) && (
               <div className="space-y-2">
-                <p className="text-sm font-medium text-slate-700">Add members</p>
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Add members</p>
                 {loadingFriends ? (
-                  <p className="text-xs text-slate-500">Loading friends…</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Loading friends…</p>
                 ) : friends.length === 0 ? (
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     You don&apos;t have any friends yet to add to this group.
                   </p>
                 ) : (
-                  <ScrollArea className="h-32 border border-slate-200 rounded-md">
+                  <ScrollArea className="h-32 border border-slate-200 dark:border-slate-700 rounded-md dark:bg-slate-800">
                     <div className="p-3 space-y-2">
                       {friends.filter((friend) => !selectedGroup.memberIds.includes(friend.id))
                         .length === 0 ? (
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
                           All of your friends are already members of this group.
                         </p>
                       ) : (
@@ -149,7 +150,7 @@ export function GroupSettingsModal({
                           .map((friend) => (
                             <label
                               key={friend.id}
-                              className="flex items-center gap-3 text-sm text-slate-700 cursor-pointer"
+                              className="flex items-center gap-3 text-sm text-slate-700 dark:text-slate-300 cursor-pointer"
                             >
                               <Checkbox
                                 checked={settingsAddMemberIds.has(friend.id)}
@@ -161,7 +162,7 @@ export function GroupSettingsModal({
                               </Avatar>
                               <div className="flex flex-col">
                                 <span className="font-medium">{friend.name}</span>
-                                <span className="text-xs text-slate-400">@{friend.username}</span>
+                                <span className="text-xs text-slate-400 dark:text-slate-500">@{friend.username}</span>
                               </div>
                             </label>
                           ))
@@ -172,7 +173,7 @@ export function GroupSettingsModal({
               </div>
             )}
 
-            {error && <p className="text-xs text-red-600">{error}</p>}
+            {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
           </div>
         )}
         <DialogFooter>

@@ -78,42 +78,42 @@ export function FriendsList({
   return (
     <div className={cn('flex flex-col', className)}>
       {/* Header */}
-      <div className="p-3 md:p-4 border-b border-slate-200">
-        <h2 className="text-lg md:text-xl font-bold text-slate-900 mb-2 md:mb-4">Messages</h2>
+      <div className="p-3 md:p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+        <h2 className="text-lg md:text-xl font-bold text-slate-900 dark:text-white mb-2 md:mb-4">Messages</h2>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4" />
           <Input
             placeholder="Search friends..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-10 border-slate-200"
+            className="pl-10 border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
           />
           {searchingFriends && (
             <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-              <div className="w-4 h-4 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin"></div>
+              <div className="w-4 h-4 border-2 border-slate-300 dark:border-slate-600 border-t-blue-600 rounded-full animate-spin"></div>
             </div>
           )}
         </div>
       </div>
 
       {/* Friends List */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 bg-white dark:bg-slate-900">
         <div className="p-2">
           {loadingFriends ? (
             <div className="flex items-center justify-center py-8">
-              <div className="w-5 h-5 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin"></div>
-              <span className="ml-2 text-slate-500 text-sm">Loading friends...</span>
+              <div className="w-5 h-5 border-2 border-slate-300 dark:border-slate-600 border-t-blue-600 rounded-full animate-spin"></div>
+              <span className="ml-2 text-slate-500 dark:text-slate-400 text-sm">Loading friends...</span>
             </div>
           ) : friends.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-xs text-slate-500 px-2 py-4">
+              <p className="text-xs text-slate-500 dark:text-slate-400 px-2 py-4">
                 {searchQuery ? `No friends found for "${searchQuery}"` : 'Add friends first to start conversations.'}
               </p>
               {searchQuery && (
                 <Button
                   variant="outline"
                   size="sm"
-                  className="mt-2"
+                  className="mt-2 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
                   onClick={onClearSearch}
                 >
                   Clear search
@@ -137,8 +137,8 @@ export function FriendsList({
                 <div ref={loadMoreFriendsRef} className="flex items-center justify-center py-4">
                   {loadingMoreFriends && (
                     <>
-                      <div className="w-4 h-4 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin"></div>
-                      <span className="ml-2 text-slate-500 text-sm">Loading more...</span>
+                      <div className="w-4 h-4 border-2 border-slate-300 dark:border-slate-600 border-t-blue-600 rounded-full animate-spin"></div>
+                      <span className="ml-2 text-slate-500 dark:text-slate-400 text-sm">Loading more...</span>
                     </>
                   )}
                 </div>
@@ -146,7 +146,7 @@ export function FriendsList({
               
               {!hasMoreFriends && friends.length > 0 && (
                 <div className="text-center py-4">
-                  <p className="text-slate-500 text-xs">You've reached the end of your friends list</p>
+                  <p className="text-slate-500 dark:text-slate-400 text-xs">You've reached the end of your friends list</p>
                 </div>
               )}
             </>
@@ -168,12 +168,12 @@ function FriendListItem({ friend, isSelected, onSelect, onViewProfile }: FriendL
   return (
     <div
       className={cn(
-        'w-full p-3 rounded-lg flex items-center gap-3 hover:bg-slate-50 transition-colors cursor-pointer',
-        isSelected && 'bg-blue-50',
+        'w-full p-3 rounded-lg flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer',
+        isSelected && 'bg-blue-50 dark:bg-blue-900/20',
       )}
     >
       <Avatar 
-        className="cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all"
+        className="cursor-pointer hover:ring-2 hover:ring-blue-300 dark:hover:ring-blue-500 transition-all"
         onClick={(e) => {
           e.stopPropagation();
           onViewProfile();
@@ -186,9 +186,9 @@ function FriendListItem({ friend, isSelected, onSelect, onViewProfile }: FriendL
         className="flex-1 text-left overflow-hidden cursor-pointer"
         onClick={onSelect}
       >
-        <p className="font-semibold text-slate-900 text-sm">{friend.name}</p>
-        <p className="text-xs text-slate-500">@{friend.username}</p>
-        <p className="text-sm text-slate-600 truncate">
+        <p className="font-semibold text-slate-900 dark:text-white text-sm">{friend.name}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">@{friend.username}</p>
+        <p className="text-sm text-slate-600 dark:text-slate-300 truncate">
           Start a conversation with {friend.name}
         </p>
       </div>

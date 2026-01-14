@@ -206,15 +206,10 @@ export function useGroupOperations({
         )
       );
 
-      // Emit socket notification
-      if (socketRef.current && data.notification) {
-        socketRef.current.emit('group:member:removed:notify', {
-          userId: memberToRemove.id,
-          groupId: selectedGroup._id,
-          groupName: selectedGroup.name,
-          removedBy: currentUserId,
-          removedByProfile: data.notification.removedByProfile,
-        });
+      // Emit socket notification to the removed member
+      if (socketRef.current && data.socketPayload) {
+        console.log('[group-operations] Emitting group:member:removed:notify', data.socketPayload);
+        socketRef.current.emit('group:member:removed:notify', data.socketPayload);
       }
 
       setRemoveMemberOpen(false);

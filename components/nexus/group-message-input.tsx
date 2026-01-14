@@ -81,7 +81,7 @@ export function GroupMessageInput({
   };
 
   return (
-    <div className="p-2 md:p-4 border-t border-slate-200 bg-white flex-shrink-0">
+    <div className="p-2 md:p-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex-shrink-0">
       <div className="max-w-3xl mx-auto space-y-2 md:space-y-3">
         {/* File Preview */}
         {filePreview && (
@@ -93,7 +93,7 @@ export function GroupMessageInput({
 
         {/* Error Message */}
         {uploadError && (
-          <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 p-2 rounded">
+          <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded">
             <AlertCircle className="w-4 h-4" />
             {uploadError}
             <Button
@@ -121,7 +121,7 @@ export function GroupMessageInput({
             <Button
               variant="ghost"
               size="icon"
-              className="text-slate-600 hover:text-blue-600 h-8 w-8 md:h-10 md:w-10"
+              className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 h-8 w-8 md:h-10 md:w-10"
               onClick={() => fileInputRef.current?.click()}
               disabled={!selectedGroup || uploadingFile}
             >
@@ -129,7 +129,7 @@ export function GroupMessageInput({
             </Button>
           </div>
           <EmojiPicker onEmojiSelect={onEmojiSelect}>
-            <Button variant="ghost" size="icon" className="text-slate-600 hover:text-blue-600 h-8 w-8 md:h-10 md:w-10">
+            <Button variant="ghost" size="icon" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 h-8 w-8 md:h-10 md:w-10">
               <Smile className="w-4 h-4 md:w-5 md:h-5" />
             </Button>
           </EmojiPicker>
@@ -137,14 +137,14 @@ export function GroupMessageInput({
             onTextReceived={onVoiceTextReceived}
             onVoiceMessageSent={onVoiceMessageSent}
           >
-            <Button variant="ghost" size="icon" className="text-slate-600 hover:text-green-600 h-8 w-8 md:h-10 md:w-10">
+            <Button variant="ghost" size="icon" className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-400 h-8 w-8 md:h-10 md:w-10">
               <Mic className="w-4 h-4 md:w-5 md:h-5" />
             </Button>
           </VoiceInput>
           <Button
             variant="ghost"
             size="icon"
-            className="text-slate-600 hover:text-purple-600 h-8 w-8 md:h-10 md:w-10"
+            className="text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 h-8 w-8 md:h-10 md:w-10"
             onClick={onCreatePoll}
             disabled={!selectedGroup || uploadingFile}
             title="Create Poll"
@@ -155,7 +155,7 @@ export function GroupMessageInput({
             placeholder={selectedGroup ? 'Type a message...' : 'Select a group to start chatting'}
             value={message}
             onChange={(e) => onMessageChange(e.target.value)}
-            className="flex-1 border-slate-200 text-sm h-8 md:h-10"
+            className="flex-1 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-sm h-8 md:h-10"
             disabled={!selectedGroup || uploadingFile}
             onKeyDown={handleKeyDown}
           />

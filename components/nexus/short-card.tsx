@@ -38,7 +38,7 @@ export function ShortCard({ short, currentUserId, onView, onLike, onDelete, onSh
 
   return (
     <Card
-      className="cursor-pointer hover:shadow-lg transition-shadow relative"
+      className="cursor-pointer hover:shadow-lg transition-shadow relative dark:border-slate-700 dark:bg-slate-900"
       onClick={() => onView(short)}
     >
       {isOwnShort && (
@@ -88,7 +88,7 @@ export function ShortCard({ short, currentUserId, onView, onLike, onDelete, onSh
               </div>
             </div>
             {short.caption && (
-              <p className="text-xs text-slate-700 line-clamp-2">{short.caption}</p>
+              <p className="text-xs text-white line-clamp-2">{short.caption}</p>
             )}
             <div className="mt-2 flex items-center justify-between text-xs text-white">
               <button

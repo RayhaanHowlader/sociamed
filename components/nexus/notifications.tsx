@@ -213,35 +213,35 @@ export function Notifications() {
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-50">
+    <div className="h-full overflow-y-auto bg-slate-50 dark:bg-slate-950">
       <div className="max-w-3xl mx-auto py-6 px-4 space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Bell className="w-6 h-6 text-blue-600" />
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <Bell className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             Notifications
           </h1>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             See new friend requests and group notifications.
           </p>
         </div>
 
         {error && (
-          <div className="flex items-center gap-2 text-sm text-red-600">
+          <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
             <AlertCircle className="w-4 h-4" />
             {error}
           </div>
         )}
 
         {loading ? (
-          <p className="text-slate-500 text-sm">Loading notifications...</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">Loading notifications...</p>
         ) : notifications.length === 0 ? (
-          <p className="text-slate-500 text-sm">No new notifications.</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">No new notifications.</p>
         ) : (
           <div className="space-y-3">
             {notifications.map((notif) => {
               if (notif.type === 'friend_request') {
                 return (
-                  <Card key={notif.id} className="border-slate-200 shadow-sm">
+                  <Card key={notif.id} className="border-slate-200 dark:border-slate-700 shadow-sm dark:bg-slate-900">
                     <CardContent className="p-4 flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
@@ -249,8 +249,8 @@ export function Notifications() {
                           <AvatarFallback>{notif.profile.name[0]}</AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="font-semibold text-slate-900">{notif.profile.name}</p>
-                          <p className="text-xs text-slate-500">
+                          <p className="font-semibold text-slate-900 dark:text-white">{notif.profile.name}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
                             {notif.profile.username} sent you a friend request.
                           </p>
                         </div>
@@ -267,7 +267,7 @@ export function Notifications() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="text-slate-600"
+                          className="text-slate-600 dark:text-slate-400 dark:border-slate-700"
                           onClick={() => handleAction(notif.id, 'decline')}
                         >
                           <X className="w-4 h-4 mr-1" />
@@ -279,14 +279,14 @@ export function Notifications() {
                 );
               } else if (notif.type === 'group_removed') {
                 return (
-                  <Card key={notif.id} className="border-slate-200 shadow-sm">
+                  <Card key={notif.id} className="border-slate-200 dark:border-slate-700 shadow-sm dark:bg-slate-900">
                     <CardContent className="p-4 flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
-                        <Users className="h-5 w-5 text-red-600" />
+                      <div className="h-10 w-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                        <Users className="h-5 w-5 text-red-600 dark:text-red-400" />
                       </div>
                       <div className="flex-1">
-                        <p className="font-semibold text-slate-900">Removed from group</p>
-                        <p className="text-xs text-slate-500">
+                        <p className="font-semibold text-slate-900 dark:text-white">Removed from group</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
                           You were removed from <span className="font-medium">{notif.groupName}</span> by{' '}
                           <span className="font-medium">{notif.removedByProfile.name}</span>
                         </p>

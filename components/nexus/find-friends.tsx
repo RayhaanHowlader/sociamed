@@ -198,18 +198,26 @@ export function FindFriends() {
       );
 
       // Emit notification to target user via socket
-      // Get the suggestion before updating state
-      const suggestion = suggestions.find((s) => s.userId === userId);
-      if (socketRef.current && suggestion && data.requestId && currentUserId) {
+      console.log('[find-friends] API response:', data);
+      if (socketRef.current && data.requestId && data.senderProfile && currentUserId) {
+        console.log('[find-friends] Emitting friend:request:notify', {
+          toUserId: userId,
+          requestId: String(data.requestId),
+          fromUserId: currentUserId,
+          profile: data.senderProfile,
+        });
         socketRef.current.emit('friend:request:notify', {
           toUserId: userId,
           requestId: String(data.requestId),
           fromUserId: currentUserId,
-          profile: {
-            name: suggestion.name,
-            username: suggestion.username,
-            avatarUrl: suggestion.avatarUrl,
-          },
+          profile: data.senderProfile,
+        });
+      } else {
+        console.log('[find-friends] Socket not ready or missing data:', {
+          socketReady: !!socketRef.current,
+          requestId: data.requestId,
+          senderProfile: data.senderProfile,
+          currentUserId,
         });
       }
     } catch (err) {
@@ -255,50 +263,50 @@ export function FindFriends() {
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-50">
+    <div className="h-full overflow-y-auto bg-slate-50 dark:bg-slate-950">
       <div className="max-w-3xl mx-auto py-6 px-4 space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <UserPlus className="w-6 h-6 text-blue-600" />
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <UserPlus className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             Find friends
           </h1>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             Discover people on Nexus and send them a friend request to start chatting.
           </p>
         </div>
 
         {profileComplete && (
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4" />
             <Input
               placeholder="Search friends by name, username, or location..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-white border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+              className="pl-10 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-white focus:border-blue-500 focus:ring-blue-500"
             />
             {searching && (
               <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                <Loader2 className="w-4 h-4 animate-spin text-slate-400 dark:text-slate-500" />
               </div>
             )}
           </div>
         )}
 
         {error && (
-          <div className="flex items-center gap-2 text-sm text-red-600">
+          <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
             <AlertCircle className="w-4 h-4" />
             {error}
           </div>
         )}
 
         {profileComplete === false && (
-          <Card className="border-amber-200 bg-amber-50">
+          <Card className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
                 <div>
-                  <p className="font-semibold text-amber-900">Profile Incomplete</p>
-                  <p className="text-sm text-amber-700">
+                  <p className="font-semibold text-amber-900 dark:text-amber-300">Profile Incomplete</p>
+                  <p className="text-sm text-amber-700 dark:text-amber-400">
                     Please complete your profile to continue finding friends and sending friend requests.
                   </p>
                 </div>
@@ -309,15 +317,15 @@ export function FindFriends() {
 
         {loading && page === 1 ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-            <span className="ml-2 text-slate-500 text-sm">Loading suggestions...</span>
+            <Loader2 className="w-6 h-6 animate-spin text-slate-400 dark:text-slate-500" />
+            <span className="ml-2 text-slate-500 dark:text-slate-400 text-sm">Loading suggestions...</span>
           </div>
         ) : !profileComplete ? (
-          <p className="text-slate-500 text-sm">Complete your profile to see friend suggestions.</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">Complete your profile to see friend suggestions.</p>
         ) : suggestions.length === 0 ? (
           <div className="text-center py-8">
-            <UserPlus className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500 text-sm">
+            <UserPlus className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+            <p className="text-slate-500 dark:text-slate-400 text-sm">
               {searchQuery ? `No friends found for "${searchQuery}"` : 'No suggestions right now. Try again later.'}
             </p>
             {searchQuery && (
@@ -334,7 +342,7 @@ export function FindFriends() {
         ) : (
           <div className="space-y-3">
             {suggestions.map((s) => (
-              <Card key={s.userId} className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+              <Card key={s.userId} className="border-slate-200 dark:border-slate-700 dark:bg-slate-900 shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="p-4 flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <Avatar className="h-10 w-10">
@@ -342,10 +350,10 @@ export function FindFriends() {
                       <AvatarFallback>{s.name[0]}</AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-semibold text-slate-900">{s.name}</p>
-                      <p className="text-xs text-slate-500">@{s.username}</p>
+                      <p className="font-semibold text-slate-900 dark:text-white">{s.name}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">@{s.username}</p>
                       {s.location && (
-                        <p className="flex items-center gap-1 text-xs text-slate-500 mt-1">
+                        <p className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 mt-1">
                           <MapPin className="w-3 h-3" />
                           {s.location}
                         </p>
@@ -396,8 +404,8 @@ export function FindFriends() {
               <div ref={loadMoreRef} className="flex items-center justify-center py-4">
                 {loadingMore && (
                   <>
-                    <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
-                    <span className="ml-2 text-slate-500 text-sm">Loading more...</span>
+                    <Loader2 className="w-5 h-5 animate-spin text-slate-400 dark:text-slate-500" />
+                    <span className="ml-2 text-slate-500 dark:text-slate-400 text-sm">Loading more...</span>
                   </>
                 )}
               </div>
@@ -405,7 +413,7 @@ export function FindFriends() {
             
             {!hasMore && suggestions.length > 0 && (
               <div className="text-center py-4">
-                <p className="text-slate-500 text-sm">You've reached the end of suggestions</p>
+                <p className="text-slate-500 dark:text-slate-400 text-sm">You've reached the end of suggestions</p>
               </div>
             )}
           </div>

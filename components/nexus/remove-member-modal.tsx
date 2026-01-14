@@ -40,8 +40,8 @@ export function RemoveMemberModal({
               <UserX className="w-6 h-6 text-white" />
             </div>
             <div>
-              <DialogTitle className="text-xl font-bold text-slate-900">Remove member</DialogTitle>
-              <DialogDescription className="text-sm text-slate-600 mt-1">
+              <DialogTitle className="text-xl font-bold text-slate-900 dark:text-white">Remove member</DialogTitle>
+              <DialogDescription className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                 This action will remove the member from the group
               </DialogDescription>
             </div>
@@ -50,7 +50,7 @@ export function RemoveMemberModal({
 
         <div className="py-4 space-y-4">
           {/* Group info */}
-          <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+          <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-sm overflow-hidden">
               {groupIcon?.startsWith('http') ? (
                 <img 
@@ -68,13 +68,13 @@ export function RemoveMemberModal({
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-slate-900 truncate">{groupName}</p>
-              <p className="text-xs text-slate-500">Group</p>
+              <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{groupName}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Group</p>
             </div>
           </div>
 
           {/* Member info */}
-          <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg border border-red-200">
+          <div className="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
             <Avatar className="w-10 h-10">
               <AvatarImage src={member.avatarUrl} />
               <AvatarFallback className="bg-gradient-to-br from-red-500 to-orange-500 text-white">
@@ -82,17 +82,17 @@ export function RemoveMemberModal({
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-slate-900 truncate">{member.name}</p>
-              <p className="text-xs text-slate-500 truncate">@{member.username}</p>
+              <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{member.name}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">@{member.username}</p>
             </div>
           </div>
 
           {/* Warning message */}
-          <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="text-sm font-medium text-amber-900">Are you sure?</p>
-              <p className="text-xs text-amber-700 mt-1">
+              <p className="text-sm font-medium text-amber-900 dark:text-amber-300">Are you sure?</p>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
                 <span className="font-semibold">{member.name}</span> will be removed from{' '}
                 <span className="font-semibold">{groupName}</span>. They will no longer be able to see group messages
                 or participate in the conversation.

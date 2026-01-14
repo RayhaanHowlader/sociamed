@@ -57,7 +57,16 @@ export async function POST(req: NextRequest) {
 
   const result = await friendRequests.insertOne(doc)
 
-  return NextResponse.json({ requestId: result.insertedId, request: doc }, { status: 201 })
+  // Return sender profile for socket notification
+  return NextResponse.json({ 
+    requestId: result.insertedId, 
+    request: doc,
+    senderProfile: {
+      name: userProfile.name,
+      username: userProfile.username,
+      avatarUrl: userProfile.avatarUrl || undefined,
+    }
+  }, { status: 201 })
 }
 
 

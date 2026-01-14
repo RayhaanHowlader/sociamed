@@ -168,21 +168,21 @@ export function ShareShortModal({ open, onOpenChange, short, onShareSuccess }: S
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md dark:bg-slate-900 dark:border-slate-700">
         <DialogHeader>
-          <DialogTitle>Share Short</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="dark:text-white">Share Short</DialogTitle>
+          <DialogDescription className="dark:text-slate-400">
             Share this short with your friends via direct messages
           </DialogDescription>
         </DialogHeader>
 
         {success ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <Send className="w-8 h-8 text-green-600" />
+            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4">
+              <Send className="w-8 h-8 text-green-600 dark:text-green-400" />
             </div>
-            <h3 className="text-lg font-semibold text-green-800 mb-2">Short Shared!</h3>
-            <p className="text-sm text-green-600">
+            <h3 className="text-lg font-semibold text-green-800 dark:text-green-300 mb-2">Short Shared!</h3>
+            <p className="text-sm text-green-600 dark:text-green-400">
               Your short has been shared with {selectedFriends.size} friend{selectedFriends.size !== 1 ? 's' : ''}
             </p>
           </div>
@@ -191,18 +191,18 @@ export function ShareShortModal({ open, onOpenChange, short, onShareSuccess }: S
             {/* Friends Search */}
             <div className="space-y-3">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4" />
                 <Input
                   placeholder="Search friends..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
                 />
               </div>
 
               {/* Selected Friends Count */}
               {selectedFriends.size > 0 && (
-                <p className="text-sm text-slate-600">
+                <p className="text-sm text-slate-600 dark:text-slate-300">
                   {selectedFriends.size} friend{selectedFriends.size !== 1 ? 's' : ''} selected
                 </p>
               )}
@@ -211,7 +211,7 @@ export function ShareShortModal({ open, onOpenChange, short, onShareSuccess }: S
               <ScrollArea className="h-48">
                 <div className="space-y-2">
                   {filteredFriends.length === 0 ? (
-                    <p className="text-sm text-slate-500 text-center py-4">
+                    <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">
                       {searchQuery ? 'No friends found' : 'No friends available'}
                     </p>
                   ) : (
@@ -220,8 +220,8 @@ export function ShareShortModal({ open, onOpenChange, short, onShareSuccess }: S
                         key={friend.userId}
                         className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
                           selectedFriends.has(friend.userId)
-                            ? 'bg-blue-50 border border-blue-200'
-                            : 'hover:bg-slate-50'
+                            ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
+                            : 'hover:bg-slate-50 dark:hover:bg-slate-800'
                         }`}
                         onClick={() => toggleFriend(friend.userId)}
                       >
@@ -230,8 +230,8 @@ export function ShareShortModal({ open, onOpenChange, short, onShareSuccess }: S
                           <AvatarFallback>{friend.name[0]}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1">
-                          <p className="text-sm font-medium">{friend.name}</p>
-                          <p className="text-xs text-slate-500">@{friend.username}</p>
+                          <p className="text-sm font-medium dark:text-white">{friend.name}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">@{friend.username}</p>
                         </div>
                         <div className={`w-4 h-4 rounded border-2 ${
                           selectedFriends.has(friend.userId)
@@ -251,22 +251,23 @@ export function ShareShortModal({ open, onOpenChange, short, onShareSuccess }: S
 
             {/* Optional Message */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Add a message (optional)</label>
+              <label className="text-sm font-medium dark:text-white">Add a message (optional)</label>
               <Textarea
                 placeholder="Say something about this short..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 rows={2}
                 maxLength={200}
+                className="dark:bg-slate-800 dark:border-slate-700 dark:text-white"
               />
-              <p className="text-xs text-slate-500 text-right">{message.length}/200</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 text-right">{message.length}/200</p>
             </div>
 
             {/* Error Message */}
             {error && (
-              <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
-                <p className="text-sm text-red-700">{error}</p>
+              <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" />
+                <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
               </div>
             )}
 

@@ -8,6 +8,7 @@ import { useMessagesManagement } from './use-messages-management';
 import { useFileUpload } from './use-file-upload';
 import { useSocketManagement } from './use-socket-management';
 import { useMessageHandlers } from './use-message-handlers';
+import { useNotifications } from './use-notifications';
 import { ChatLayout } from './chat-layout';
 import { CallUI } from './call-ui';
 import { EchoFreeCallUI } from './echo-free-call-ui';
@@ -69,6 +70,7 @@ export function DirectMessages() {
   const friendsManagement = useFriendsManagement();
   const messagesManagement = useMessagesManagement(currentUserId, selectedChat);
   const fileUpload = useFileUpload();
+  const { showNotification } = useNotifications();
 
   // Stable callback functions to prevent socket re-initialization
   const handleMessageReceived = useCallback((message: ChatMessage) => {
@@ -87,9 +89,38 @@ export function DirectMessages() {
       }
       
       console.log('[direct-messages] Adding new message to state');
+      
+      // Show notification if message is from someone else
+      if (message.fromUserId !== currentUserId) {
+        const sender = friendsManagement.friends.find(f => f.userId === message.fromUserId);
+        
+        let notificationBody = message.content;
+        if (message.fileUrl && message.isImage) {
+          notificationBody = '📷 Sent a photo';
+        } else if (message.fileUrl && message.mimeType?.startsWith('audio/')) {
+          notificationBody = '🎤 Sent a voice message';
+        } else if (message.fileUrl) {
+          notificationBody = `📎 Sent a file: ${message.fileName || 'file'}`;
+        } else if (message.sharedPostData) {
+          notificationBody = '📝 Shared a post';
+        }
+        
+        showNotification({
+          title: sender?.name || 'New Message',
+          body: notificationBody,
+          icon: sender?.avatarUrl,
+          tag: `message-${message.fromUserId}`,
+          data: {
+            type: 'message',
+            userId: message.fromUserId,
+            messageId: message.id,
+          }
+        });
+      }
+      
       return [...prev, message];
     });
-  }, [messagesManagement.setMessages, selectedChat?.userId]);
+  }, [messagesManagement.setMessages, selectedChat?.userId, currentUserId, friendsManagement.friends, showNotification]);
 
   const handleMessageSeen = useCallback((messageId: string) => {
     messagesManagement.setMessages((prev) =>

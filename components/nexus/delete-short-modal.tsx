@@ -45,17 +45,17 @@ export function DeleteShortModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg dark:bg-slate-800 dark:border-slate-700">
         <DialogHeader>
           <div className="flex items-start gap-3">
             <div className="p-3 rounded-2xl bg-gradient-to-br from-red-500 via-rose-500 to-orange-500 text-white shadow-lg shadow-red-500/30">
               <Trash2 className="w-6 h-6" />
             </div>
             <div>
-              <DialogTitle className="text-xl font-semibold text-slate-900">
+              <DialogTitle className="text-xl font-semibold text-slate-900 dark:text-white">
                 Delete this short?
               </DialogTitle>
-              <DialogDescription className="text-sm text-slate-600 mt-1">
+              <DialogDescription className="text-sm text-slate-600 dark:text-slate-300 mt-1">
                 This action will permanently remove the video from Nexus and Cloudinary. You can’t undo this.
               </DialogDescription>
             </div>
@@ -63,12 +63,12 @@ export function DeleteShortModal({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="rounded-xl border border-red-100 bg-red-50/70 p-4 shadow-sm">
-            <div className="flex items-center gap-3 text-sm text-red-900">
+          <div className="rounded-xl border border-red-100 dark:border-red-900/50 bg-red-50/70 dark:bg-red-900/20 p-4 shadow-sm">
+            <div className="flex items-center gap-3 text-sm text-red-900 dark:text-red-300">
               <AlertTriangle className="w-5 h-5" />
               <div className="font-medium">You’re about to permanently delete this video.</div>
             </div>
-            <ul className="mt-3 space-y-2 text-xs text-red-700">
+            <ul className="mt-3 space-y-2 text-xs text-red-700 dark:text-red-400">
               <li>• The short will be removed from everyone’s feed immediately.</li>
               <li>• The video file will be deleted from Cloudinary storage.</li>
               <li>• Likes and comments tied to this short will be lost.</li>

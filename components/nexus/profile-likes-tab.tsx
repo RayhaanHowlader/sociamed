@@ -66,7 +66,7 @@ export function ProfileLikesTab({
 }: ProfileLikesTabProps) {
   if (loadingLikes) {
     return (
-      <div className="text-center py-12 text-slate-500">
+      <div className="text-center py-12 text-slate-500 dark:text-slate-400">
         <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
         Loading liked content...
       </div>
@@ -75,7 +75,7 @@ export function ProfileLikesTab({
 
   if (likedPosts.length === 0 && likedShorts.length === 0) {
     return (
-      <div className="text-center py-12 text-slate-500">
+      <div className="text-center py-12 text-slate-500 dark:text-slate-400">
         Liked posts and shorts will appear here.
       </div>
     );
@@ -85,12 +85,12 @@ export function ProfileLikesTab({
       {/* Liked Posts Section */}
       {likedPosts.length > 0 && (
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Liked Posts</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Liked Posts</h3>
           <div className="space-y-4">
             {likedPosts.map((post) => (
               <Card
                 key={post._id}
-                className="border-slate-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                className="border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow cursor-pointer dark:bg-slate-900"
                 onClick={() => onHighlightPost(post._id)}
               >
                 <CardContent className="p-4">
@@ -100,15 +100,15 @@ export function ProfileLikesTab({
                       <AvatarFallback>{post.author.name?.[0]}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-slate-900">{post.author.name}</p>
-                      <p className="text-xs text-slate-500">{post.author.username}</p>
+                      <p className="font-semibold text-sm text-slate-900 dark:text-white">{post.author.name}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{post.author.username}</p>
                     </div>
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-slate-400 dark:text-slate-500">
                       {new Date(post.createdAt).toLocaleDateString()}
                     </span>
                   </div>
                   
-                  <p className="text-sm text-slate-700 mb-3 line-clamp-3">{post.content}</p>
+                  <p className="text-sm text-slate-700 dark:text-slate-300 mb-3 line-clamp-3">{post.content}</p>
                   
                   {post.imageUrl && (
                     <div className="rounded-lg overflow-hidden mb-3">
@@ -120,7 +120,7 @@ export function ProfileLikesTab({
                     </div>
                   )}
                   
-                  <div className="flex items-center gap-4 text-xs text-slate-500">
+                  <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
                     <span>{post.stats.likes} likes</span>
                     <span>{post.stats.comments} comments</span>
                     <span>{post.stats.shares} shares</span>
@@ -135,7 +135,7 @@ export function ProfileLikesTab({
       {/* Liked Shorts Section */}
       {likedShorts.length > 0 && (
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Liked Shorts</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Liked Shorts</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {likedShorts.map((short) => (
               <ProfileShortCard

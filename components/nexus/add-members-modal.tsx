@@ -126,8 +126,8 @@ export function AddMembersModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] max-w-2xl h-[90vh] max-h-[600px] flex flex-col gap-0 p-0">
-        <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b border-slate-200">
-          <DialogTitle className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-3">
+        <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b border-slate-200 dark:border-slate-700">
+          <DialogTitle className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
             <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-lg sm:text-xl shadow-sm overflow-hidden flex-shrink-0">
               {groupIcon?.startsWith('http') ? (
                 <img 
@@ -146,7 +146,7 @@ export function AddMembersModal({
             </div>
             <span className="truncate text-sm sm:text-lg">Add members to {groupName}</span>
           </DialogTitle>
-          <DialogDescription className="text-xs sm:text-sm text-slate-600 mt-2">
+          <DialogDescription className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-2">
             Select friends to invite to this group. You can search and select multiple members at once.
           </DialogDescription>
         </DialogHeader>
@@ -154,26 +154,26 @@ export function AddMembersModal({
         <div className="flex-1 flex flex-col min-h-0 space-y-3 p-6 pt-4">
           {/* Search bar */}
           <div className="relative flex-shrink-0">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4" />
             <Input
               placeholder="Search friends..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 border-slate-200 focus:border-blue-500 focus:ring-blue-500 text-sm"
+              className="pl-10 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white focus:border-blue-500 focus:ring-blue-500 text-sm"
             />
           </div>
 
           {/* Selected count */}
           {selectedMemberIds.size > 0 && (
-            <div className="flex-shrink-0 flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <span className="text-xs sm:text-sm font-medium text-blue-900 truncate">
+            <div className="flex-shrink-0 flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <span className="text-xs sm:text-sm font-medium text-blue-900 dark:text-blue-300 truncate">
                 {selectedMemberIds.size} {selectedMemberIds.size === 1 ? 'member' : 'members'} selected
               </span>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setSelectedMemberIds(new Set())}
-                className="h-6 sm:h-7 px-2 sm:px-3 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-100 flex-shrink-0 ml-2"
+                className="h-6 sm:h-7 px-2 sm:px-3 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 flex-shrink-0 ml-2"
               >
                 Clear
               </Button>
@@ -181,20 +181,20 @@ export function AddMembersModal({
           )}
 
           {/* Friends list */}
-          <div className="flex-1 min-h-0 border border-slate-200 rounded-lg bg-white overflow-hidden">
+          <div className="flex-1 min-h-0 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 overflow-hidden">
             {loadingFriends ? (
               <div className="flex items-center justify-center h-full py-12">
-                <p className="text-sm text-slate-500">Loading friends…</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Loading friends…</p>
               </div>
             ) : filteredFriends.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center px-4">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
-                  <UserPlus className="w-6 h-6 sm:w-8 sm:h-8 text-slate-400" />
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center mb-4">
+                  <UserPlus className="w-6 h-6 sm:w-8 sm:h-8 text-slate-400 dark:text-slate-500" />
                 </div>
-                <p className="text-sm font-medium text-slate-900 mb-2">
+                <p className="text-sm font-medium text-slate-900 dark:text-white mb-2">
                   {availableFriends.length === 0 ? 'All friends are already in this group' : 'No friends found'}
                 </p>
-                <p className="text-xs text-slate-500 max-w-sm">
+                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm">
                   {availableFriends.length === 0
                     ? 'You have added all your friends to this group.'
                     : 'Try adjusting your search terms to find more friends.'}
@@ -208,8 +208,8 @@ export function AddMembersModal({
                       key={friend.id}
                       className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg cursor-pointer transition-all border ${
                         selectedMemberIds.has(friend.id)
-                          ? 'bg-blue-50 border-blue-300 shadow-sm'
-                          : 'hover:bg-slate-50 border-transparent hover:border-slate-200'
+                          ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 shadow-sm'
+                          : 'hover:bg-slate-50 dark:hover:bg-slate-700 border-transparent hover:border-slate-200 dark:hover:border-slate-600'
                       }`}
                       onClick={() => toggleMember(friend.id)}
                     >
@@ -225,8 +225,8 @@ export function AddMembersModal({
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-slate-900 truncate">{friend.name}</p>
-                        <p className="text-xs text-slate-500 truncate">@{friend.username}</p>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{friend.name}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">@{friend.username}</p>
                       </div>
                       {selectedMemberIds.has(friend.id) && (
                         <div className="flex-shrink-0">
@@ -244,14 +244,14 @@ export function AddMembersModal({
 
           {/* Error message */}
           {error && (
-            <div className="flex-shrink-0 flex items-start gap-2 px-3 sm:px-4 py-2 sm:py-3 bg-red-50 border border-red-200 rounded-lg">
-              <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-              <p className="text-xs sm:text-sm text-red-600 break-words">{error}</p>
+            <div className="flex-shrink-0 flex items-start gap-2 px-3 sm:px-4 py-2 sm:py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs sm:text-sm text-red-600 dark:text-red-400 break-words">{error}</p>
             </div>
           )}
         </div>
 
-        <DialogFooter className="flex-shrink-0 border-t border-slate-200 p-6 pt-4 bg-white">
+        <DialogFooter className="flex-shrink-0 border-t border-slate-200 dark:border-slate-700 p-6 pt-4 bg-white dark:bg-slate-900">
           <div className="flex flex-col sm:flex-row gap-3 w-full">
             <Button 
               variant="ghost" 

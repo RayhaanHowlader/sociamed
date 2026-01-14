@@ -90,11 +90,11 @@ export function Profile({ userId }: ProfileProps = {}) {
   };
 
   return (
-    <ScrollArea className="h-full bg-slate-50">
+    <ScrollArea className="h-full bg-slate-50 dark:bg-slate-950">
       <div className="max-w-4xl mx-auto">
         {loading ? (
           <div className="flex items-center justify-center py-24">
-            <Loader2 className="size-6 animate-spin text-blue-600" />
+            <Loader2 className="size-6 animate-spin text-blue-600 dark:text-blue-400" />
           </div>
         ) : profile ? (
           <>

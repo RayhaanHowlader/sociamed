@@ -188,22 +188,22 @@ export function MessagesArea({
 
   return (
     <ScrollArea 
-      className="flex-1 p-3 md:p-6 bg-slate-50 h-[calc(100vh-220px)]"
+      className="flex-1 p-3 md:p-6 bg-slate-50 dark:bg-slate-900 h-[calc(100vh-220px)]"
       ref={messagesContainerRef}
     >
       {selectedChat ? (
         <div className="space-y-4 max-w-3xl mx-auto">
           {/* Beginning of conversation indicator */}
           {!hasMoreMessages && filteredMessages.length > 0 && (
-            <div className="flex flex-col items-center py-8 space-y-3 border-b border-slate-200 mb-4">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center shadow-sm">
-                <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex flex-col items-center py-8 space-y-3 border-b border-slate-200 dark:border-slate-700 mb-4">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/40 dark:to-purple-900/40 rounded-full flex items-center justify-center shadow-sm">
+                <svg className="w-8 h-8 text-blue-500 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               </div>
               <div className="text-center space-y-1">
-                <p className="text-sm font-semibold text-slate-700">Beginning of conversation</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Beginning of conversation</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   This is where your conversation with {selectedChat?.name} started
                 </p>
               </div>
@@ -217,6 +217,7 @@ export function MessagesArea({
                 size="sm"
                 onClick={onLoadMoreMessages}
                 disabled={loadingMore}
+                className="dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
               >
                 {loadingMore ? 'Loading…' : 'Load older messages'}
               </Button>
@@ -226,7 +227,7 @@ export function MessagesArea({
           {/* Loading indicator when loading more messages */}
           {loadingMore && (
             <div className="flex justify-center py-2">
-              <div className="text-sm text-slate-500">Loading older messages...</div>
+              <div className="text-sm text-slate-500 dark:text-slate-400">Loading older messages...</div>
             </div>
           )}
           
@@ -253,7 +254,7 @@ export function MessagesArea({
           <div ref={messagesEndRef} />
         </div>
       ) : (
-        <div className="h-full flex items-center justify-center text-slate-400 text-sm">
+        <div className="h-full flex items-center justify-center text-slate-400 dark:text-slate-500 text-sm">
           Select a friend from the list to begin chatting.
         </div>
       )}

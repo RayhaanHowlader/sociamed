@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { UserMinus, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { UnfriendModal } from './unfriend-modal';
+import { io } from 'socket.io-client';
 
 interface FriendshipActionsProps {
   viewedUserId: string | null;
@@ -64,10 +65,29 @@ export function FriendshipActions({
         body: JSON.stringify({ toUserId: viewedUserId }),
       });
       
+      const data = await res.json();
+      
       if (res.ok) {
+        // Emit socket notification
+        if (data.requestId && data.senderProfile && currentUserId) {
+          const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://sociamed.onrender.com';
+          const socket = io(socketUrl);
+          
+          socket.on('connect', () => {
+            socket.emit('friend:request:notify', {
+              toUserId: viewedUserId,
+              requestId: String(data.requestId),
+              fromUserId: currentUserId,
+              profile: data.senderProfile,
+            });
+            
+            // Disconnect after emitting
+            setTimeout(() => socket.disconnect(), 1000);
+          });
+        }
+        
         alert('Friend request sent!');
       } else {
-        const data = await res.json();
         alert(data.error || 'Failed to send friend request');
       }
     } catch (err) {

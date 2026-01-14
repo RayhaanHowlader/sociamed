@@ -51,11 +51,11 @@ export function DeleteGroupModal({
           </DialogDescription>
         </DialogHeader>
         <div className="py-2">
-          <p className="text-sm text-slate-700">
+          <p className="text-sm text-slate-700 dark:text-slate-300">
             Are you sure you want to delete{' '}
             <span className="font-semibold">{selectedGroup?.name}</span>?
           </p>
-          {deleteError && <p className="mt-2 text-xs text-red-600">{deleteError}</p>}
+          {deleteError && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{deleteError}</p>}
         </div>
         <DialogFooter>
           <Button

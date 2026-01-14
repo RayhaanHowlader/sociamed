@@ -25,12 +25,12 @@ export function Sidebar({ activeView, onViewChange, notificationCount = 0 }: Sid
 
   return (
     // Hidden on mobile, shown on md+; mobile nav is handled in the top header
-    <aside className="hidden md:flex w-56 bg-white border-r border-slate-200 flex-col h-full">
-      <div className="p-4 border-b border-slate-200 flex-shrink-0">
+    <aside className="hidden md:flex w-56 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 flex-col h-full">
+      <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
         <h1 className="text-sm font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
           Nexus
         </h1>
-        <p className="text-[10px] text-slate-500">Connect & Share</p>
+        <p className="text-[10px] text-slate-500 dark:text-slate-400">Connect & Share</p>
       </div>
 
       <nav className="flex-1 px-3 py-3 space-y-2 min-h-0">
@@ -46,8 +46,8 @@ export function Sidebar({ activeView, onViewChange, notificationCount = 0 }: Sid
               className={cn(
                 'w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all relative',
                 isActive
-                  ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-blue-200'
-                  : 'text-slate-600 hover:bg-slate-100'
+                  ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-blue-200 dark:shadow-blue-900/50'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
               )}
             >
               <div className="relative">

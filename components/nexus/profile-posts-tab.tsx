@@ -59,7 +59,7 @@ export function ProfilePostsTab({
 
   if (loadingPosts) {
     return (
-      <div className="text-center py-12 text-slate-500">
+      <div className="text-center py-12 text-slate-500 dark:text-slate-400">
         Loading your posts...
       </div>
     );
@@ -67,7 +67,7 @@ export function ProfilePostsTab({
 
   if (posts.length === 0) {
     return (
-      <div className="text-center py-12 text-slate-500">
+      <div className="text-center py-12 text-slate-500 dark:text-slate-400">
         Your posts will appear here.
       </div>
     );
@@ -77,14 +77,14 @@ export function ProfilePostsTab({
       {posts.map((post) => (
           <Card
             key={post.id}
-            className="border-slate-200 shadow-sm hover:shadow-md transition-shadow"
+            className="border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow dark:bg-slate-900"
           >
             <CardContent className="p-5 space-y-3">
-              <p className="text-sm text-slate-700 whitespace-pre-wrap">
+              <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
                 {post.content}
               </p>
               {post.imageUrl && (
-                <div className="rounded-xl overflow-hidden border border-slate-100">
+                <div className="rounded-xl overflow-hidden border border-slate-100 dark:border-slate-700">
                   <img
                     src={post.imageUrl}
                     alt="Post"
@@ -92,7 +92,7 @@ export function ProfilePostsTab({
                   />
                 </div>
               )}
-              <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+              <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-1">
                 <span>
                   {new Date(post.createdAt).toLocaleString(undefined, {
                     day: 'numeric',
@@ -114,7 +114,7 @@ export function ProfilePostsTab({
       {hasMorePosts && (
         <div ref={loadMoreRef} className="flex justify-center py-4">
           {loadingMorePosts && (
-            <div className="flex items-center gap-2 text-slate-500 text-sm">
+            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm">
               <Loader2 className="w-4 h-4 animate-spin" />
               Loading more posts...
             </div>
@@ -124,7 +124,7 @@ export function ProfilePostsTab({
       
       {/* End message */}
       {!hasMorePosts && posts.length > 0 && (
-        <div className="text-center py-6 text-slate-400 text-sm">
+        <div className="text-center py-6 text-slate-400 dark:text-slate-500 text-sm">
           You've reached the end
         </div>
       )}

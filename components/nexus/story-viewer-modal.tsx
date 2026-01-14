@@ -95,7 +95,7 @@ export function StoryViewerModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg p-0 bg-black">
+      <DialogContent className="sm:max-w-lg p-0 bg-black dark:bg-black dark:border-slate-800">
         <DialogTitle className="sr-only">
           {activeStoryGroup?.author.name}'s Story
         </DialogTitle>

@@ -45,7 +45,7 @@ export function ProfileShortsTab({
 }: ProfileShortsTabProps) {
   if (loadingShorts) {
     return (
-      <div className="text-center py-12 text-slate-500">
+      <div className="text-center py-12 text-slate-500 dark:text-slate-400">
         <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
         Loading your shorts...
       </div>
@@ -54,7 +54,7 @@ export function ProfileShortsTab({
 
   if (shorts.length === 0) {
     return (
-      <div className="text-center py-12 text-slate-500">
+      <div className="text-center py-12 text-slate-500 dark:text-slate-400">
         Your shorts will appear here.
       </div>
     );

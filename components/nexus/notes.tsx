@@ -386,21 +386,21 @@ export function Notes() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+      <div className="flex items-center justify-center h-full bg-slate-50 dark:bg-slate-900">
+        <Loader2 className="w-6 h-6 animate-spin text-slate-400 dark:text-slate-500" />
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-50 p-4 md:p-6">
+    <div className="h-full overflow-y-auto bg-slate-50 dark:bg-slate-900 p-4 md:p-6">
       <div className="max-w-2xl mx-auto">
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
               Notes
             </h1>
-            <p className="text-sm text-slate-500 mt-1">Share small notes with your friends</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Share small notes with your friends</p>
           </div>
           <Button
             onClick={() => setCreateModalOpen(true)}
@@ -415,13 +415,13 @@ export function Notes() {
         <div ref={notesContainerRef}>
           {notes.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-slate-500">No notes yet. Create one to get started!</p>
+              <p className="text-slate-500 dark:text-slate-400">No notes yet. Create one to get started!</p>
             </div>
           ) : (
             <>
               <div className="space-y-4">
                 {notes.map((note) => (
-              <Card key={note._id} className="hover:shadow-md transition-shadow">
+              <Card key={note._id} className="hover:shadow-md transition-shadow bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
                     <Avatar>
@@ -431,10 +431,10 @@ export function Notes() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <p className="font-semibold text-slate-900">{note.author.name}</p>
-                          <p className="text-sm text-slate-500">@{note.author.username}</p>
-                          <span className="text-slate-400">·</span>
-                          <p className="text-xs text-slate-500">{formatTimeAgo(note.createdAt)}</p>
+                          <p className="font-semibold text-slate-900 dark:text-white">{note.author.name}</p>
+                          <p className="text-sm text-slate-500 dark:text-slate-400">@{note.author.username}</p>
+                          <span className="text-slate-400 dark:text-slate-500">·</span>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">{formatTimeAgo(note.createdAt)}</p>
                         </div>
                         {/* Edit/Delete Menu - Only show for note creator */}
                         {currentUserId === note.userId && (
@@ -443,7 +443,7 @@ export function Notes() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8"
+                                className="h-8 w-8 dark:hover:bg-slate-700"
                                 disabled={deletingNoteId === note._id}
                               >
                                 {deletingNoteId === note._id ? (
@@ -453,14 +453,14 @@ export function Notes() {
                                 )}
                               </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleEditNote(note)}>
+                            <DropdownMenuContent align="end" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                              <DropdownMenuItem onClick={() => handleEditNote(note)} className="dark:text-slate-300 dark:hover:bg-slate-700">
                                 <Edit2 className="w-4 h-4 mr-2" />
                                 Edit
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleDeleteNote(note._id)}
-                                className="text-red-600 focus:text-red-600"
+                                className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400 dark:hover:bg-slate-700"
                               >
                                 <Trash2 className="w-4 h-4 mr-2" />
                                 Delete
@@ -471,17 +471,17 @@ export function Notes() {
                       </div>
 
                       {note.text && (
-                        <p className="text-slate-700 mb-3 whitespace-pre-wrap break-words">
+                        <p className="text-slate-700 dark:text-slate-200 mb-3 whitespace-pre-wrap break-words">
                           {note.text}
                         </p>
                       )}
 
                       {note.musicUrl && (
-                        <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg border border-blue-200">
+                        <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                           <Button
                             variant="outline"
                             size="icon"
-                            className="flex-shrink-0"
+                            className="flex-shrink-0 dark:border-slate-600 dark:hover:bg-slate-700"
                             onClick={() => togglePlayMusic(note._id, note.musicUrl)}
                           >
                             {playingNoteId === note._id ? (
@@ -491,12 +491,12 @@ export function Notes() {
                             )}
                           </Button>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-slate-800 truncate">
+                            <p className="font-medium text-slate-800 dark:text-slate-200 truncate">
                               {note.musicTitle || 'Music'}
                             </p>
-                            <p className="text-xs text-slate-600 truncate">{note.musicUrl}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 truncate">{note.musicUrl}</p>
                           </div>
-                          <Music className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                          <Music className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
                         </div>
                       )}
                     </div>
@@ -536,25 +536,25 @@ export function Notes() {
           resetForm();
         }
       }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
           <DialogHeader>
-            <DialogTitle>Create Note</DialogTitle>
+            <DialogTitle className="text-slate-900 dark:text-white">Create Note</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-slate-700 mb-2 block">Text</label>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">Text</label>
               <Textarea
                 placeholder="What's on your mind?"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                className="min-h-[120px]"
+                className="min-h-[120px] dark:bg-slate-900 dark:border-slate-600 dark:text-white"
                 maxLength={500}
               />
-              <p className="text-xs text-slate-500 mt-1">{text.length}/500</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{text.length}/500</p>
             </div>
 
             <div>
-              <label className="text-sm font-medium text-slate-700 mb-2 block">Music (Optional)</label>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">Music (Optional)</label>
               
               {/* File Upload Option */}
               <div className="mb-3">
@@ -568,7 +568,7 @@ export function Notes() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full"
+                  className="w-full dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingMusic}
                 >
@@ -588,18 +588,18 @@ export function Notes() {
 
               {/* Uploaded File Preview */}
               {musicFile && musicFileUrl && (
-                <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
+                <div className="mb-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-center justify-between">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <Music className="w-5 h-5 text-green-600 flex-shrink-0" />
+                    <Music className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-green-800 truncate">{musicFile.name}</p>
-                      <p className="text-xs text-green-600">Uploaded successfully</p>
+                      <p className="text-sm font-medium text-green-800 dark:text-green-300 truncate">{musicFile.name}</p>
+                      <p className="text-xs text-green-600 dark:text-green-400">Uploaded successfully</p>
                     </div>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="flex-shrink-0"
+                    className="flex-shrink-0 dark:hover:bg-slate-700"
                     onClick={() => {
                       setMusicFile(null);
                       setMusicFileUrl('');
@@ -616,10 +616,10 @@ export function Notes() {
               {!musicFile && (
                 <div className="relative mb-3">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-slate-300"></div>
+                    <div className="w-full border-t border-slate-300 dark:border-slate-600"></div>
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-white px-2 text-slate-500">Or</span>
+                    <span className="bg-white dark:bg-slate-800 px-2 text-slate-500 dark:text-slate-400">Or</span>
                   </div>
                 </div>
               )}
@@ -631,14 +631,15 @@ export function Notes() {
                     placeholder="Music URL (e.g., Spotify, YouTube, SoundCloud)"
                     value={musicUrl}
                     onChange={(e) => setMusicUrl(e.target.value)}
-                    className="mb-2"
+                    className="mb-2 dark:bg-slate-900 dark:border-slate-600 dark:text-white"
                   />
                   <Input
                     placeholder="Music Title (Optional)"
                     value={musicTitle}
                     onChange={(e) => setMusicTitle(e.target.value)}
+                    className="dark:bg-slate-900 dark:border-slate-600 dark:text-white"
                   />
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                     Add a link to your favorite song or music
                   </p>
                 </>
@@ -650,6 +651,7 @@ export function Notes() {
                   placeholder="Music Title (Optional)"
                   value={musicTitle}
                   onChange={(e) => setMusicTitle(e.target.value)}
+                  className="dark:bg-slate-900 dark:border-slate-600 dark:text-white"
                 />
               )}
             </div>
@@ -679,25 +681,25 @@ export function Notes() {
           resetForm();
         }
       }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
           <DialogHeader>
-            <DialogTitle>Edit Note</DialogTitle>
+            <DialogTitle className="text-slate-900 dark:text-white">Edit Note</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-slate-700 mb-2 block">Text</label>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">Text</label>
               <Textarea
                 placeholder="What's on your mind?"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                className="min-h-[120px]"
+                className="min-h-[120px] dark:bg-slate-900 dark:border-slate-600 dark:text-white"
                 maxLength={500}
               />
-              <p className="text-xs text-slate-500 mt-1">{text.length}/500</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{text.length}/500</p>
             </div>
 
             <div>
-              <label className="text-sm font-medium text-slate-700 mb-2 block">Music (Optional)</label>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">Music (Optional)</label>
               
               {/* File Upload Option */}
               <div className="mb-3">
@@ -711,7 +713,7 @@ export function Notes() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full"
+                  className="w-full dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
                   onClick={() => editFileInputRef.current?.click()}
                   disabled={uploadingMusic}
                 >
@@ -731,18 +733,18 @@ export function Notes() {
 
               {/* Uploaded File Preview */}
               {musicFile && musicFileUrl && (
-                <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
+                <div className="mb-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-center justify-between">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <Music className="w-5 h-5 text-green-600 flex-shrink-0" />
+                    <Music className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-green-800 truncate">{musicFile.name}</p>
-                      <p className="text-xs text-green-600">Uploaded successfully</p>
+                      <p className="text-sm font-medium text-green-800 dark:text-green-300 truncate">{musicFile.name}</p>
+                      <p className="text-xs text-green-600 dark:text-green-400">Uploaded successfully</p>
                     </div>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="flex-shrink-0"
+                    className="flex-shrink-0 dark:hover:bg-slate-700"
                     onClick={() => {
                       setMusicFile(null);
                       setMusicFileUrl('');
@@ -759,10 +761,10 @@ export function Notes() {
               {!musicFile && (
                 <div className="relative mb-3">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-slate-300"></div>
+                    <div className="w-full border-t border-slate-300 dark:border-slate-600"></div>
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-white px-2 text-slate-500">Or</span>
+                    <span className="bg-white dark:bg-slate-800 px-2 text-slate-500 dark:text-slate-400">Or</span>
                   </div>
                 </div>
               )}
@@ -774,14 +776,15 @@ export function Notes() {
                     placeholder="Music URL (e.g., Spotify, YouTube, SoundCloud)"
                     value={musicUrl}
                     onChange={(e) => setMusicUrl(e.target.value)}
-                    className="mb-2"
+                    className="mb-2 dark:bg-slate-900 dark:border-slate-600 dark:text-white"
                   />
                   <Input
                     placeholder="Music Title (Optional)"
                     value={musicTitle}
                     onChange={(e) => setMusicTitle(e.target.value)}
+                    className="dark:bg-slate-900 dark:border-slate-600 dark:text-white"
                   />
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                     Add a link to your favorite song or music
                   </p>
                 </>
@@ -793,6 +796,7 @@ export function Notes() {
                   placeholder="Music Title (Optional)"
                   value={musicTitle}
                   onChange={(e) => setMusicTitle(e.target.value)}
+                  className="dark:bg-slate-900 dark:border-slate-600 dark:text-white"
                 />
               )}
             </div>

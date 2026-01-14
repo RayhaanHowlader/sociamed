@@ -204,17 +204,17 @@ export function ShortViewerModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-6xl h-[95vh] max-h-[900px] p-0 gap-0 overflow-hidden">
-        <DialogHeader className="p-3 md:p-4 pb-2 border-b border-slate-200 flex-shrink-0">
-          <DialogTitle className="flex items-center justify-between">
+      <DialogContent className="w-[95vw] max-w-6xl h-[95vh] max-h-[900px] p-0 gap-0 overflow-hidden dark:bg-slate-900 dark:border-slate-700">
+        <DialogHeader className="p-3 md:p-4 pb-2 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
+          <DialogTitle className="flex items-center justify-between dark:text-white">
             <div className="flex items-center gap-2">
               <Avatar className="h-6 h-6 md:h-8 md:w-8">
                 <AvatarImage src={short.author.avatarUrl} />
                 <AvatarFallback>{short.author.name?.[0]}</AvatarFallback>
               </Avatar>
               <div>
-                <p className="text-xs md:text-sm font-semibold">{short.author.name}</p>
-                <p className="text-xs text-slate-500">@{short.author.username}</p>
+                <p className="text-xs md:text-sm font-semibold dark:text-white">{short.author.name}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">@{short.author.username}</p>
               </div>
             </div>
             {isOwnShort && (
@@ -256,7 +256,7 @@ export function ShortViewerModal({
           {/* Content Section - Scrollable on mobile */}
           <div className="flex-1 flex flex-col min-h-0 mt-3 md:mt-0">
             {/* Stats and Actions */}
-            <div className="flex items-center gap-4 text-sm text-slate-600 flex-shrink-0 mb-3">
+            <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400 flex-shrink-0 mb-3">
               <button
                 type="button"
                 onClick={() => onLike(short._id)}
@@ -280,33 +280,33 @@ export function ShortViewerModal({
             {/* Caption and Date */}
             <div className="flex-shrink-0 space-y-2 mb-3">
               {short.caption && (
-                <p className="text-sm text-slate-800 break-words">{short.caption}</p>
+                <p className="text-sm text-slate-800 dark:text-slate-200 break-words">{short.caption}</p>
               )}
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Shared {new Date(short.createdAt).toLocaleString()}
               </p>
             </div>
             
             {/* Comments Section - Scrollable */}
-            <div className="flex-1 min-h-0 border-t border-slate-200 pt-3">
+            <div className="flex-1 min-h-0 border-t border-slate-200 dark:border-slate-700 pt-3">
               <div className="h-full flex flex-col">
                 <div className="flex-1 min-h-0 overflow-y-auto space-y-3 mb-3">
                   {commentsLoading ? (
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                       <Loader2 className="w-3 h-3 animate-spin" />
                       Loading comments...
                     </div>
                   ) : shortComments.length === 0 ? (
-                    <p className="text-xs text-slate-400">No comments yet. Be the first to comment!</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500">No comments yet. Be the first to comment!</p>
                   ) : (
                     shortComments.map((comment) => (
                       <div key={comment.id} className="text-xs space-y-0.5">
-                        <p className="font-semibold text-slate-700">
+                        <p className="font-semibold text-slate-700 dark:text-slate-300">
                           {comment.author.name}{' '}
-                          <span className="text-slate-400">@{comment.author.username}</span>
+                          <span className="text-slate-400 dark:text-slate-500">@{comment.author.username}</span>
                         </p>
-                        <p className="text-slate-700 break-words">{comment.content}</p>
-                        <p className="text-[10px] text-slate-400">
+                        <p className="text-slate-700 dark:text-slate-300 break-words">{comment.content}</p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500">
                           {new Date(comment.createdAt).toLocaleString()}
                         </p>
                       </div>
@@ -315,14 +315,14 @@ export function ShortViewerModal({
                 </div>
                 
                 {/* Add Comment Section - Fixed at bottom */}
-                <div className="flex-shrink-0 border-t border-slate-200 pt-3 space-y-2">
-                  <label className="text-xs font-medium text-slate-600">Add a comment</label>
+                <div className="flex-shrink-0 border-t border-slate-200 dark:border-slate-700 pt-3 space-y-2">
+                  <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Add a comment</label>
                   <Textarea
                     rows={2}
                     value={commentInput}
                     onChange={(e) => setCommentInput(e.target.value)}
                     placeholder="Share your thoughts…"
-                    className="text-sm resize-none"
+                    className="text-sm resize-none dark:bg-slate-800 dark:border-slate-700 dark:text-white"
                   />
                   <div className="flex justify-end">
                     <Button

@@ -45,14 +45,14 @@ export function StoryCard({ group, isCreateCard = false, onCreateClick, onStoryC
   if (isCreateCard) {
     return (
       <Card
-        className="flex-shrink-0 w-24 md:w-32 h-40 md:h-48 rounded-xl cursor-pointer hover:shadow-lg transition-shadow border-2 border-dashed border-slate-300 hover:border-blue-500"
+        className="flex-shrink-0 w-24 md:w-32 h-40 md:h-48 rounded-xl cursor-pointer hover:shadow-lg transition-shadow border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-blue-500 dark:hover:border-blue-400 dark:bg-slate-800"
         onClick={onCreateClick}
       >
         <div className="h-full flex flex-col items-center justify-center gap-2 p-4">
           <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gradient-to-r from-blue-600 to-cyan-600 flex items-center justify-center">
             <Plus className="w-6 h-6 md:w-8 md:h-8 text-white" />
           </div>
-          <p className="text-xs md:text-sm font-medium text-slate-600 text-center">Create Story</p>
+          <p className="text-xs md:text-sm font-medium text-slate-600 dark:text-slate-300 text-center">Create Story</p>
         </div>
       </Card>
     );
@@ -62,7 +62,7 @@ export function StoryCard({ group, isCreateCard = false, onCreateClick, onStoryC
 
   return (
     <Card
-      className="flex-shrink-0 w-24 md:w-32 h-40 md:h-48 rounded-xl cursor-pointer hover:shadow-lg transition-shadow overflow-hidden relative"
+      className="flex-shrink-0 w-24 md:w-32 h-40 md:h-48 rounded-xl cursor-pointer hover:shadow-lg transition-shadow overflow-hidden relative dark:border-slate-700"
       onClick={() => onStoryClick?.(group, 0)}
     >
       <div className="h-full relative">

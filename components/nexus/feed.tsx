@@ -135,7 +135,7 @@ export function Feed() {
 
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-50">
+    <div className="h-full overflow-y-auto bg-slate-50 dark:bg-slate-900">
       <div className="max-w-2xl mx-auto py-6 px-4 space-y-6">
         <PostComposer profile={profile} onPostCreated={handlePostCreated} />
 
@@ -145,8 +145,8 @@ export function Feed() {
               <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
             </div>
           ) : posts.length === 0 ? (
-            <Card className="border-slate-200 shadow-sm">
-              <CardContent className="py-12 text-center text-slate-500">
+            <Card className="border-slate-200 dark:border-slate-700 shadow-sm bg-white dark:bg-slate-800">
+              <CardContent className="py-12 text-center text-slate-500 dark:text-slate-400">
                 No posts yet. Be the first to share something!
               </CardContent>
             </Card>
@@ -218,7 +218,7 @@ export function Feed() {
               {/* End of posts indicator */}
               {!hasMorePosts && posts.length > 0 && (
                 <div className="flex justify-center py-8">
-                  <p className="text-sm text-slate-500">You've reached the end of the feed</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">You've reached the end of the feed</p>
                 </div>
               )}
             </>
@@ -227,15 +227,15 @@ export function Feed() {
       </div>
 
       <Dialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
           <DialogHeader>
-            <DialogTitle>Delete post?</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-slate-900 dark:text-white">Delete post?</DialogTitle>
+            <DialogDescription className="text-slate-600 dark:text-slate-400">
               This action cannot be undone. The post and any attached image will be permanently removed.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setDeleteTarget(null)}>
+            <Button type="button" variant="ghost" onClick={() => setDeleteTarget(null)} className="dark:text-slate-300 dark:hover:bg-slate-700">
               Cancel
             </Button>
             <Button

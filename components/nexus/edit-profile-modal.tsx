@@ -128,10 +128,10 @@ export function EditProfileModal({ open, onOpenChange, profile, onSave }: EditPr
   };
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="sm:max-w-xl dark:bg-slate-900 dark:border-slate-700">
         <DialogHeader>
-          <DialogTitle>{profile ? 'Edit your profile' : 'Create your profile'}</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="dark:text-white">{profile ? 'Edit your profile' : 'Create your profile'}</DialogTitle>
+          <DialogDescription className="dark:text-slate-400">
             This information appears on your public profile. You can update it anytime.
           </DialogDescription>
         </DialogHeader>
@@ -139,54 +139,59 @@ export function EditProfileModal({ open, onOpenChange, profile, onSave }: EditPr
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium text-slate-600">Name</label>
+              <label className="text-sm font-medium text-slate-600 dark:text-slate-300">Name</label>
               <Input
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
                 required
+                className="dark:bg-slate-800 dark:border-slate-700 dark:text-white"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-600">Username</label>
+              <label className="text-sm font-medium text-slate-600 dark:text-slate-300">Username</label>
               <Input
                 value={formData.username}
                 onChange={(e) => handleInputChange('username', e.target.value)}
                 required
                 placeholder="@yourhandle"
+                className="dark:bg-slate-800 dark:border-slate-700 dark:text-white"
               />
             </div>
           </div>
 
           <div>
-            <label className="text-sm font-medium text-slate-600">Bio</label>
+            <label className="text-sm font-medium text-slate-600 dark:text-slate-300">Bio</label>
             <Textarea
               value={formData.bio}
               onChange={(e) => handleInputChange('bio', e.target.value)}
               rows={3}
+              className="dark:bg-slate-800 dark:border-slate-700 dark:text-white"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium text-slate-600">Location</label>
+              <label className="text-sm font-medium text-slate-600 dark:text-slate-300">Location</label>
               <Input
                 value={formData.location}
                 onChange={(e) => handleInputChange('location', e.target.value)}
                 placeholder="City, Country"
+                className="dark:bg-slate-800 dark:border-slate-700 dark:text-white"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-600">Website</label>
+              <label className="text-sm font-medium text-slate-600 dark:text-slate-300">Website</label>
               <Input
                 value={formData.website}
                 onChange={(e) => handleInputChange('website', e.target.value)}
                 placeholder="https://example.com"
+                className="dark:bg-slate-800 dark:border-slate-700 dark:text-white"
               />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium text-slate-600">Avatar</label>
+              <label className="text-sm font-medium text-slate-600 dark:text-slate-300">Avatar</label>
               <div className="flex items-center gap-3">
                 <Avatar className="w-14 h-14">
                   <AvatarImage src={formData.avatarUrl} />
@@ -210,7 +215,7 @@ export function EditProfileModal({ open, onOpenChange, profile, onSave }: EditPr
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-600">Cover</label>
+              <label className="text-sm font-medium text-slate-600 dark:text-slate-300">Cover</label>
               <label className="text-xs text-blue-600 hover:underline cursor-pointer">
                 <input
                   type="file"
@@ -225,14 +230,14 @@ export function EditProfileModal({ open, onOpenChange, profile, onSave }: EditPr
                 {uploadingImage === 'cover' ? 'Uploading...' : 'Upload cover image'}
               </label>
               {formData.coverUrl && (
-                <div className="mt-2 rounded-lg overflow-hidden border">
+                <div className="mt-2 rounded-lg overflow-hidden border dark:border-slate-700">
                   <img src={formData.coverUrl} alt="Cover preview" className="h-24 w-full object-cover" />
                 </div>
               )}
             </div>
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>

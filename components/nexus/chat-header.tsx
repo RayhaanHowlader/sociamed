@@ -64,20 +64,20 @@ export function ChatHeader({
   };
 
   return (
-    <div className="p-3 md:p-4 border-b border-slate-200 flex items-center justify-between bg-white">
+    <div className="p-3 md:p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between bg-white dark:bg-slate-900">
       {selectedChat ? (
         <div className="flex items-center gap-3">
           {/* Back button - only visible on mobile */}
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden text-slate-600 hover:text-slate-900"
+            className="md:hidden text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
             onClick={onBackClick}
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <Avatar 
-            className="cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all"
+            className="cursor-pointer hover:ring-2 hover:ring-blue-300 dark:hover:ring-blue-500 transition-all"
             onClick={handleProfileClick}
           >
             <AvatarImage src={selectedChat.avatarUrl} />
@@ -87,21 +87,21 @@ export function ChatHeader({
             className="cursor-pointer hover:opacity-80 transition-opacity"
             onClick={handleProfileClick}
           >
-            <p className="font-semibold text-slate-900">{selectedChat.name}</p>
-            <p className="text-sm text-slate-500">Say hi to your new friend.</p>
+            <p className="font-semibold text-slate-900 dark:text-white">{selectedChat.name}</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Say hi to your new friend.</p>
           </div>
         </div>
       ) : (
-        <p className="text-sm text-slate-500">Select a friend to start chatting.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Select a friend to start chatting.</p>
       )}
       
-      <div className="flex gap-2 items-center flex-wrap justify-end sticky top-0 bg-white z-10 py-2">
+      <div className="flex gap-2 items-center flex-wrap justify-end sticky top-0 bg-white dark:bg-slate-900 z-10 py-2">
         <Button
           variant="ghost"
           size="icon"
           className={cn(
-            'text-slate-600 hover:text-blue-600',
-            (callState.isCalling || callState.isInCall) && 'text-blue-600 bg-blue-50'
+            'text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400',
+            (callState.isCalling || callState.isInCall) && 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
           )}
           onClick={handleCallButtonClick}
           disabled={!selectedChat || callState.isReceivingCall}
@@ -115,7 +115,7 @@ export function ChatHeader({
         <Button 
           variant="ghost" 
           size="icon" 
-          className="text-slate-600 hover:text-blue-600"
+          className="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400"
           onClick={onVideoCallClick}
           disabled={!selectedChat || callState.isReceivingCall}
         >
@@ -125,7 +125,7 @@ export function ChatHeader({
         <Button 
           variant="ghost" 
           size="icon" 
-          className="text-slate-600 hover:text-slate-900"
+          className="text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
           onClick={onSearchMediaClick}
         >
           <MoreVertical className="w-5 h-5" />
@@ -135,7 +135,7 @@ export function ChatHeader({
           size="sm"
           disabled={!selectedChat}
           onClick={() => (selectMode ? onClearSelection() : onSelectModeToggle())}
-          className="min-w-[92px]"
+          className="min-w-[92px] dark:border-slate-600 dark:text-slate-300"
         >
           {selectMode ? 'Cancel' : 'Select'}
         </Button>

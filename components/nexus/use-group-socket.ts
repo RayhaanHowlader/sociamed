@@ -3,14 +3,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { GroupMessage } from './group-chat-utils';
+import { useNotifications } from './use-notifications';
 
 interface UseGroupSocketProps {
   currentUserId: string | null;
-  groups: { _id: string }[];
+  groups: { _id: string; name?: string; icon?: string }[];
   setMessages: React.Dispatch<React.SetStateAction<GroupMessage[]>>;
   setPinnedMessages: React.Dispatch<React.SetStateAction<GroupMessage[]>>;
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
   refreshCurrentGroup: () => Promise<void>;
+  groupMembers?: { id: string; name: string; avatarUrl?: string }[];
 }
 
 export function useGroupSocket({
@@ -19,13 +21,15 @@ export function useGroupSocket({
   setMessages,
   setPinnedMessages,
   messagesEndRef,
-  refreshCurrentGroup
+  refreshCurrentGroup,
+  groupMembers = []
 }: UseGroupSocketProps) {
   const socketRef = useRef<Socket | null>(null);
   const [socketReadyState, setSocketReadyState] = useState(false);
   const setMessagesRef = useRef(setMessages);
   const setPinnedMessagesRef = useRef(setPinnedMessages);
   const refreshCurrentGroupRef = useRef(refreshCurrentGroup);
+  const { showNotification } = useNotifications();
 
   // Update refs when handlers change
   useEffect(() => {
@@ -55,6 +59,12 @@ export function useGroupSocket({
     socket.on('connect', () => {
       console.log('[group-socket] Connected to:', socketUrl);
       setSocketReadyState(true);
+      
+      // Join user's notification room for group removal notifications
+      if (currentUserId) {
+        socket.emit('notification:join', { userId: currentUserId });
+        console.log('[group-socket] Joined notification room for user:', currentUserId);
+      }
     });
 
     socket.on('disconnect', (reason) => {
@@ -71,6 +81,34 @@ export function useGroupSocket({
       // Ignore messages already added locally
       if (payload.fromUserId === currentUserId) return;
       console.log('[socket] group:message received', payload.id);
+      
+      // Show notification for group messages
+      const group = groups.find(g => g._id === payload.groupId);
+      const sender = groupMembers.find(m => m.id === payload.fromUserId);
+      
+      let notificationBody = payload.content;
+      if (payload.fileUrl && payload.isImage) {
+        notificationBody = '📷 Sent a photo';
+      } else if (payload.fileUrl && payload.mimeType?.startsWith('audio/')) {
+        notificationBody = '🎤 Sent a voice message';
+      } else if (payload.fileUrl) {
+        notificationBody = `📎 Sent a file: ${payload.fileName || 'file'}`;
+      } else if (payload.poll) {
+        notificationBody = '📊 Created a poll';
+      }
+      
+      showNotification({
+        title: `${sender?.name || 'Someone'} in ${group?.name || 'Group'}`,
+        body: notificationBody,
+        icon: sender?.avatarUrl || group?.icon,
+        tag: `group-${payload.groupId}`,
+        data: {
+          type: 'group-message',
+          groupId: payload.groupId,
+          messageId: payload.id,
+        }
+      });
+      
       setMessagesRef.current((prev) => [...prev, payload]);
       
       // Scroll to bottom when receiving a new message
@@ -154,6 +192,32 @@ export function useGroupSocket({
       
       // Refresh poll data by refetching from server
       refreshCurrentGroupRef.current();
+    });
+
+    // Listen for group member removal notification
+    socket.on('group:member:removed', ({ userId, groupId, groupName, removedBy, removedByProfile }: {
+      userId: string;
+      groupId: string;
+      groupName: string;
+      removedBy: string;
+      removedByProfile: { name: string; username: string; avatarUrl?: string };
+    }) => {
+      console.log('[socket] group:member:removed received', { userId, groupId, groupName });
+      
+      // Only show notification if this is for the current user
+      if (userId === currentUserId) {
+        showNotification({
+          title: `Removed from ${groupName}`,
+          body: `${removedByProfile.name} removed you from the group`,
+          icon: removedByProfile.avatarUrl,
+          tag: `group-removed-${groupId}`,
+          data: {
+            type: 'group-removed',
+            groupId,
+            removedBy,
+          }
+        });
+      }
     });
 
     return () => {

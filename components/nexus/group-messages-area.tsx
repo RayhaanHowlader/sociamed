@@ -211,17 +211,17 @@ export function GroupMessagesArea({
   }, [hasMoreMessages, loadingMore, onLoadMoreMessages]);
   return (
     <ScrollArea 
-      className="flex-1 p-3 md:p-6 bg-slate-50 h-[calc(100vh-220px)]"
+      className="flex-1 p-3 md:p-6 bg-slate-50 dark:bg-slate-950 h-[calc(100vh-220px)]"
       ref={scrollAreaRef}
     >
       <div className="space-y-3 md:space-y-4 max-w-3xl mx-auto">
         {/* Pinned Messages Section */}
         {pinnedMessages.length > 0 && showPinnedMessages && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mb-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <Pin className="w-4 h-4 text-yellow-600" />
-                <span className="text-sm font-medium text-yellow-800">
+                <Pin className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                <span className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
                   Pinned Messages ({pinnedMessages.length})
                 </span>
               </div>
@@ -229,7 +229,7 @@ export function GroupMessagesArea({
                 variant="ghost"
                 size="sm"
                 onClick={() => onTogglePinnedMessages(false)}
-                className="h-6 px-2 text-yellow-600 hover:text-yellow-800"
+                className="h-6 px-2 text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-300"
               >
                 <X className="w-3 h-3" />
               </Button>
@@ -272,7 +272,7 @@ export function GroupMessagesArea({
               variant="outline"
               size="sm"
               onClick={() => onTogglePinnedMessages(true)}
-              className="text-yellow-600 border-yellow-200 hover:bg-yellow-50"
+              className="text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800 hover:bg-yellow-50 dark:hover:bg-yellow-900/20"
             >
               <Pin className="w-3 h-3 mr-1" />
               Show {pinnedMessages.length} Pinned Message{pinnedMessages.length > 1 ? 's' : ''}
@@ -288,7 +288,7 @@ export function GroupMessagesArea({
         {/* Loading indicator for lazy loading */}
         {loadingMore && (
           <div className="flex justify-center py-4">
-            <div className="flex items-center gap-2 text-sm text-slate-500">
+            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
               Loading older messages...
             </div>
@@ -305,7 +305,7 @@ export function GroupMessagesArea({
                 console.log('[group scroll] manual load more button click');
                 onLoadMoreMessages();
               }}
-              className="text-xs text-slate-600 hover:text-slate-800"
+              className="text-xs text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 dark:border-slate-700"
             >
               Load older messages
             </Button>
@@ -315,7 +315,7 @@ export function GroupMessagesArea({
         {/* No more messages indicator */}
         {!hasMoreMessages && messages.length > 0 && (
           <div className="flex justify-center py-2">
-            <div className="text-xs text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
+            <div className="text-xs text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
               Beginning of conversation
             </div>
           </div>

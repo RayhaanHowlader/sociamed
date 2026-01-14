@@ -14,6 +14,9 @@ import { Stories } from '@/components/nexus/stories';
 import { Notes } from '@/components/nexus/notes';
 import { AIAssistant } from '@/components/nexus/ai-assistant';
 import { NotificationPopup } from '@/components/nexus/notification-popup';
+import { NotificationPrompt } from '@/components/nexus/notification-prompt';
+import { ThemeToggle } from '@/components/nexus/theme-toggle';
+import { useNotifications } from '@/components/nexus/use-notifications';
 import LoginPage from '@/components/LoginPage';
 import SignupPage from '@/components/SignupPage';
 import ForgotPassword from '@/components/ForgotPassword';
@@ -43,6 +46,7 @@ export default function Home() {
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const notificationSoundRef = useRef<HTMLAudioElement | null>(null);
+  const { showNotification } = useNotifications();
 
   // On first load, ask the server if the auth cookie is valid so the session
   // is maintained across refreshes.
@@ -142,8 +146,23 @@ export default function Home() {
 
     // Listen for friend request notifications
     socket.on('friend:request', (data: FriendRequestNotification) => {
+      console.log('[app/page] Received friend:request event:', data);
       setCurrentNotification(data);
       setNotificationCount((prev) => prev + 1);
+      
+      // Show browser notification
+      console.log('[app/page] Showing browser notification for friend request');
+      showNotification({
+        title: 'Friend Request',
+        body: `${data.profile.name} sent you a friend request`,
+        icon: data.profile.avatarUrl,
+        tag: `friend-request-${data.id}`,
+        data: {
+          type: 'friend-request',
+          requestId: data.id,
+          fromUserId: data.fromUserId,
+        }
+      });
       
       // Play notification sound
       if (notificationSoundRef.current) {
@@ -272,8 +291,8 @@ export default function Home() {
 
   if (!authChecked) {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-50">
-        <p className="text-sm text-slate-500">Loading your session...</p>
+      <div className="flex h-screen items-center justify-center bg-slate-50 dark:bg-slate-900">
+        <p className="text-sm text-slate-500 dark:text-slate-400">Loading your session...</p>
       </div>
     );
   }
@@ -305,7 +324,7 @@ export default function Home() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-900 overflow-hidden">
       {/* Desktop sidebar */}
       <Sidebar
         activeView={activeView}
@@ -322,11 +341,11 @@ export default function Home() {
       />
       <main className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Top navbar */}
-        <header className="h-16 border-b border-slate-200 bg-white/80 backdrop-blur flex items-center justify-between px-4 flex-shrink-0">
+        <header className="h-16 border-b border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur flex items-center justify-between px-4 flex-shrink-0">
           <div className="flex items-center gap-3">
             {/* Mobile menu toggle */}
             <button
-              className="md:hidden inline-flex items-center justify-center rounded-md p-1 text-slate-700 hover:bg-slate-100"
+              className="md:hidden inline-flex items-center justify-center rounded-md p-1 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
               onClick={() => setMobileNavOpen((v) => !v)}
               aria-label="Toggle navigation"
             >
@@ -339,17 +358,20 @@ export default function Home() {
               <p className="text-sm font-semibold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
                 Nexus
               </p>
-              <p className="text-xs text-slate-500">Connect &amp; Share</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Connect &amp; Share</p>
             </div>
           </div>
 
-          <button
-            onClick={handleLogout}
-            className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-medium text-slate-700 shadow-sm hover:bg-slate-100 hover:border-slate-300 transition"
-          >
-            <LogOut className="h-3 w-3" />
-            <span className="hidden sm:inline">Log out</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1 text-[10px] font-medium text-slate-700 dark:text-slate-300 shadow-sm hover:bg-slate-100 dark:hover:bg-slate-700 hover:border-slate-300 dark:hover:border-slate-600 transition"
+            >
+              <LogOut className="h-3 w-3" />
+              <span className="hidden sm:inline">Log out</span>
+            </button>
+          </div>
         </header>
 
         {/* Mobile nav drawer overlay */}
@@ -362,13 +384,13 @@ export default function Home() {
 
         {/* Mobile nav drawer - slides in from left */}
         <div
-          className={`md:hidden fixed top-0 left-0 h-full w-64 bg-white shadow-xl z-50 transform transition-transform duration-300 ease-in-out ${
+          className={`md:hidden fixed top-0 left-0 h-full w-64 bg-white dark:bg-slate-900 shadow-xl z-50 transform transition-transform duration-300 ease-in-out ${
             mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
           <div className="flex flex-col h-full">
             {/* Drawer Header */}
-            <div className="flex items-center justify-between p-4 border-b border-slate-200">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
               <div className="flex items-center gap-3">
                 <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center shadow-sm">
                   <span className="text-white font-bold text-base tracking-tight">N</span>
@@ -377,12 +399,12 @@ export default function Home() {
                   <p className="text-sm font-semibold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
                     Nexus
                   </p>
-                  <p className="text-xs text-slate-500">Connect & Share</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Connect & Share</p>
                 </div>
               </div>
               <button
                 onClick={() => setMobileNavOpen(false)}
-                className="inline-flex items-center justify-center rounded-md p-1 text-slate-700 hover:bg-slate-100"
+                className="inline-flex items-center justify-center rounded-md p-1 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                 aria-label="Close navigation"
               >
                 <X className="w-5 h-5" />
@@ -417,11 +439,11 @@ export default function Home() {
                       setViewingUserId(null); // Reset to own profile
                     }
                   }}
-                    className={`flex items-center justify-start gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-slate-100 transition-colors w-full ${
-                      activeView === item.id ? 'bg-blue-50 text-blue-700 font-medium border-r-2 border-blue-600' : ''
+                    className={`flex items-center justify-start gap-3 px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors w-full ${
+                      activeView === item.id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 font-medium border-r-2 border-blue-600' : ''
                   }`}
                 >
-                    <Icon className={`w-5 h-5 ${activeView === item.id ? 'text-blue-600' : 'text-slate-500'}`} />
+                    <Icon className={`w-5 h-5 ${activeView === item.id ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400'}`} />
                     <span className="flex-1 text-left">{item.label}</span>
                     {item.badge && item.badge > 0 && (
                       <span className="bg-red-500 text-white text-xs font-semibold rounded-full px-2 py-0.5 min-w-[20px] text-center">
@@ -434,12 +456,12 @@ export default function Home() {
             </nav>
 
             {/* Drawer Footer */}
-            <div className="p-4 border-t border-slate-200">
+            <div className="p-4 border-t border-slate-200 dark:border-slate-700">
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
               >
-                <LogOut className="w-5 h-5 text-slate-500" />
+                <LogOut className="w-5 h-5 text-slate-500 dark:text-slate-400" />
                 <span>Log out</span>
               </button>
             </div>
@@ -473,6 +495,9 @@ export default function Home() {
         onDecline={handleNotificationDecline}
         onClose={() => setCurrentNotification(null)}
       />
+      
+      {/* Browser Notification Prompt */}
+      {isLoggedIn && <NotificationPrompt />}
     </div>
   );
 }

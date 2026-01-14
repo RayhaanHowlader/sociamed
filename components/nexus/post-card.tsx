@@ -133,9 +133,9 @@ export function PostCard({
   return (
     <>
       <Card 
-      className={`border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 ${
+      className={`border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all duration-300 bg-white dark:bg-slate-800 ${
         highlightedPostId === post._id 
-          ? 'ring-2 ring-blue-500 ring-offset-2 bg-blue-50/50' 
+          ? 'ring-2 ring-blue-500 ring-offset-2 bg-blue-50/50 dark:bg-blue-900/20' 
           : ''
       }`}
     >
@@ -165,8 +165,8 @@ export function PostCard({
                 }
               }}
             >
-              <p className="font-semibold text-slate-900">{post.author.name}</p>
-              <p className="text-sm text-slate-500">
+              <p className="font-semibold text-slate-900 dark:text-white">{post.author.name}</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
                 {post.author.username} · {new Date(post.createdAt).toLocaleString()}
               </p>
             </div>
@@ -174,17 +174,17 @@ export function PostCard({
           {currentUserId && currentUserId === post.userId && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-slate-400 hover:text-slate-600">
+                <Button variant="ghost" size="icon" className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300">
                   <MoreHorizontal className="w-5 h-5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => startEditing(post)} className="flex items-center gap-2">
-                  <Pencil className="w-4 h-4 text-slate-500" />
+              <DropdownMenuContent align="end" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                <DropdownMenuItem onClick={() => startEditing(post)} className="flex items-center gap-2 dark:text-slate-300 dark:hover:bg-slate-700">
+                  <Pencil className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                   Edit
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  className="text-red-600 focus:text-red-600 flex items-center gap-2"
+                  className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400 flex items-center gap-2 dark:hover:bg-slate-700"
                   onClick={() => onDelete(post)}
                 >
                   <Trash2 className="w-4 h-4" />
@@ -201,9 +201,10 @@ export function PostCard({
               value={editingContent}
               onChange={(e) => setEditingContent(e.target.value)}
               rows={3}
+              className="dark:bg-slate-900 dark:border-slate-600 dark:text-white"
             />
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" size="sm" onClick={cancelEditing}>
+              <Button type="button" variant="ghost" size="sm" onClick={cancelEditing} className="dark:text-slate-300 dark:hover:bg-slate-700">
                 Cancel
               </Button>
               <Button
@@ -217,7 +218,7 @@ export function PostCard({
             </div>
           </div>
         ) : (
-          post.content && <p className="text-slate-700 mb-4 leading-relaxed">{post.content}</p>
+          post.content && <p className="text-slate-700 dark:text-slate-200 mb-4 leading-relaxed">{post.content}</p>
         )}
 
         {post.imageUrl && (

@@ -86,7 +86,7 @@ export function MessageInputArea({
   };
 
   return (
-    <div className="p-3 md:p-4 border-t border-slate-200 bg-white">
+    <div className="p-3 md:p-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
       <div className="max-w-3xl mx-auto space-y-3">
         {/* File Preview */}
         {filePreview && (
@@ -98,13 +98,13 @@ export function MessageInputArea({
 
         {/* Error Message */}
         {error && (
-          <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 p-2 rounded">
+          <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded">
             <AlertCircle className="w-4 h-4" />
             {error}
             <Button
               variant="ghost"
               size="sm"
-              className="ml-auto h-auto p-1"
+              className="ml-auto h-auto p-1 dark:hover:bg-red-900/40"
               onClick={onClearError}
             >
               <X className="w-4 h-4" />
@@ -123,7 +123,7 @@ export function MessageInputArea({
             <Button
               variant="ghost"
               size="icon"
-              className="text-slate-600 hover:text-blue-600"
+              className="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400"
               onClick={() => fileInputRef.current?.click()}
               disabled={!selectedChat || uploadingFile}
             >
@@ -132,7 +132,7 @@ export function MessageInputArea({
           </div>
           
           <EmojiPicker onEmojiSelect={onEmojiSelect}>
-            <Button variant="ghost" size="icon" className="text-slate-600 hover:text-blue-600">
+            <Button variant="ghost" size="icon" className="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400">
               <Smile className="w-5 h-5" />
             </Button>
           </EmojiPicker>
@@ -141,7 +141,7 @@ export function MessageInputArea({
             onTextReceived={onVoiceTextReceived}
             onVoiceMessageSent={onVoiceMessageSent}
           >
-            <Button variant="ghost" size="icon" className="text-slate-600 hover:text-green-600">
+            <Button variant="ghost" size="icon" className="text-slate-600 dark:text-slate-300 hover:text-green-600 dark:hover:text-green-400">
               <Mic className="w-5 h-5" />
             </Button>
           </VoiceInput>
@@ -150,7 +150,7 @@ export function MessageInputArea({
             placeholder={selectedChat ? 'Type a message...' : 'Select a friend to start chatting'}
             value={message}
             onChange={(e) => onMessageChange(e.target.value)}
-            className="flex-1 border-slate-200"
+            className="flex-1 border-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
             disabled={!selectedChat || uploadingFile}
             onKeyDown={handleKeyDown}
           />

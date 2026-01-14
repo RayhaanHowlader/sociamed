@@ -80,13 +80,13 @@ export function GroupsList({
 
   return (
     <div className={cn(
-      'w-full md:w-80 border-b md:border-b-0 md:border-r border-slate-200 flex flex-col max-h-[50vh] md:max-h-none',
+      'w-full md:w-80 border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-700 flex flex-col max-h-[50vh] md:max-h-none bg-white dark:bg-slate-900',
       selectedGroup && 'hidden md:flex',
       className
     )}>
-      <div className="p-2 md:p-3 lg:p-4 border-b border-slate-200 flex-shrink-0">
+      <div className="p-2 md:p-3 lg:p-4 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
         <div className="flex items-center justify-between mb-2 md:mb-4">
-          <h2 className="text-base md:text-lg lg:text-xl font-bold text-slate-900">Groups</h2>
+          <h2 className="text-base md:text-lg lg:text-xl font-bold text-slate-900 dark:text-white">Groups</h2>
           <Button
             size="sm"
             className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 h-8 w-8 md:h-9 md:w-auto md:px-3"
@@ -96,12 +96,12 @@ export function GroupsList({
           </Button>
         </div>
         <div className="relative">
-          <Search className="absolute left-2 md:left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-3 h-3 md:w-4 md:h-4" />
+          <Search className="absolute left-2 md:left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 w-3 h-3 md:w-4 md:h-4" />
           <Input
             placeholder="Search groups..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-8 md:pl-10 border-slate-200 text-sm h-8 md:h-10"
+            className="pl-8 md:pl-10 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-sm h-8 md:h-10"
           />
           {searchingGroups && (
             <div className="absolute right-2 md:right-3 top-1/2 transform -translate-y-1/2">
@@ -115,12 +115,12 @@ export function GroupsList({
         <div className="p-1 md:p-2">
           {loadingGroups ? (
             <div className="flex items-center justify-center py-8">
-              <div className="w-4 h-4 md:w-5 md:h-5 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin"></div>
-              <span className="ml-2 text-slate-500 text-xs md:text-sm">Loading groups...</span>
+              <div className="w-4 h-4 md:w-5 md:h-5 border-2 border-slate-300 dark:border-slate-600 border-t-blue-600 rounded-full animate-spin"></div>
+              <span className="ml-2 text-slate-500 dark:text-slate-400 text-xs md:text-sm">Loading groups...</span>
             </div>
           ) : groups.length === 0 ? (
             <div className="text-center py-8">
-              <p className="px-2 py-4 text-xs text-slate-500">
+              <p className="px-2 py-4 text-xs text-slate-500 dark:text-slate-400">
                 {searchQuery ? `No groups found for "${searchQuery}"` : 'No groups yet. Create a new group to get started.'}
               </p>
               {searchQuery && (
@@ -141,8 +141,8 @@ export function GroupsList({
                   key={group._id}
                   onClick={() => onGroupSelect(group)}
                   className={cn(
-                    'w-full p-2 md:p-3 rounded-lg flex items-center gap-2 md:gap-3 hover:bg-slate-50 transition-colors cursor-pointer',
-                    selectedGroup && selectedGroup._id === group._id && 'bg-blue-50'
+                    'w-full p-2 md:p-3 rounded-lg flex items-center gap-2 md:gap-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer',
+                    selectedGroup && selectedGroup._id === group._id && 'bg-blue-50 dark:bg-slate-800'
                   )}
                 >
                   <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-xl md:text-2xl flex-shrink-0 overflow-hidden">
@@ -163,13 +163,13 @@ export function GroupsList({
                   </div>
                   <div className="flex-1 text-left min-w-0">
                     <div className="flex items-center gap-2 mb-0.5 md:mb-1">
-                      <p className="font-semibold text-slate-900 text-xs md:text-sm truncate">{group.name}</p>
-                      {group.isPrivate && <Lock className="w-3 h-3 text-slate-400 flex-shrink-0" />}
+                      <p className="font-semibold text-slate-900 dark:text-white text-xs md:text-sm truncate">{group.name}</p>
+                      {group.isPrivate && <Lock className="w-3 h-3 text-slate-400 dark:text-slate-500 flex-shrink-0" />}
                     </div>
-                    <p className="text-xs text-slate-500 mb-0.5 md:mb-1">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-0.5 md:mb-1">
                       {group.memberIds?.length ?? 0} members
                     </p>
-                    <p className="text-xs md:text-sm text-slate-600 truncate break-words">
+                    <p className="text-xs md:text-sm text-slate-600 dark:text-slate-300 truncate break-words">
                       {group.lastMessage || 'Start the conversation'}
                     </p>
                   </div>
@@ -181,8 +181,8 @@ export function GroupsList({
                 <div ref={loadMoreGroupsRef} className="flex items-center justify-center py-4">
                   {loadingMoreGroups && (
                     <>
-                      <div className="w-3 h-3 md:w-4 md:h-4 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin"></div>
-                      <span className="ml-2 text-slate-500 text-xs">Loading more...</span>
+                      <div className="w-3 h-3 md:w-4 md:h-4 border-2 border-slate-300 dark:border-slate-600 border-t-blue-600 rounded-full animate-spin"></div>
+                      <span className="ml-2 text-slate-500 dark:text-slate-400 text-xs">Loading more...</span>
                     </>
                   )}
                 </div>
@@ -190,7 +190,7 @@ export function GroupsList({
               
               {!hasMoreGroups && groups.length > 0 && (
                 <div className="text-center py-4">
-                  <p className="text-slate-500 text-xs">You've reached the end of your groups</p>
+                  <p className="text-slate-500 dark:text-slate-400 text-xs">You've reached the end of your groups</p>
                 </div>
               )}
             </>

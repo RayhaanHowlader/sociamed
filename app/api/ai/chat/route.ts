@@ -1,8 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getDb } from '@/lib/mongodb';
+import { ObjectId } from 'mongodb';
+import jwt from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
+function getUserIdFromToken(request: NextRequest): string | null {
+  const token = request.cookies.get('auth_token')?.value;
+  if (!token) return null;
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { sub: string };
+    return decoded.sub;
+  } catch {
+    return null;
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, chatHistory } = await request.json();
+    const { message, chatHistory, conversationId } = await request.json();
 
     if (!message) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
@@ -65,6 +82,49 @@ export async function POST(request: NextRequest) {
     }
 
     const aiResponse = data.choices[0].message.content;
+
+    // Save messages to database if conversationId is provided
+    const userId = getUserIdFromToken(request);
+    if (userId && conversationId) {
+      try {
+        const db = await getDb();
+        const messagesCollection = db.collection('ai_messages');
+        const conversationsCollection = db.collection('ai_conversations');
+
+        // Save user message
+        await messagesCollection.insertOne({
+          conversationId: new ObjectId(conversationId),
+          userId: new ObjectId(userId),
+          sender: 'user',
+          text: message,
+          createdAt: new Date()
+        });
+
+        // Save AI response
+        await messagesCollection.insertOne({
+          conversationId: new ObjectId(conversationId),
+          userId: new ObjectId(userId),
+          sender: 'ai',
+          text: aiResponse,
+          createdAt: new Date()
+        });
+
+        // Update conversation
+        await conversationsCollection.updateOne(
+          { _id: new ObjectId(conversationId) },
+          {
+            $set: {
+              lastMessage: message.substring(0, 100),
+              updatedAt: new Date()
+            },
+            $inc: { messageCount: 2 }
+          }
+        );
+      } catch (dbError) {
+        console.error('Error saving messages to database:', dbError);
+        // Continue even if DB save fails
+      }
+    }
 
     return NextResponse.json({ 
       response: aiResponse,

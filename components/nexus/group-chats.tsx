@@ -162,6 +162,7 @@ export function GroupChats() {
     setMessages,
     setPinnedMessages,
     messagesEndRef,
+    groupMembers,
     refreshCurrentGroup: async () => {
       if (!selectedGroup) return;
       try {
@@ -496,7 +497,7 @@ export function GroupChats() {
   );
 
   return (
-    <div className="h-full flex flex-col md:flex-row bg-white">
+    <div className="h-full flex flex-col md:flex-row bg-white dark:bg-slate-900">
       {/* Groups List - Hidden on mobile when group is selected */}
       <GroupsList
         groups={groups}
@@ -588,7 +589,7 @@ export function GroupChats() {
         />
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-sm text-slate-500">
+          <div className="flex-1 flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">
             {loadingGroups
               ? 'Loading groups...'
               : 'Select a group or create a new one to start chatting.'}

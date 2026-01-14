@@ -118,17 +118,17 @@ export function GroupMessageBubble({ message, isMine, displayName, avatarUrl, se
       </Avatar>
       <div className={cn('flex flex-col min-w-0 flex-1', isMine && 'items-end')}>
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-xs font-semibold text-slate-700">
+          <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
             {displayName}
           </span>
-          <span className="text-xs text-slate-500">{time}</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400">{time}</span>
         </div>
         <div
           className={cn(
             'max-w-[85vw] md:max-w-md px-3 md:px-4 py-2 rounded-2xl',
             isMine
               ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-tr-sm'
-              : 'bg-white text-slate-900 rounded-tl-sm shadow-sm',
+              : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-tl-sm shadow-sm',
             'overflow-visible',
             selectable && !message.deleted && 'ring-1 ring-offset-2 ring-blue-200',
             selectable && !message.deleted && selected && 'ring-blue-500'
