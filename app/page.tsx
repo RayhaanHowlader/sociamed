@@ -151,18 +151,23 @@ export default function Home() {
       setNotificationCount((prev) => prev + 1);
       
       // Show browser notification
-      console.log('[app/page] Showing browser notification for friend request');
-      showNotification({
-        title: 'Friend Request',
-        body: `${data.profile.name} sent you a friend request`,
-        icon: data.profile.avatarUrl,
-        tag: `friend-request-${data.id}`,
-        data: {
-          type: 'friend-request',
-          requestId: data.id,
-          fromUserId: data.fromUserId,
-        }
-      });
+      try {
+        console.log('[app/page] Showing browser notification for friend request');
+        showNotification({
+          title: 'Friend Request',
+          body: `${data.profile.name} sent you a friend request`,
+          icon: data.profile.avatarUrl,
+          tag: `friend-request-${data.id}`,
+          data: {
+            type: 'friend-request',
+            requestId: data.id,
+            fromUserId: data.fromUserId,
+          }
+        });
+      } catch (error) {
+        console.error('[app/page] Error showing notification:', error);
+        // Continue with notification handling even if browser notification fails
+      }
       
       // Play notification sound
       if (notificationSoundRef.current) {

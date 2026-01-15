@@ -92,30 +92,35 @@ export function DirectMessages() {
       
       // Show notification if message is from someone else
       if (message.fromUserId !== currentUserId) {
-        const sender = friendsManagement.friends.find(f => f.userId === message.fromUserId);
-        
-        let notificationBody = message.content;
-        if (message.fileUrl && message.isImage) {
-          notificationBody = '📷 Sent a photo';
-        } else if (message.fileUrl && message.mimeType?.startsWith('audio/')) {
-          notificationBody = '🎤 Sent a voice message';
-        } else if (message.fileUrl) {
-          notificationBody = `📎 Sent a file: ${message.fileName || 'file'}`;
-        } else if (message.sharedPostData) {
-          notificationBody = '📝 Shared a post';
-        }
-        
-        showNotification({
-          title: sender?.name || 'New Message',
-          body: notificationBody,
-          icon: sender?.avatarUrl,
-          tag: `message-${message.fromUserId}`,
-          data: {
-            type: 'message',
-            userId: message.fromUserId,
-            messageId: message.id,
+        try {
+          const sender = friendsManagement.friends.find(f => f.userId === message.fromUserId);
+          
+          let notificationBody = message.content;
+          if (message.fileUrl && message.isImage) {
+            notificationBody = '📷 Sent a photo';
+          } else if (message.fileUrl && message.mimeType?.startsWith('audio/')) {
+            notificationBody = '🎤 Sent a voice message';
+          } else if (message.fileUrl) {
+            notificationBody = `📎 Sent a file: ${message.fileName || 'file'}`;
+          } else if (message.sharedPostData) {
+            notificationBody = '📝 Shared a post';
           }
-        });
+          
+          showNotification({
+            title: sender?.name || 'New Message',
+            body: notificationBody,
+            icon: sender?.avatarUrl,
+            tag: `message-${message.fromUserId}`,
+            data: {
+              type: 'message',
+              userId: message.fromUserId,
+              messageId: message.id,
+            }
+          });
+        } catch (error) {
+          console.error('[direct-messages] Error showing notification:', error);
+          // Continue with message handling even if notification fails
+        }
       }
       
       return [...prev, message];

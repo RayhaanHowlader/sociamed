@@ -82,32 +82,37 @@ export function useGroupSocket({
       if (payload.fromUserId === currentUserId) return;
       console.log('[socket] group:message received', payload.id);
       
-      // Show notification for group messages
-      const group = groups.find(g => g._id === payload.groupId);
-      const sender = groupMembers.find(m => m.id === payload.fromUserId);
-      
-      let notificationBody = payload.content;
-      if (payload.fileUrl && payload.isImage) {
-        notificationBody = '📷 Sent a photo';
-      } else if (payload.fileUrl && payload.mimeType?.startsWith('audio/')) {
-        notificationBody = '🎤 Sent a voice message';
-      } else if (payload.fileUrl) {
-        notificationBody = `📎 Sent a file: ${payload.fileName || 'file'}`;
-      } else if (payload.poll) {
-        notificationBody = '📊 Created a poll';
-      }
-      
-      showNotification({
-        title: `${sender?.name || 'Someone'} in ${group?.name || 'Group'}`,
-        body: notificationBody,
-        icon: sender?.avatarUrl || group?.icon,
-        tag: `group-${payload.groupId}`,
-        data: {
-          type: 'group-message',
-          groupId: payload.groupId,
-          messageId: payload.id,
+      // Try to show notification, but don't let it break message handling
+      try {
+        const group = groups.find(g => g._id === payload.groupId);
+        const sender = groupMembers.find(m => m.id === payload.fromUserId);
+        
+        let notificationBody = payload.content;
+        if (payload.fileUrl && payload.isImage) {
+          notificationBody = '📷 Sent a photo';
+        } else if (payload.fileUrl && payload.mimeType?.startsWith('audio/')) {
+          notificationBody = '🎤 Sent a voice message';
+        } else if (payload.fileUrl) {
+          notificationBody = `📎 Sent a file: ${payload.fileName || 'file'}`;
+        } else if (payload.poll) {
+          notificationBody = '📊 Created a poll';
         }
-      });
+        
+        showNotification({
+          title: `${sender?.name || 'Someone'} in ${group?.name || 'Group'}`,
+          body: notificationBody,
+          icon: sender?.avatarUrl || group?.icon,
+          tag: `group-${payload.groupId}`,
+          data: {
+            type: 'group-message',
+            groupId: payload.groupId,
+            messageId: payload.id,
+          }
+        });
+      } catch (error) {
+        console.error('[socket] Error showing notification:', error);
+        // Continue with message handling even if notification fails
+      }
       
       setMessagesRef.current((prev) => [...prev, payload]);
       
@@ -206,17 +211,21 @@ export function useGroupSocket({
       
       // Only show notification if this is for the current user
       if (userId === currentUserId) {
-        showNotification({
-          title: `Removed from ${groupName}`,
-          body: `${removedByProfile.name} removed you from the group`,
-          icon: removedByProfile.avatarUrl,
-          tag: `group-removed-${groupId}`,
-          data: {
-            type: 'group-removed',
-            groupId,
-            removedBy,
-          }
-        });
+        try {
+          showNotification({
+            title: `Removed from ${groupName}`,
+            body: `${removedByProfile.name} removed you from the group`,
+            icon: removedByProfile.avatarUrl,
+            tag: `group-removed-${groupId}`,
+            data: {
+              type: 'group-removed',
+              groupId,
+              removedBy,
+            }
+          });
+        } catch (error) {
+          console.error('[socket] Error showing removal notification:', error);
+        }
       }
     });
 
@@ -233,17 +242,21 @@ export function useGroupSocket({
       
       // Only show notification if this is for the current user
       if (userId === currentUserId) {
-        showNotification({
-          title: `Added to ${groupName}`,
-          body: `${addedByProfile.name} added you to the group`,
-          icon: groupIcon || addedByProfile.avatarUrl,
-          tag: `group-added-${groupId}`,
-          data: {
-            type: 'group-added',
-            groupId,
-            addedBy,
-          }
-        });
+        try {
+          showNotification({
+            title: `Added to ${groupName}`,
+            body: `${addedByProfile.name} added you to the group`,
+            icon: groupIcon || addedByProfile.avatarUrl,
+            tag: `group-added-${groupId}`,
+            data: {
+              type: 'group-added',
+              groupId,
+              addedBy,
+            }
+          });
+        } catch (error) {
+          console.error('[socket] Error showing added notification:', error);
+        }
       }
     });
 
