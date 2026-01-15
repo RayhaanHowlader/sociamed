@@ -30,7 +30,7 @@ export function Sidebar({ activeView, onViewChange, notificationCount = 0 }: Sid
         <h1 className="text-sm font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
           Nexus
         </h1>
-        <p className="text-[10px] text-slate-500 dark:text-slate-400">Connect & Share</p>
+        <p className="text-[10px] text-slate-500 dark:text-slate-300">Connect & Share</p>
       </div>
 
       <nav className="flex-1 px-3 py-3 space-y-2 min-h-0">
