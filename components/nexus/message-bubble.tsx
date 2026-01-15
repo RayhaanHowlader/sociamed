@@ -109,7 +109,7 @@ export function MessageBubble({ message, isMine, currentUserId, selected, select
           'max-w-md px-4 py-2 rounded-2xl',
           isMine
             ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-br-sm'
-            : 'bg-white text-slate-900 rounded-bl-sm shadow-sm',
+            : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-bl-sm shadow-sm',
           selectable && !message.deleted && 'ring-1 ring-offset-2 ring-blue-200',
           selectable && !message.deleted && selected && 'ring-blue-500',
         )}
@@ -205,7 +205,7 @@ export function MessageBubble({ message, isMine, currentUserId, selected, select
             <div 
               className={cn(
                 'border rounded-lg p-3 bg-opacity-50 cursor-pointer transition-all hover:shadow-md',
-                isMine ? 'border-white/20 bg-white/10 hover:bg-white/20' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                isMine ? 'border-white/20 bg-white/10 hover:bg-white/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800'
               )}
               onClick={(event) => {
                 event.stopPropagation();
@@ -234,13 +234,13 @@ export function MessageBubble({ message, isMine, currentUserId, selected, select
                   <div className="flex-1 min-w-0">
                     <p className={cn(
                       'text-xs font-semibold',
-                      isMine ? 'text-white hover:text-blue-100' : 'text-slate-900 hover:text-blue-600'
+                      isMine ? 'text-white hover:text-blue-100' : 'text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400'
                     )}>
                       {message.sharedPostData.author.name}
                     </p>
                     <p className={cn(
                       'text-xs',
-                      isMine ? 'text-blue-100' : 'text-slate-500'
+                      isMine ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'
                     )}>
                       @{message.sharedPostData.author.username}
                     </p>
@@ -249,13 +249,13 @@ export function MessageBubble({ message, isMine, currentUserId, selected, select
                 <div className="flex items-center gap-1">
                   <span className={cn(
                     'text-xs',
-                    isMine ? 'text-blue-100' : 'text-slate-500'
+                    isMine ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'
                   )}>
                     View post
                   </span>
                   <ExternalLink className={cn(
                     'w-3 h-3',
-                    isMine ? 'text-blue-100' : 'text-slate-400'
+                    isMine ? 'text-blue-100' : 'text-slate-400 dark:text-slate-500'
                   )} />
                 </div>
               </div>
@@ -263,7 +263,7 @@ export function MessageBubble({ message, isMine, currentUserId, selected, select
               {message.sharedPostData.content && (
                 <p className={cn(
                   'text-xs mb-2',
-                  isMine ? 'text-blue-50' : 'text-slate-700'
+                  isMine ? 'text-blue-50' : 'text-slate-700 dark:text-slate-300'
                 )}
                 style={{
                   display: '-webkit-box',
@@ -287,7 +287,7 @@ export function MessageBubble({ message, isMine, currentUserId, selected, select
               
               <div className={cn(
                 'text-xs mt-2 pt-2 border-t opacity-75',
-                isMine ? 'border-white/20 text-blue-100' : 'border-slate-200 text-slate-500'
+                isMine ? 'border-white/20 text-blue-100' : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400'
               )}>
                 Click to view original post
               </div>
@@ -303,7 +303,7 @@ export function MessageBubble({ message, isMine, currentUserId, selected, select
                 'p-3 rounded-lg border cursor-pointer transition-colors',
                 isMine 
                   ? 'bg-blue-700/50 border-blue-600/50 hover:bg-blue-700/70' 
-                  : 'bg-slate-100 border-slate-200 hover:bg-slate-150'
+                  : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:bg-slate-150 dark:hover:bg-slate-800'
               )}
               onClick={() => onSharedShortClick?.(message.sharedShort)}
             >
@@ -328,13 +328,13 @@ export function MessageBubble({ message, isMine, currentUserId, selected, select
                     <div className="flex-1 min-w-0">
                       <p className={cn(
                         'text-xs font-medium truncate',
-                        isMine ? 'text-white' : 'text-slate-900'
+                        isMine ? 'text-white' : 'text-slate-900 dark:text-white'
                       )}>
                         {message.sharedShort.author.name}
                       </p>
                       <p className={cn(
                         'text-xs truncate',
-                        isMine ? 'text-blue-100' : 'text-slate-500'
+                        isMine ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'
                       )}>
                         @{message.sharedShort.author.username}
                       </p>
@@ -344,7 +344,7 @@ export function MessageBubble({ message, isMine, currentUserId, selected, select
                   {message.sharedShort.caption && (
                     <p className={cn(
                       'text-xs mb-1 line-clamp-2',
-                      isMine ? 'text-blue-100' : 'text-slate-700'
+                      isMine ? 'text-blue-100' : 'text-slate-700 dark:text-slate-300'
                     )}>
                       {message.sharedShort.caption}
                     </p>
@@ -352,17 +352,17 @@ export function MessageBubble({ message, isMine, currentUserId, selected, select
                   
                   <div className="flex items-center gap-2 text-xs">
                     <span className={cn(
-                      isMine ? 'text-blue-200' : 'text-slate-500'
+                      isMine ? 'text-blue-200' : 'text-slate-500 dark:text-slate-400'
                     )}>
                       {Math.floor(message.sharedShort.duration)}s
                     </span>
                     <span className={cn(
-                      isMine ? 'text-blue-200' : 'text-slate-500'
+                      isMine ? 'text-blue-200' : 'text-slate-500 dark:text-slate-400'
                     )}>
                       •
                     </span>
                     <span className={cn(
-                      isMine ? 'text-blue-200' : 'text-slate-500'
+                      isMine ? 'text-blue-200' : 'text-slate-500 dark:text-slate-400'
                     )}>
                       {new Date(message.sharedShort.createdAt).toLocaleDateString()}
                     </span>
@@ -375,7 +375,7 @@ export function MessageBubble({ message, isMine, currentUserId, selected, select
                 'flex items-center justify-center gap-1 mt-2 pt-2 border-t text-xs',
                 isMine 
                   ? 'border-blue-600/30 text-blue-200' 
-                  : 'border-slate-300 text-slate-500'
+                  : 'border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400'
               )}>
                 <ExternalLink className="w-3 h-3" />
                 <span>Click to view short</span>

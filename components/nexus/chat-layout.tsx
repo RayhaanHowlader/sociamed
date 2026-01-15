@@ -174,7 +174,7 @@ export function ChatLayout({
   onClearError,
 }: ChatLayoutProps) {
   return (
-    <div className="h-full flex flex-col md:flex-row bg-white">
+    <div className="h-full flex flex-col md:flex-row bg-white dark:bg-slate-900">
       {/* Friends List - Hidden on mobile when chat is selected */}
       <FriendsList
         friends={friends}

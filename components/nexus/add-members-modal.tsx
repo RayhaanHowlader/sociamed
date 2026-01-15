@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, UserPlus, Check, AlertCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { io, Socket } from 'socket.io-client';
 
 interface Friend {
   id: string;
@@ -41,6 +42,7 @@ export function AddMembersModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState('');
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -48,6 +50,16 @@ export function AddMembersModal({
       setSelectedMemberIds(new Set());
       setSearchQuery('');
       setError('');
+      
+      // Connect socket for notifications
+      const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
+      const socket = io(socketUrl);
+      socketRef.current = socket;
+      
+      return () => {
+        socket.disconnect();
+        socketRef.current = null;
+      };
     }
   }, [open]);
 
@@ -103,6 +115,14 @@ export function AddMembersModal({
       if (!res.ok) {
         setError(data.error || 'Unable to add members');
         return;
+      }
+
+      // Emit socket notifications for each added member
+      if (socketRef.current && data.socketPayloads && Array.isArray(data.socketPayloads)) {
+        console.log('[add-members] Emitting notifications for added members:', data.socketPayloads);
+        data.socketPayloads.forEach((payload: any) => {
+          socketRef.current?.emit('group:member:added:notify', payload);
+        });
       }
 
       onSuccess();

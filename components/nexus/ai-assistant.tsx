@@ -35,11 +35,13 @@ export function AIAssistant() {
     conversationsPage,
     messagesPage,
     editingMessageId,
+    selectedImage,
     recognitionRef,
     setInputMessage,
     setIsListening,
     setEditingMessageId,
     setSelectedConversationId,
+    setSelectedImage,
     setMessages,
     loadConversations,
     loadMessages,
@@ -183,10 +185,12 @@ export function AIAssistant() {
                 isListening={isListening}
                 isSending={isSending}
                 editingMessageId={editingMessageId}
+                selectedImage={selectedImage}
                 onMessageChange={setInputMessage}
                 onSend={() => handleSendMessage()}
                 onKeyDown={handleKeyDown}
                 onVoiceInput={handleVoiceInput}
+                onImageSelect={setSelectedImage}
                 onCancelEdit={() => {
                   setEditingMessageId(null);
                   setInputMessage('');
@@ -314,10 +318,12 @@ export function AIAssistant() {
               isListening={isListening}
               isSending={isSending}
               editingMessageId={editingMessageId}
+              selectedImage={selectedImage}
               onMessageChange={setInputMessage}
               onSend={() => handleSendMessage()}
               onKeyDown={handleKeyDown}
               onVoiceInput={handleVoiceInput}
+              onImageSelect={setSelectedImage}
               onCancelEdit={() => {
                 setEditingMessageId(null);
                 setInputMessage('');

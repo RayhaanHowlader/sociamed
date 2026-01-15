@@ -137,7 +137,7 @@ export default function Home() {
   useEffect(() => {
     if (!currentUserId || !isLoggedIn) return;
 
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://sociamed.onrender.com';
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
     const socket = io(socketUrl);
     socketRef.current = socket;
 
@@ -358,7 +358,7 @@ export default function Home() {
               <p className="text-sm font-semibold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
                 Nexus
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Connect &amp; Share</p>
+              <p className="text-xs text-slate-500 dark:text-slate-300">Connect &amp; Share</p>
             </div>
           </div>
 
@@ -399,7 +399,7 @@ export default function Home() {
                   <p className="text-sm font-semibold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
                     Nexus
                   </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Connect & Share</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-300">Connect & Share</p>
                 </div>
               </div>
               <button

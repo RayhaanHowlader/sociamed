@@ -70,7 +70,7 @@ export function FriendshipActions({
       if (res.ok) {
         // Emit socket notification
         if (data.requestId && data.senderProfile && currentUserId) {
-          const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://sociamed.onrender.com';
+          const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
           const socket = io(socketUrl);
           
           socket.on('connect', () => {

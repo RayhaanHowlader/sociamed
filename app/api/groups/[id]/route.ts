@@ -131,7 +131,30 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const updated = await groups.findOne({ _id })
 
-  return NextResponse.json({ group: updated }, { status: 200 })
+  // Get adder profile for notifications
+  const profiles = db.collection("profiles")
+  const adderProfile = await profiles.findOne<{ name: string; username: string; avatarUrl?: string }>({
+    userId: currentUserId,
+  })
+
+  // Prepare socket payload for added members
+  const socketPayloads = addMemberIds?.map((memberId) => ({
+    userId: memberId,
+    groupId: String(groupId),
+    groupName: updated?.name || "Group",
+    groupIcon: updated?.icon || "",
+    addedBy: currentUserId,
+    addedByProfile: {
+      name: adderProfile?.name || "Someone",
+      username: adderProfile?.username || "",
+      avatarUrl: adderProfile?.avatarUrl || "",
+    },
+  })) || []
+
+  return NextResponse.json({ 
+    group: updated,
+    socketPayloads, // Return payloads for client to emit
+  }, { status: 200 })
 }
 
 

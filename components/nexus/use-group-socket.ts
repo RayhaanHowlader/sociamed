@@ -43,8 +43,8 @@ export function useGroupSocket({
     if (!currentUserId) return;
  
     const socketUrl = process.env.NODE_ENV === 'production' 
-      ? (process.env.NEXT_PUBLIC_SOCKET_URL || 'https://sociamed.onrender.com')
-      : 'https://sociamed.onrender.com';
+      ? (process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000')
+      : 'http://localhost:4000';
     const socket = io(socketUrl, {
       timeout: 15000,
       transports: ['websocket'], // Only WebSocket, no polling
@@ -215,6 +215,33 @@ export function useGroupSocket({
             type: 'group-removed',
             groupId,
             removedBy,
+          }
+        });
+      }
+    });
+
+    // Listen for group member added notification
+    socket.on('group:member:added', ({ userId, groupId, groupName, groupIcon, addedBy, addedByProfile }: {
+      userId: string;
+      groupId: string;
+      groupName: string;
+      groupIcon: string;
+      addedBy: string;
+      addedByProfile: { name: string; username: string; avatarUrl?: string };
+    }) => {
+      console.log('[socket] group:member:added received', { userId, groupId, groupName });
+      
+      // Only show notification if this is for the current user
+      if (userId === currentUserId) {
+        showNotification({
+          title: `Added to ${groupName}`,
+          body: `${addedByProfile.name} added you to the group`,
+          icon: groupIcon || addedByProfile.avatarUrl,
+          tag: `group-added-${groupId}`,
+          data: {
+            type: 'group-added',
+            groupId,
+            addedBy,
           }
         });
       }

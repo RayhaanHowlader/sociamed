@@ -33,6 +33,7 @@ export function useAIAssistant() {
   const [conversationsPage, setConversationsPage] = useState(1);
   const [messagesPage, setMessagesPage] = useState(1);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
 
   // Load conversations
@@ -153,20 +154,23 @@ export function useAIAssistant() {
   }, []);
 
   // Send message
-  const handleSendMessage = useCallback(async (messageText?: string) => {
+  const handleSendMessage = useCallback(async (messageText?: string, imageData?: string | null) => {
     const textToSend = messageText || inputMessage.trim();
-    if (!textToSend || isSending || !selectedConversationId) return;
+    const imageToSend = imageData !== undefined ? imageData : selectedImage;
+    
+    if ((!textToSend && !imageToSend) || isSending || !selectedConversationId) return;
 
     const tempId = `temp-${Date.now()}`;
     const newMessage: Message = {
       id: tempId,
-      text: textToSend,
+      text: textToSend || (imageToSend ? 'Analyzing image...' : ''),
       sender: 'user',
       createdAt: new Date()
     };
 
     setMessages(prev => [...prev, newMessage]);
     setInputMessage('');
+    setSelectedImage(null);
     setIsSending(true);
     setIsTyping(true);
 
@@ -176,7 +180,8 @@ export function useAIAssistant() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          message: textToSend,
+          message: textToSend || 'What do you see in this image?',
+          image: imageToSend,
           chatHistory: messages.slice(-10),
           conversationId: selectedConversationId
         }),
@@ -215,7 +220,7 @@ export function useAIAssistant() {
       setIsTyping(false);
       setIsSending(false);
     }
-  }, [inputMessage, isSending, selectedConversationId, messages]);
+  }, [inputMessage, selectedImage, isSending, selectedConversationId, messages]);
 
   return {
     conversations,
@@ -232,11 +237,13 @@ export function useAIAssistant() {
     conversationsPage,
     messagesPage,
     editingMessageId,
+    selectedImage,
     recognitionRef,
     setInputMessage,
     setIsListening,
     setEditingMessageId,
     setSelectedConversationId,
+    setSelectedImage,
     setMessages,
     loadConversations,
     loadMessages,

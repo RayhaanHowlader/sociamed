@@ -127,7 +127,7 @@ export function PostComposer({ profile, onPostCreated }: PostComposerProps) {
                   placeholder="What's on your mind?"
                   value={postContent}
                   onChange={(e) => setPostContent(e.target.value)}
-                  className="min-h-[80px] resize-none border-slate-200 dark:border-slate-600 focus:border-blue-500 transition-colors dark:bg-slate-900 dark:text-white"
+                  className="min-h-[80px] resize-none border-slate-200 dark:border-slate-600 focus:border-blue-500 transition-colors dark:bg-slate-900 dark:text-white dark:placeholder-slate-400"
                   disabled={posting}
                 />
                 {postImageUrl && (

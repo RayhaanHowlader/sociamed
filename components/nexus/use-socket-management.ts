@@ -137,8 +137,8 @@ export function useSocketManagement({
     if (!currentUserId) return;
 
     const socketUrl = process.env.NODE_ENV === 'production' 
-      ? (process.env.NEXT_PUBLIC_SOCKET_URL || 'https://sociamed.onrender.com')
-      : 'https://sociamed.onrender.com';
+      ? (process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000')
+      : 'http://localhost:4000';
     console.log('[socket] Connecting to:', socketUrl, '(env:', process.env.NODE_ENV + ')');
     
     const socket = io(socketUrl, {

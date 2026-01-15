@@ -158,10 +158,10 @@ export function SharePostModal({ open, onOpenChange, post, onShareSuccess, socke
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-md max-h-[85vh] overflow-y-auto mx-4">
+      <DialogContent className="w-[95vw] max-w-md max-h-[85vh] overflow-y-auto mx-4 dark:bg-slate-800 dark:border-slate-700">
         <DialogHeader>
-          <DialogTitle>Share Post</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="dark:text-white">Share Post</DialogTitle>
+          <DialogDescription className="dark:text-slate-300">
             Share this post with your friends via messages
           </DialogDescription>
         </DialogHeader>
@@ -169,18 +169,18 @@ export function SharePostModal({ open, onOpenChange, post, onShareSuccess, socke
         <div className="space-y-3 px-1">
           {/* Compact Post Preview */}
           {post && (
-            <div className="bg-slate-50 rounded-lg p-2 border">
+            <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-2 border dark:border-slate-700">
               <div className="flex items-center gap-2 mb-1">
                 <Avatar className="w-6 h-6">
                   <AvatarImage src={post.author.avatarUrl} />
                   <AvatarFallback className="text-xs">{post.author.name?.[0]}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-slate-900 truncate">{post.author.name}</p>
+                  <p className="text-xs font-semibold text-slate-900 dark:text-white truncate">{post.author.name}</p>
                 </div>
               </div>
               {post.content && (
-                <p className="text-xs text-slate-700 mb-1 overflow-hidden" style={{
+                <p className="text-xs text-slate-700 dark:text-slate-300 mb-1 overflow-hidden" style={{
                   display: '-webkit-box',
                   WebkitLineClamp: 2,
                   WebkitBoxOrient: 'vertical'
@@ -202,27 +202,27 @@ export function SharePostModal({ open, onOpenChange, post, onShareSuccess, socke
 
           {/* Search Friends */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 w-4 h-4" />
             <Input
               placeholder="Search friends..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 h-9 text-sm"
+              className="pl-10 h-9 text-sm dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder-slate-400"
             />
           </div>
 
           {/* Friends List */}
           <div className="space-y-2">
-            <p className="text-sm font-medium text-slate-700">
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
               Select friends ({selectedFriends.size} selected)
             </p>
             
             {loading ? (
               <div className="flex items-center justify-center py-6">
-                <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                <Loader2 className="w-5 h-5 animate-spin text-blue-600 dark:text-blue-400" />
               </div>
             ) : filteredFriends.length === 0 ? (
-              <p className="text-sm text-slate-500 py-4 text-center">
+              <p className="text-sm text-slate-500 dark:text-slate-400 py-4 text-center">
                 {friends.length === 0 ? 'No friends found' : 'No friends match your search'}
               </p>
             ) : (
@@ -232,8 +232,10 @@ export function SharePostModal({ open, onOpenChange, post, onShareSuccess, socke
                     <button
                       key={friend.userId}
                       onClick={() => toggleFriendSelection(friend.userId)}
-                      className={`w-full p-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 transition-colors ${
-                        selectedFriends.has(friend.userId) ? 'bg-blue-50 border border-blue-200' : ''
+                      className={`w-full p-2 rounded-lg flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${
+                        selectedFriends.has(friend.userId) 
+                          ? 'bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700' 
+                          : 'dark:border-transparent'
                       }`}
                     >
                       <Avatar className="w-7 h-7">
@@ -241,11 +243,11 @@ export function SharePostModal({ open, onOpenChange, post, onShareSuccess, socke
                         <AvatarFallback className="text-xs">{friend.name[0]}</AvatarFallback>
                       </Avatar>
                       <div className="flex-1 text-left min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">{friend.name}</p>
-                        <p className="text-xs text-slate-500 truncate">@{friend.username}</p>
+                        <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{friend.name}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">@{friend.username}</p>
                       </div>
                       {selectedFriends.has(friend.userId) && (
-                        <div className="w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                        <div className="w-4 h-4 bg-blue-600 dark:bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
                           <div className="w-1.5 h-1.5 bg-white rounded-full" />
                         </div>
                       )}
@@ -258,27 +260,27 @@ export function SharePostModal({ open, onOpenChange, post, onShareSuccess, socke
 
           {/* Optional Message */}
           <div className="space-y-2">
-            <p className="text-sm font-medium text-slate-700">Add a message (optional)</p>
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Add a message (optional)</p>
             <Textarea
               placeholder="Say something about this post..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              className="min-h-[50px] resize-none text-sm"
+              className="min-h-[50px] resize-none text-sm dark:bg-slate-900 dark:border-slate-700 dark:text-white dark:placeholder-slate-400"
               maxLength={200}
               rows={2}
             />
-            <p className="text-xs text-slate-500 text-right">{message.length}/200</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 text-right">{message.length}/200</p>
           </div>
 
           {/* Error Message */}
           {error && (
-            <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 p-2 rounded">
+            <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded border dark:border-red-800">
               <AlertCircle className="w-4 h-4" />
               {error}
             </div>
           )}
 
-          <Separator />
+          <Separator className="dark:bg-slate-700" />
 
           {/* Action Buttons */}
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2">
@@ -286,7 +288,7 @@ export function SharePostModal({ open, onOpenChange, post, onShareSuccess, socke
               variant="ghost"
               onClick={() => onOpenChange(false)}
               disabled={sharing}
-              className="w-full sm:w-auto"
+              className="w-full sm:w-auto dark:text-slate-300 dark:hover:bg-slate-700"
             >
               Cancel
             </Button>

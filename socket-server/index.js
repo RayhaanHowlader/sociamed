@@ -219,6 +219,19 @@ io.on('connection', (socket) => {
     })
   })
 
+  // Group member added notification
+  socket.on('group:member:added:notify', ({ userId, groupId, groupName, groupIcon, addedBy, addedByProfile }) => {
+    if (!userId || !groupId || !addedBy || !addedByProfile) return
+    io.to(`user:${userId}`).emit('group:member:added', {
+      userId,
+      groupId,
+      groupName,
+      groupIcon,
+      addedBy,
+      addedByProfile,
+    })
+  })
+
   socket.on('disconnect', () => {
     console.log('Socket disconnected:', socket.id)
   })
