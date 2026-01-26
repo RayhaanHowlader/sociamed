@@ -121,50 +121,50 @@ export function GroupMessageInput({
             <Button
               variant="ghost"
               size="icon"
-              className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 h-8 w-8 md:h-10 md:w-10"
+              className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400"
               onClick={() => fileInputRef.current?.click()}
               disabled={!selectedGroup || uploadingFile}
             >
-              <Paperclip className="w-4 h-4 md:w-5 md:h-5" />
+              <Paperclip className="w-5 h-5" />
             </Button>
           </div>
           <EmojiPicker onEmojiSelect={onEmojiSelect}>
-            <Button variant="ghost" size="icon" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 h-8 w-8 md:h-10 md:w-10">
-              <Smile className="w-4 h-4 md:w-5 md:h-5" />
+            <Button variant="ghost" size="icon" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400">
+              <Smile className="w-5 h-5" />
             </Button>
           </EmojiPicker>
           <VoiceInput 
             onTextReceived={onVoiceTextReceived}
             onVoiceMessageSent={onVoiceMessageSent}
           >
-            <Button variant="ghost" size="icon" className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-400 h-8 w-8 md:h-10 md:w-10">
-              <Mic className="w-4 h-4 md:w-5 md:h-5" />
+            <Button variant="ghost" size="icon" className="text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-400">
+              <Mic className="w-5 h-5" />
             </Button>
           </VoiceInput>
           <Button
             variant="ghost"
             size="icon"
-            className="text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 h-8 w-8 md:h-10 md:w-10"
+            className="text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-400"
             onClick={onCreatePoll}
             disabled={!selectedGroup || uploadingFile}
             title="Create Poll"
           >
-            <BarChart3 className="w-4 h-4 md:w-5 md:h-5" />
+            <BarChart3 className="w-5 h-5" />
           </Button>
           <Input
             placeholder={selectedGroup ? 'Type a message...' : 'Select a group to start chatting'}
             value={message}
             onChange={(e) => onMessageChange(e.target.value)}
-            className="flex-1 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-sm h-8 md:h-10"
+            className="flex-1 border-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
             disabled={!selectedGroup || uploadingFile}
             onKeyDown={handleKeyDown}
           />
           <Button
-            className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 h-8 w-8 md:h-10 md:w-10 md:px-4"
+            className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
             disabled={!selectedGroup || uploadingFile}
             onClick={handleSendClick}
           >
-            <Send className="w-3 h-3 md:w-4 md:h-4" />
+            <Send className="w-4 h-4" />
           </Button>
         </div>
       </div>

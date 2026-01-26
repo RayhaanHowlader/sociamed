@@ -166,7 +166,7 @@ export function GroupChats() {
     refreshCurrentGroup: async () => {
       if (!selectedGroup) return;
       try {
-        const res = await fetch(`/api/groups/history?groupId=${selectedGroup._id}&limit=20`, {
+        const res = await fetch(`/api/groups/history?groupId=${selectedGroup._id}&limit=5`, {
           credentials: 'include',
         });
         const data = await res.json();
@@ -185,9 +185,18 @@ export function GroupChats() {
   const {
     hasMoreMessages,
     loadingMore,
+    loadingInitial,
     loadMoreMessages,
     refreshCurrentGroup
   } = useGroupMessages({ selectedGroup, socketReady, loadPinnedMessages, setMessages, setPinnedMessages });
+
+  // Debug logging
+  console.log('[DEBUG] Group Chat State:', { 
+    selectedGroupId: selectedGroup?._id,
+    socketReady,
+    loadingInitial,
+    messagesCount: messages.length
+  });
 
   // Custom hooks for group operations
   const {
@@ -520,73 +529,87 @@ export function GroupChats() {
       )}>
         {selectedGroup ? (
           <>
-        <GroupChatHeader
-          selectedGroup={selectedGroup}
-          onBackClick={() => setSelectedGroup(null)}
-          onAddMemberClick={() => setAddMemberOpen(true)}
-          onToggleMembersClick={() => setShowMembers(!showMembers)}
-          onSearchMediaClick={() => setSearchMediaOpen(true)}
-          onSettingsClick={openSettings}
-          onDeleteClick={() => setDeleteOpen(true)}
-          onSelectModeToggle={() => (selectMode ? clearSelection() : setSelectMode(true))}
-          onDeleteSelected={deleteSelectedMessages}
-          canInviteMembers={canInviteMembers}
-          selectMode={selectMode}
-          selectedMessageIds={selectedMessageIds}
-        />
+            <GroupChatHeader
+              selectedGroup={selectedGroup}
+              onBackClick={() => setSelectedGroup(null)}
+              onAddMemberClick={() => setAddMemberOpen(true)}
+              onToggleMembersClick={() => setShowMembers(!showMembers)}
+              onSearchMediaClick={() => setSearchMediaOpen(true)}
+              onSettingsClick={openSettings}
+              onDeleteClick={() => setDeleteOpen(true)}
+              onSelectModeToggle={() => (selectMode ? clearSelection() : setSelectMode(true))}
+              onDeleteSelected={deleteSelectedMessages}
+              canInviteMembers={canInviteMembers}
+              selectMode={selectMode}
+              selectedMessageIds={selectedMessageIds}
+            />
 
-        <div className="flex flex-1 overflow-hidden min-h-0">
-          <GroupMessagesArea
-            selectedGroup={selectedGroup}
-            messages={messages}
-            pinnedMessages={pinnedMessages}
-            showPinnedMessages={showPinnedMessages}
-            onTogglePinnedMessages={setShowPinnedMessages}
-            hasMoreMessages={hasMoreMessages}
-            loadingMore={loadingMore}
-            onLoadMoreMessages={loadMoreMessages}
-            groupMembers={groupMembers}
-            currentUserId={currentUserId}
-            isCurrentUserAdmin={isCurrentUserAdmin}
-            selectMode={selectMode}
-            selectedMessageIds={selectedMessageIds}
-            onToggleMessageSelection={toggleMessageSelection}
-            onImageClick={handleGroupImageClick}
-            onPinToggle={handleTogglePinMessage}
-            onPollVote={handlePollVote}
-            messagesContainerRef={messagesContainerRef}
-            messagesEndRef={messagesEndRef}
-          />
+            {loadingInitial ? (
+              <>
+                {console.log('[DEBUG] Rendering loading screen - loadingInitial is true')}
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="flex flex-col items-center space-y-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Loading messages...</p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex flex-1 overflow-hidden min-h-0">
+                  <GroupMessagesArea
+                    selectedGroup={selectedGroup}
+                    messages={messages}
+                    pinnedMessages={pinnedMessages}
+                    showPinnedMessages={showPinnedMessages}
+                    onTogglePinnedMessages={setShowPinnedMessages}
+                    hasMoreMessages={hasMoreMessages}
+                    loadingMore={loadingMore}
+                    onLoadMoreMessages={loadMoreMessages}
+                    groupMembers={groupMembers}
+                    currentUserId={currentUserId}
+                    isCurrentUserAdmin={isCurrentUserAdmin}
+                    selectMode={selectMode}
+                    selectedMessageIds={selectedMessageIds}
+                    onToggleMessageSelection={toggleMessageSelection}
+                    onImageClick={handleGroupImageClick}
+                    onPinToggle={handleTogglePinMessage}
+                    onPollVote={handlePollVote}
+                    messagesContainerRef={messagesContainerRef}
+                    messagesEndRef={messagesEndRef}
+                  />
 
-          <GroupMembersSidebar
-            show={showMembers}
-            selectedGroup={selectedGroup}
-            groupMembers={groupMembers}
-            loadingMembers={loadingMembers}
-            currentUserId={currentUserId}
-            isCurrentUserAdmin={isCurrentUserAdmin}
-            onRemoveMember={openRemoveMemberModal}
-          />
-        </div>
+                  <GroupMembersSidebar
+                    show={showMembers}
+                    selectedGroup={selectedGroup}
+                    groupMembers={groupMembers}
+                    loadingMembers={loadingMembers}
+                    currentUserId={currentUserId}
+                    isCurrentUserAdmin={isCurrentUserAdmin}
+                    onRemoveMember={openRemoveMemberModal}
+                  />
+                </div>
 
-        <GroupMessageInput
-          selectedGroup={selectedGroup}
-          message={message}
-          onMessageChange={setMessage}
-          onSendMessage={handleSendMessage}
-          onSendPreview={handleSendPreview}
-          filePreview={filePreview}
-          onFileChange={handleFileChange}
-          onCancelPreview={cancelPreview}
-          uploadProgress={uploadProgress}
-          uploadingFile={uploadingFile}
-          uploadError={uploadError}
-          onClearUploadError={() => setUploadError('')}
-          onEmojiSelect={handleEmojiSelect}
-          onVoiceTextReceived={handleVoiceTextReceived}
-          onVoiceMessageSent={handleVoiceMessageSent}
-          onCreatePoll={handleCreatePoll}
-        />
+                <GroupMessageInput
+                  selectedGroup={selectedGroup}
+                  message={message}
+                  onMessageChange={setMessage}
+                  onSendMessage={handleSendMessage}
+                  onSendPreview={handleSendPreview}
+                  filePreview={filePreview}
+                  onFileChange={handleFileChange}
+                  onCancelPreview={cancelPreview}
+                  uploadProgress={uploadProgress}
+                  uploadingFile={uploadingFile}
+                  uploadError={uploadError}
+                  onClearUploadError={() => setUploadError('')}
+                  onEmojiSelect={handleEmojiSelect}
+                  onVoiceTextReceived={handleVoiceTextReceived}
+                  onVoiceMessageSent={handleVoiceMessageSent}
+                  onCreatePoll={handleCreatePoll}
+                />
+              </>
+            )}
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">

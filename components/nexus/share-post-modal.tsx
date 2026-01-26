@@ -158,7 +158,7 @@ export function SharePostModal({ open, onOpenChange, post, onShareSuccess, socke
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-md max-h-[85vh] overflow-y-auto mx-4 dark:bg-slate-800 dark:border-slate-700">
+      <DialogContent className="sm:max-w-md w-[90vw] max-h-[85vh] overflow-y-auto dark:bg-slate-800 dark:border-slate-700">
         <DialogHeader>
           <DialogTitle className="dark:text-white">Share Post</DialogTitle>
           <DialogDescription className="dark:text-slate-300">

@@ -11,17 +11,10 @@ interface UseGroupMessagesProps {
   setPinnedMessages: React.Dispatch<React.SetStateAction<GroupMessage[]>>;
 }
 
-interface UseGroupMessagesProps {
-  selectedGroup: Group | null;
-  socketReady: boolean;
-  loadPinnedMessages: () => Promise<void>;
-  setMessages: React.Dispatch<React.SetStateAction<GroupMessage[]>>;
-  setPinnedMessages: React.Dispatch<React.SetStateAction<GroupMessage[]>>;
-}
-
 export function useGroupMessages({ selectedGroup, socketReady, loadPinnedMessages, setMessages, setPinnedMessages }: UseGroupMessagesProps) {
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadingInitial, setLoadingInitial] = useState(false);
   const [messages, setLocalMessages] = useState<GroupMessage[]>([]);
 
   // Clear selection function
@@ -31,19 +24,40 @@ export function useGroupMessages({ selectedGroup, socketReady, loadPinnedMessage
 
   // Load initial history when selected group changes
   useEffect(() => {
+    console.log('[DEBUG] useGroupMessages effect triggered', { 
+      selectedGroup: selectedGroup?._id, 
+      socketReady,
+      hasSelectedGroup: !!selectedGroup 
+    });
+
     if (!selectedGroup || !socketReady) {
+      console.log('[DEBUG] Clearing messages - no group or socket not ready');
       setMessages([]);
       setPinnedMessages([]);
       setHasMoreMessages(false);
+      setLoadingInitial(false);
       return;
     }
 
     const loadHistory = async () => {
+      console.log('[DEBUG] Starting to load history for group:', selectedGroup._id);
+      setLoadingInitial(true);
       try {
-        const res = await fetch(`/api/groups/history?groupId=${selectedGroup._id}&limit=5`, {
+        const url = `/api/groups/history?groupId=${selectedGroup._id}&limit=5`;
+        console.log('[DEBUG] Fetching from URL:', url);
+        
+        const res = await fetch(url, {
           credentials: 'include',
         });
         const data = await res.json();
+        
+        console.log('[DEBUG] API Response:', { 
+          ok: res.ok, 
+          status: res.status, 
+          messagesCount: data.messages?.length,
+          hasMore: data.hasMore 
+        });
+        
         if (!res.ok) {
           console.error(data.error || 'Unable to load group history');
           return;
@@ -53,7 +67,10 @@ export function useGroupMessages({ selectedGroup, socketReady, loadPinnedMessage
         setLocalMessages(data.messages ?? []);
         setHasMoreMessages(data.hasMore ?? false);
       } catch (err) {
-        console.error(err);
+        console.error('Failed to load group history:', err);
+      } finally {
+        console.log('[DEBUG] Finished loading history, setting loadingInitial to false');
+        setLoadingInitial(false);
       }
     };
 
@@ -79,7 +96,7 @@ export function useGroupMessages({ selectedGroup, socketReady, loadPinnedMessage
     
     try {
       const res = await fetch(
-        `/api/groups/history?groupId=${selectedGroup._id}&limit=10&before=${oldestMessage.createdAt}`,
+        `/api/groups/history?groupId=${selectedGroup._id}&limit=5&before=${oldestMessage.createdAt}`,
         {
           credentials: 'include',
         }
@@ -113,8 +130,9 @@ export function useGroupMessages({ selectedGroup, socketReady, loadPinnedMessage
   // Refresh current group messages
   const refreshCurrentGroup = useCallback(async () => {
     if (!selectedGroup) return;
+    setLoadingInitial(true);
     try {
-      const res = await fetch(`/api/groups/history?groupId=${selectedGroup._id}&limit=20`, {
+      const res = await fetch(`/api/groups/history?groupId=${selectedGroup._id}&limit=5`, {
         credentials: 'include',
       });
       const data = await res.json();
@@ -126,13 +144,16 @@ export function useGroupMessages({ selectedGroup, socketReady, loadPinnedMessage
       setLocalMessages(data.messages ?? []);
       setHasMoreMessages(data.hasMore ?? false);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to refresh group messages:', err);
+    } finally {
+      setLoadingInitial(false);
     }
   }, [selectedGroup, setMessages]);
 
   return {
     hasMoreMessages,
     loadingMore,
+    loadingInitial,
     loadMoreMessages,
     refreshCurrentGroup
   };
