@@ -7,6 +7,7 @@ import { StoryCard } from './story-card';
 import { StoryCreateModal } from './story-create-modal';
 import { StoryViewerModal } from './story-viewer-modal';
 import { StoryRateLimitModal } from './story-rate-limit-modal';
+import { DeleteStoryModal } from './delete-story-modal';
 import { useStoryData } from './use-story-data';
 import { useStoryInteractions } from './use-story-interactions';
 import { useStoryViewer } from './use-story-viewer';
@@ -30,6 +31,9 @@ export function Stories() {
     setRateLimitError,
     editingStory,
     setEditingStory,
+    deleteModalOpen,
+    setDeleteModalOpen,
+    isDeleting,
     handleFileChange,
     handleVideoRecorded,
     removeMedia,
@@ -37,6 +41,7 @@ export function Stories() {
     handleCreateStory,
     handleEditStory,
     handleDeleteStory,
+    confirmDeleteStory,
     openEditModal,
   } = useStoryInteractions(fetchStories);
 
@@ -189,6 +194,13 @@ export function Stories() {
         onRemoveMedia={removeMedia}
         onCreateStory={handleEdit}
         onVideoRecorded={handleVideoRecorded}
+      />
+
+      <DeleteStoryModal
+        open={deleteModalOpen}
+        onOpenChange={setDeleteModalOpen}
+        onConfirm={confirmDeleteStory}
+        isDeleting={isDeleting}
       />
     </div>
   );

@@ -29,9 +29,10 @@ interface PostActionsProps {
   onLike: (postId: string) => void;
   onToggleComments: (postId: string) => void;
   onShare: (post: Post) => void;
+  isCommentsOpen?: boolean;
 }
 
-export function PostActions({ post, onLike, onToggleComments, onShare }: PostActionsProps) {
+export function PostActions({ post, onLike, onToggleComments, onShare, isCommentsOpen }: PostActionsProps) {
   return (
     <>
       <Separator className="mb-4 dark:bg-slate-700" />
@@ -40,7 +41,10 @@ export function PostActions({ post, onLike, onToggleComments, onShare }: PostAct
           variant="ghost"
           size="sm"
           className="hover:text-rose-600 hover:bg-rose-50 dark:hover:text-rose-400 dark:hover:bg-rose-900/20 dark:text-slate-300"
-          onClick={() => onLike(post._id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onLike(post._id);
+          }}
         >
           <Heart
             className="w-5 h-5 mr-2"
@@ -52,7 +56,10 @@ export function PostActions({ post, onLike, onToggleComments, onShare }: PostAct
           variant="ghost"
           size="sm"
           className="hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/20 dark:text-slate-300"
-          onClick={() => onToggleComments(post._id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleComments(post._id);
+          }}
         >
           <MessageCircle className="w-5 h-5 mr-2" />
           {post.stats?.comments ?? 0}
@@ -61,12 +68,22 @@ export function PostActions({ post, onLike, onToggleComments, onShare }: PostAct
           variant="ghost" 
           size="sm" 
           className="hover:text-green-600 hover:bg-green-50 dark:hover:text-green-400 dark:hover:bg-green-900/20 dark:text-slate-300"
-          onClick={() => onShare(post)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onShare(post);
+          }}
         >
           <Share2 className="w-5 h-5 mr-2" />
           {post.stats?.shares ?? 0}
         </Button>
-        <Button variant="ghost" size="icon" className="hover:text-amber-600 hover:bg-amber-50 dark:hover:text-amber-400 dark:hover:bg-amber-900/20 dark:text-slate-300">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="hover:text-amber-600 hover:bg-amber-50 dark:hover:text-amber-400 dark:hover:bg-amber-900/20 dark:text-slate-300"
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+        >
           <Bookmark className="w-5 h-5" />
         </Button>
       </div>

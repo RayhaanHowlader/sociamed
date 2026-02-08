@@ -12,6 +12,66 @@ interface RouteParams {
   }
 }
 
+export async function GET(req: NextRequest, { params }: RouteParams) {
+  const user = getUserFromRequest(req)
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const db = await getDb()
+  const posts = db.collection("posts")
+  const users = db.collection("users")
+
+  const _id = new ObjectId(params.id)
+  
+  // Find the post
+  const post = await posts.findOne({ _id })
+  if (!post) {
+    return NextResponse.json({ error: "Post not found" }, { status: 404 })
+  }
+
+  // Get author information
+  const author = await users.findOne(
+    { _id: new ObjectId(post.userId) },
+    { projection: { name: 1, username: 1, avatarUrl: 1 } }
+  )
+
+  if (!author) {
+    return NextResponse.json({ error: "Author not found" }, { status: 404 })
+  }
+
+  // Get like status for current user
+  const likes = db.collection("likes")
+  const userLike = await likes.findOne({
+    postId: post._id.toString(),
+    userId: user.sub,
+  })
+
+  // Get stats
+  const [likesCount, commentsCount, sharesCount] = await Promise.all([
+    likes.countDocuments({ postId: post._id.toString() }),
+    db.collection("comments").countDocuments({ postId: post._id.toString() }),
+    db.collection("shares").countDocuments({ postId: post._id.toString() }),
+  ])
+
+  const postWithDetails = {
+    ...post,
+    author: {
+      name: author.name,
+      username: author.username,
+      avatarUrl: author.avatarUrl,
+    },
+    liked: !!userLike,
+    stats: {
+      likes: likesCount,
+      comments: commentsCount,
+      shares: sharesCount,
+    },
+  }
+
+  return NextResponse.json({ post: postWithDetails }, { status: 200 })
+}
+
 export async function PATCH(req: NextRequest, { params }: RouteParams) {
   const user = getUserFromRequest(req)
   if (!user) {

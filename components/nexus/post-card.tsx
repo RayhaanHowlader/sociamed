@@ -159,7 +159,8 @@ export function PostCard({
             </Avatar>
             <div 
               className="cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 if (post.userId && post.userId !== currentUserId) {
                   onViewProfile(post.userId);
                 }
@@ -179,13 +180,22 @@ export function PostCard({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-                <DropdownMenuItem onClick={() => startEditing(post)} className="flex items-center gap-2 dark:text-slate-300 dark:hover:bg-slate-700">
+                <DropdownMenuItem 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    startEditing(post);
+                  }} 
+                  className="flex items-center gap-2 dark:text-slate-300 dark:hover:bg-slate-700"
+                >
                   <Pencil className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                   Edit
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400 flex items-center gap-2 dark:hover:bg-slate-700"
-                  onClick={() => onDelete(post)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(post);
+                  }}
                 >
                   <Trash2 className="w-4 h-4" />
                   Delete
@@ -204,14 +214,26 @@ export function PostCard({
               className="dark:bg-slate-900 dark:border-slate-600 dark:text-white"
             />
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" size="sm" onClick={cancelEditing} className="dark:text-slate-300 dark:hover:bg-slate-700">
+              <Button 
+                type="button" 
+                variant="ghost" 
+                size="sm" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  cancelEditing();
+                }} 
+                className="dark:text-slate-300 dark:hover:bg-slate-700"
+              >
                 Cancel
               </Button>
               <Button
                 type="button"
                 size="sm"
                 className="bg-gradient-to-r from-blue-600 to-cyan-600"
-                onClick={() => saveEdit(post)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  saveEdit(post);
+                }}
               >
                 Save
               </Button>
@@ -224,7 +246,10 @@ export function PostCard({
         {post.imageUrl && (
           <div 
             className="rounded-xl overflow-hidden mb-4 cursor-pointer hover:opacity-95 transition-opacity"
-            onClick={() => onImageClick(post)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onImageClick(post);
+            }}
           >
             <img src={post.imageUrl} alt="Post content" className="w-full object-cover" />
           </div>

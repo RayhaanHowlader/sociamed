@@ -208,9 +208,13 @@ export function MessageBubble({ message, isMine, currentUserId, selected, select
                 isMine ? 'border-white/20 bg-white/10 hover:bg-white/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800'
               )}
               onClick={(event) => {
+                console.log('[MessageBubble] Shared post clicked:', message.sharedPostId);
                 event.stopPropagation();
                 if (message.sharedPostId && onSharedPostClick) {
+                  console.log('[MessageBubble] Calling onSharedPostClick with postId:', message.sharedPostId);
                   onSharedPostClick(message.sharedPostId);
+                } else {
+                  console.log('[MessageBubble] Missing sharedPostId or onSharedPostClick handler');
                 }
               }}
             >

@@ -139,11 +139,32 @@ export function useMessageHandlers({
     [friends, setImageViewerData, setImageViewerOpen],
   );
 
-  const handleSharedPostClick = useCallback((postId: string) => {
-    // Navigate to the feed and highlight the post
-    window.dispatchEvent(new CustomEvent('navigate-to-post', { 
-      detail: { postId } 
-    }));
+  const handleSharedPostClick = useCallback(async (postId: string) => {
+    console.log('[handleSharedPostClick] Clicked on shared post:', postId);
+    try {
+      // Fetch the post data
+      const response = await fetch(`/api/posts/${postId}`, {
+        credentials: 'include',
+      });
+      
+      console.log('[handleSharedPostClick] API response status:', response.status);
+      
+      if (!response.ok) {
+        console.error('[handleSharedPostClick] Failed to fetch post data, status:', response.status);
+        return;
+      }
+      
+      const postData = await response.json();
+      console.log('[handleSharedPostClick] Fetched post data:', postData);
+      
+      // Dispatch event to open post modal with the fetched data
+      console.log('[handleSharedPostClick] Dispatching open-post-modal event');
+      window.dispatchEvent(new CustomEvent('open-post-modal', { 
+        detail: { post: postData.post } 
+      }));
+    } catch (error) {
+      console.error('[handleSharedPostClick] Error fetching shared post:', error);
+    }
   }, []);
 
   const handleSharedShortClick = useCallback((short: any) => {

@@ -37,6 +37,9 @@ export function useStoryInteractions(fetchStories: () => void) {
   const [uploading, setUploading] = useState(false);
   const [rateLimitError, setRateLimitError] = useState<{ message: string; hoursRemaining: number } | null>(null);
   const [editingStory, setEditingStory] = useState<Story | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [storyToDelete, setStoryToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Handle story type changes with media compatibility
@@ -331,10 +334,16 @@ export function useStoryInteractions(fetchStories: () => void) {
   };
 
   const handleDeleteStory = async (storyId: string) => {
-    if (!confirm('Are you sure you want to delete this story?')) return;
+    setStoryToDelete(storyId);
+    setDeleteModalOpen(true);
+  };
 
+  const confirmDeleteStory = async () => {
+    if (!storyToDelete) return;
+
+    setIsDeleting(true);
     try {
-      const res = await fetch(`/api/stories/${storyId}`, {
+      const res = await fetch(`/api/stories/${storyToDelete}`, {
         method: 'DELETE',
         credentials: 'include',
       });
@@ -345,9 +354,13 @@ export function useStoryInteractions(fetchStories: () => void) {
       }
 
       fetchStories();
+      setDeleteModalOpen(false);
+      setStoryToDelete(null);
     } catch (err: any) {
       console.error(err);
       alert(err.message || 'Failed to delete story. Please try again.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -619,6 +632,9 @@ export function useStoryInteractions(fetchStories: () => void) {
     setRateLimitError,
     editingStory,
     setEditingStory,
+    deleteModalOpen,
+    setDeleteModalOpen,
+    isDeleting,
     handleFileChange,
     handleVideoRecorded,
     removeMedia,
@@ -626,6 +642,7 @@ export function useStoryInteractions(fetchStories: () => void) {
     handleCreateStory,
     handleEditStory,
     handleDeleteStory,
+    confirmDeleteStory,
     openEditModal,
   };
 }

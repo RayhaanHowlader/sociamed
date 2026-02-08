@@ -15,6 +15,7 @@ import { EchoFreeCallUI } from './echo-free-call-ui';
 import { CallAudioElements } from './call-audio-elements';
 import { ChatSearchMedia } from './chat-search-media';
 import { ImageViewerModal } from './image-viewer-modal';
+import { PostModal } from './post-modal';
 
 interface FriendConversation {
   userId: string;
@@ -65,6 +66,12 @@ export function DirectMessages() {
     fileName?: string;
   } | null>(null);
   const [searchMediaOpen, setSearchMediaOpen] = useState(false);
+  const [postModalOpen, setPostModalOpen] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<any>(null);
+  const [postComments, setPostComments] = useState<any[]>([]);
+  const [postCommentValue, setPostCommentValue] = useState('');
+  const [hasMorePostComments, setHasMorePostComments] = useState(false);
+  const [loadingMorePostComments, setLoadingMorePostComments] = useState(false);
 
   // Custom hooks
   const friendsManagement = useFriendsManagement();
@@ -244,6 +251,173 @@ export function DirectMessages() {
 
     loadCurrentUser();
   }, []);
+
+  // Listen for post modal open events
+  useEffect(() => {
+    const handleOpenPostModal = (event: CustomEvent) => {
+      console.log('[DirectMessages] Received open-post-modal event:', event.detail);
+      const { post } = event.detail;
+      setSelectedPost(post);
+      setPostModalOpen(true);
+      // Load comments for the post
+      loadPostComments(post._id);
+    };
+
+    console.log('[DirectMessages] Adding event listener for open-post-modal');
+    window.addEventListener('open-post-modal', handleOpenPostModal as EventListener);
+    
+    return () => {
+      console.log('[DirectMessages] Removing event listener for open-post-modal');
+      window.removeEventListener('open-post-modal', handleOpenPostModal as EventListener);
+    };
+  }, []);
+
+  // Load post comments
+  const loadPostComments = async (postId: string) => {
+    try {
+      const response = await fetch(`/api/posts/${postId}/comments?limit=10`, {
+        credentials: 'include',
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setPostComments(data.comments || []);
+        setHasMorePostComments(data.hasMore || false);
+      }
+    } catch (error) {
+      console.error('Failed to load post comments:', error);
+    }
+  };
+
+  // Post modal handlers
+  const handlePostEdit = (post: any) => {
+    // Handle post edit - could dispatch event to main feed
+    console.log('Edit post:', post);
+  };
+
+  const handlePostDelete = async (post: any) => {
+    try {
+      const response = await fetch(`/api/posts/${post._id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      
+      if (response.ok) {
+        setPostModalOpen(false);
+        setSelectedPost(null);
+      }
+    } catch (error) {
+      console.error('Failed to delete post:', error);
+    }
+  };
+
+  const handlePostLike = async (postId: string) => {
+    try {
+      const response = await fetch(`/api/posts/${postId}/like`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        // Update the selected post's like status
+        if (selectedPost && selectedPost._id === postId) {
+          setSelectedPost({
+            ...selectedPost,
+            liked: data.liked,
+            stats: {
+              ...selectedPost.stats,
+              likes: data.likesCount,
+            },
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to like post:', error);
+    }
+  };
+
+  const handlePostShare = (post: any) => {
+    // Handle post share - could open share modal
+    console.log('Share post:', post);
+  };
+
+  const handlePostImageClick = (post: any) => {
+    if (post.imageUrl) {
+      setImageViewerData({
+        url: post.imageUrl,
+        senderName: post.author.name,
+        senderAvatar: post.author.avatarUrl,
+        senderUsername: post.author.username,
+        timestamp: post.createdAt,
+        caption: post.content,
+      });
+      setImageViewerOpen(true);
+    }
+  };
+
+  const handlePostCommentChange = (postId: string, value: string) => {
+    setPostCommentValue(value);
+  };
+
+  const handleAddPostComment = async (postId: string) => {
+    if (!postCommentValue.trim()) return;
+    
+    try {
+      const response = await fetch(`/api/posts/${postId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ content: postCommentValue }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setPostComments(prev => [data.comment, ...prev]);
+        setPostCommentValue('');
+        
+        // Update comment count in selected post
+        if (selectedPost && selectedPost._id === postId) {
+          setSelectedPost({
+            ...selectedPost,
+            stats: {
+              ...selectedPost.stats,
+              comments: (selectedPost.stats?.comments || 0) + 1,
+            },
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to add comment:', error);
+    }
+  };
+
+  const handleLoadMorePostComments = async (postId: string) => {
+    if (loadingMorePostComments) return;
+    
+    setLoadingMorePostComments(true);
+    try {
+      const response = await fetch(`/api/posts/${postId}/comments?limit=10&offset=${postComments.length}`, {
+        credentials: 'include',
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setPostComments(prev => [...prev, ...data.comments]);
+        setHasMorePostComments(data.hasMore || false);
+      }
+    } catch (error) {
+      console.error('Failed to load more comments:', error);
+    } finally {
+      setLoadingMorePostComments(false);
+    }
+  };
+
+  const handleViewProfile = (userId: string) => {
+    window.dispatchEvent(new CustomEvent('view-profile', { 
+      detail: { userId } 
+    }));
+  };
 
   // Load initial messages when chat is selected
   useEffect(() => {
@@ -477,6 +651,33 @@ export function DirectMessages() {
           setImageViewerOpen(true);
           setSearchMediaOpen(false);
         }}
+      />
+
+      <PostModal
+        open={postModalOpen}
+        onOpenChange={(open) => {
+          setPostModalOpen(open);
+          if (!open) {
+            setSelectedPost(null);
+            setPostComments([]);
+            setPostCommentValue('');
+          }
+        }}
+        post={selectedPost}
+        comments={postComments}
+        commentValue={postCommentValue}
+        hasMoreComments={hasMorePostComments}
+        loadingMoreComments={loadingMorePostComments}
+        currentUserId={currentUserId}
+        onEdit={handlePostEdit}
+        onDelete={handlePostDelete}
+        onLike={handlePostLike}
+        onShare={handlePostShare}
+        onImageClick={handlePostImageClick}
+        onCommentChange={handlePostCommentChange}
+        onAddComment={handleAddPostComment}
+        onLoadMoreComments={handleLoadMorePostComments}
+        onViewProfile={handleViewProfile}
       />
     </>
   );
