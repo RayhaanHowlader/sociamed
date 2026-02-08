@@ -184,72 +184,81 @@ export default function ForgotPassword({ onBackToLogin }: ForgotPasswordProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center p-4 relative">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center px-4 py-12 relative overflow-hidden">
+      {/* Animated background elements for glassomorphism */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/20 to-cyan-400/20 dark:from-blue-500/10 dark:to-cyan-500/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-purple-400/20 to-pink-400/20 dark:from-purple-500/10 dark:to-pink-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-cyan-400/10 to-blue-400/10 dark:from-cyan-500/5 dark:to-blue-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+      </div>
+
       {/* Theme Toggle - Top Right */}
-      <div className="absolute top-4 right-4">
+      <div className="absolute top-4 right-4 z-20">
         <ThemeToggle />
       </div>
       
-      <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-600 to-cyan-500 p-8 text-white">
-            {step !== 'email' && step !== 'success' && (
-              <button
-                onClick={() => setStep(step === 'otp' ? 'email' : 'otp')}
-                className="mb-4 flex items-center gap-2 text-white/90 hover:text-white transition-colors"
-              >
-                <ArrowLeft size={20} />
-                <span className="text-sm">Back</span>
-              </button>
-            )}
-            <h1 className="text-3xl font-bold mb-2">
-              {step === 'email' && 'Forgot Password?'}
-              {step === 'otp' && 'Verify OTP'}
-              {step === 'reset' && 'Reset Password'}
-              {step === 'success' && 'Password Reset!'}
-            </h1>
-            <p className="text-blue-100">
-              {step === 'email' && "No worries, we'll send you reset instructions."}
-              {step === 'otp' && `Enter the 6-digit code sent to ${email}`}
-              {step === 'reset' && 'Create a strong new password for your account.'}
-              {step === 'success' && 'Your password has been successfully reset.'}
-            </p>
+      <div className="w-full max-w-md relative z-10">
+        {/* Glassomorphism Card */}
+        <div className="bg-white/80 dark:bg-slate-800/40 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden border border-white/20 dark:border-slate-700/50">
+          {/* Gradient Header with Glass Effect */}
+          <div className="relative bg-gradient-to-r from-blue-600 to-cyan-500 dark:from-blue-500 dark:to-cyan-400 p-8 text-white overflow-hidden">
+            <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
+            <div className="relative z-10">
+              {step !== 'email' && step !== 'success' && (
+                <button
+                  onClick={() => setStep(step === 'otp' ? 'email' : 'otp')}
+                  className="mb-4 flex items-center gap-2 text-white/90 hover:text-white transition-colors"
+                >
+                  <ArrowLeft size={20} />
+                  <span className="text-sm">Back</span>
+                </button>
+              )}
+              <h1 className="text-3xl font-bold mb-2">
+                {step === 'email' && 'Forgot Password?'}
+                {step === 'otp' && 'Verify OTP'}
+                {step === 'reset' && 'Reset Password'}
+                {step === 'success' && 'Password Reset!'}
+              </h1>
+              <p className="text-blue-100 dark:text-blue-50">
+                {step === 'email' && "No worries, we'll send you reset instructions."}
+                {step === 'otp' && `Enter the 6-digit code sent to ${email}`}
+                {step === 'reset' && 'Create a strong new password for your account.'}
+                {step === 'success' && 'Your password has been successfully reset.'}
+              </p>
+            </div>
           </div>
 
-          <div className="p-8">
-            {step === 'email' && (
+          <div className="p-8">{step === 'email' && (
               <form onSubmit={handleEmailSubmit} className="space-y-6">
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="email" className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">
                     Email Address
                   </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Mail className="h-5 w-5 text-gray-400" />
-                    </div>
+                    <Mail className="absolute left-3 top-3.5 h-5 w-5 text-slate-500 dark:text-slate-400 z-10" />
                     <input
                       id="email"
                       type="email"
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                      className="block w-full pl-10 pr-3 py-3 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-white/50 focus:border-transparent transition-all outline-none"
                       placeholder="you@example.com"
                     />
                   </div>
                 </div>
 
                 {error && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2">
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-center gap-2 backdrop-blur-sm">
                     <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0"></div>
-                    <p className="text-sm text-red-700">{error}</p>
+                    <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
                   </div>
                 )}
 
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-3 rounded-lg font-medium hover:from-blue-700 hover:to-cyan-600 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 dark:from-blue-500 dark:to-cyan-400 text-white py-3 rounded-lg font-medium hover:from-blue-700 hover:to-cyan-600 dark:hover:from-blue-600 dark:hover:to-cyan-500 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
                 >
                   {isLoading ? 'Sending...' : 'Send Reset Code'}
                 </button>
@@ -257,7 +266,7 @@ export default function ForgotPassword({ onBackToLogin }: ForgotPasswordProps) {
                   <button
                     type="button"
                     onClick={handleBackToLoginClick}
-                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors"
                   >
                     Back to Login
                   </button>
@@ -268,7 +277,7 @@ export default function ForgotPassword({ onBackToLogin }: ForgotPasswordProps) {
             {step === 'otp' && (
               <form onSubmit={handleOtpSubmit} className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-4 text-center">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-4 text-center">
                     Enter Verification Code
                   </label>
                   <div className="flex gap-2 justify-center">
@@ -282,23 +291,23 @@ export default function ForgotPassword({ onBackToLogin }: ForgotPasswordProps) {
                         value={digit}
                         onChange={(e) => handleOtpChange(index, e.target.value)}
                         onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                        className="w-12 h-14 text-center text-xl font-semibold border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                        className="w-12 h-14 text-center text-xl font-semibold bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border-2 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-white/50 focus:border-transparent transition-all outline-none"
                       />
                     ))}
                   </div>
                 </div>
 
                 {error && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2">
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-center gap-2 backdrop-blur-sm">
                     <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0"></div>
-                    <p className="text-sm text-red-700">{error}</p>
+                    <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
                   </div>
                 )}
 
                 <button
                   type="submit"
                   disabled={isLoading || otp.join('').length !== 6}
-                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-3 rounded-lg font-medium hover:from-blue-700 hover:to-cyan-600 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 dark:from-blue-500 dark:to-cyan-400 text-white py-3 rounded-lg font-medium hover:from-blue-700 hover:to-cyan-600 dark:hover:from-blue-600 dark:hover:to-cyan-500 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
                 >
                   {isLoading ? 'Verifying...' : 'Verify OTP'}
                 </button>
@@ -307,10 +316,10 @@ export default function ForgotPassword({ onBackToLogin }: ForgotPasswordProps) {
                     type="button"
                     onClick={handleResendOtp}
                     disabled={isLoading}
-                    className="text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50"
+                    className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 disabled:opacity-50 transition-colors"
                   >
                     Didn't receive code?{' '}
-                    <span className="text-blue-600 font-medium">
+                    <span className="text-blue-600 dark:text-blue-400 font-medium">
                       {isLoading ? 'Sending...' : 'Resend'}
                     </span>
                   </button>
@@ -321,82 +330,78 @@ export default function ForgotPassword({ onBackToLogin }: ForgotPasswordProps) {
             {step === 'reset' && (
               <form onSubmit={handlePasswordReset} className="space-y-6">
                 <div>
-                  <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="newPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">
                     New Password
                   </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Lock className="h-5 w-5 text-gray-400" />
-                    </div>
+                    <Lock className="absolute left-3 top-3.5 h-5 w-5 text-slate-500 dark:text-slate-400 z-10" />
                     <input
                       id="newPassword"
                       type={showPassword ? 'text' : 'password'}
                       required
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      className="block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                      className="block w-full pl-10 pr-10 py-3 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-white/50 focus:border-transparent transition-all outline-none"
                       placeholder="Enter new password"
                       minLength={8}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                      className="absolute right-3 top-3.5 z-10"
                     >
                       {showPassword ? (
-                        <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                        <EyeOff className="h-5 w-5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200" />
                       ) : (
-                        <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                        <Eye className="h-5 w-5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200" />
                       )}
                     </button>
                   </div>
                 </div>
                 <div>
-                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-2">
                     Confirm Password
                   </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Lock className="h-5 w-5 text-gray-400" />
-                    </div>
+                    <Lock className="absolute left-3 top-3.5 h-5 w-5 text-slate-500 dark:text-slate-400 z-10" />
                     <input
                       id="confirmPassword"
                       type={showConfirmPassword ? 'text' : 'password'}
                       required
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                      className="block w-full pl-10 pr-10 py-3 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-white/50 focus:border-transparent transition-all outline-none"
                       placeholder="Confirm new password"
                       minLength={8}
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                      className="absolute right-3 top-3.5 z-10"
                     >
                       {showConfirmPassword ? (
-                        <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                        <EyeOff className="h-5 w-5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200" />
                       ) : (
-                        <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                        <Eye className="h-5 w-5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200" />
                       )}
                     </button>
                   </div>
                   {confirmPassword && newPassword !== confirmPassword && (
-                    <p className="mt-2 text-sm text-red-600">Passwords do not match</p>
+                    <p className="mt-2 text-sm text-red-600 dark:text-red-400">Passwords do not match</p>
                   )}
                 </div>
 
                 {error && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2">
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-center gap-2 backdrop-blur-sm">
                     <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0"></div>
-                    <p className="text-sm text-red-700">{error}</p>
+                    <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
                   </div>
                 )}
 
                 <button
                   type="submit"
                   disabled={isLoading || newPassword !== confirmPassword || !newPassword}
-                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-3 rounded-lg font-medium hover:from-blue-700 hover:to-cyan-600 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 dark:from-blue-500 dark:to-cyan-400 text-white py-3 rounded-lg font-medium hover:from-blue-700 hover:to-cyan-600 dark:hover:from-blue-600 dark:hover:to-cyan-500 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
                 >
                   {isLoading ? 'Resetting...' : 'Reset Password'}
                 </button>
@@ -406,16 +411,16 @@ export default function ForgotPassword({ onBackToLogin }: ForgotPasswordProps) {
             {step === 'success' && (
               <div className="text-center space-y-6">
                 <div className="flex justify-center">
-                  <div className="bg-green-100 rounded-full p-4">
-                    <CheckCircle className="h-16 w-16 text-green-600" />
+                  <div className="bg-green-100 dark:bg-green-900/30 backdrop-blur-sm rounded-full p-4">
+                    <CheckCircle className="h-16 w-16 text-green-600 dark:text-green-400" />
                   </div>
                 </div>
-                <p className="text-gray-600">
+                <p className="text-slate-600 dark:text-slate-300">
                   Your password has been reset successfully. You can now log in with your new password.
                 </p>
                 <button
                   onClick={handleBackToLoginClick}
-                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-3 rounded-lg font-medium hover:from-blue-700 hover:to-cyan-600 transition-all duration-200 shadow-lg hover:shadow-xl"
+                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 dark:from-blue-500 dark:to-cyan-400 text-white py-3 rounded-lg font-medium hover:from-blue-700 hover:to-cyan-600 dark:hover:from-blue-600 dark:hover:to-cyan-500 transition-all duration-200 shadow-lg hover:shadow-xl backdrop-blur-sm"
                 >
                   Back to Login
                 </button>
@@ -424,10 +429,11 @@ export default function ForgotPassword({ onBackToLogin }: ForgotPasswordProps) {
           </div>
         </div>
 
+        {/* Footer */}
         <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
             Need help?{' '}
-            <a href="#" className="text-blue-600 hover:text-blue-700 font-medium">
+            <a href="#" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors">
               Contact Support
             </a>
           </p>

@@ -19,11 +19,9 @@ export async function POST(request: NextRequest) {
     // Check if user exists
     const user = await users.findOne({ email });
     if (!user) {
-      // Don't reveal if email exists or not for security
       return NextResponse.json({ 
-        success: true, 
-        message: 'If an account with this email exists, you will receive a reset code.' 
-      }, { status: 200 });
+        error: 'Account not found. Please check your email address.' 
+      }, { status: 404 });
     }
 
     // Generate 6-digit OTP
