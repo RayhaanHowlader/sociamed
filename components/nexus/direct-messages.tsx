@@ -255,20 +255,19 @@ export function DirectMessages() {
   // Listen for post modal open events
   useEffect(() => {
     const handleOpenPostModal = (event: CustomEvent) => {
-      console.log('[DirectMessages] Received open-post-modal event:', event.detail);
+      console.log('[DirectMessages] Received open-chat-post-modal event:', event.detail);
       const { post } = event.detail;
       setSelectedPost(post);
       setPostModalOpen(true);
-      // Load comments for the post
-      loadPostComments(post._id);
+      // Don't load comments initially - they'll load when user clicks comment icon
     };
 
-    console.log('[DirectMessages] Adding event listener for open-post-modal');
-    window.addEventListener('open-post-modal', handleOpenPostModal as EventListener);
+    console.log('[DirectMessages] Adding event listener for open-chat-post-modal');
+    window.addEventListener('open-chat-post-modal', handleOpenPostModal as EventListener);
     
     return () => {
-      console.log('[DirectMessages] Removing event listener for open-post-modal');
-      window.removeEventListener('open-post-modal', handleOpenPostModal as EventListener);
+      console.log('[DirectMessages] Removing event listener for open-chat-post-modal');
+      window.removeEventListener('open-chat-post-modal', handleOpenPostModal as EventListener);
     };
   }, []);
 
@@ -678,6 +677,7 @@ export function DirectMessages() {
         onAddComment={handleAddPostComment}
         onLoadMoreComments={handleLoadMorePostComments}
         onViewProfile={handleViewProfile}
+        onLoadComments={loadPostComments}
       />
     </>
   );

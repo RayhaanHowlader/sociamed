@@ -14,7 +14,6 @@ import {
 } from '@/components/ui/dialog';
 import { PostComposer } from './post-composer';
 import { PostCard } from './post-card';
-import { PostModal } from './post-modal';
 import { SharePostModal } from './share-post-modal';
 import { ImageViewerModal } from './image-viewer-modal';
 import { usePostData } from './use-post-data';
@@ -44,8 +43,6 @@ interface Post {
 
 export function Feed() {
   const [highlightedPostId, setHighlightedPostId] = useState<string | null>(null);
-  const [postModalOpen, setPostModalOpen] = useState(false);
-  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const postRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Use custom hooks for data and interactions
@@ -106,13 +103,6 @@ export function Feed() {
     setPosts((prev) => [newPost, ...prev]);
   };
 
-  const handlePostClick = (post: Post) => {
-    setSelectedPost(post);
-    setPostModalOpen(true);
-    // Load comments for the selected post
-    loadComments(post._id);
-  };
-
   // Listen for post highlight events
   useEffect(() => {
     const handleHighlightPost = (e: CustomEvent<{ postId: string }>) => {
@@ -171,8 +161,6 @@ export function Feed() {
                     ref={(el) => {
                       postRefs.current[post._id] = el;
                     }}
-                    className="cursor-pointer"
-                    onClick={() => handlePostClick(post)}
                   >
                     <PostCard
                       post={post}
@@ -274,37 +262,6 @@ export function Feed() {
         open={imageViewerOpen}
         onOpenChange={setImageViewerOpen}
         image={imageViewerData}
-      />
-
-      <PostModal
-        open={postModalOpen}
-        onOpenChange={setPostModalOpen}
-        post={selectedPost}
-        comments={selectedPost ? (postComments[selectedPost._id] ?? []) : []}
-        commentValue={selectedPost ? (commentInputs[selectedPost._id] ?? '') : ''}
-        hasMoreComments={selectedPost ? (hasMoreComments[selectedPost._id] ?? false) : false}
-        loadingMoreComments={selectedPost ? (loadingMoreComments[selectedPost._id] ?? false) : false}
-        currentUserId={currentUserId}
-        onEdit={() => {}} // Edit functionality handled in PostModal
-        onDelete={(post) => {
-          setDeleteTarget(post);
-          setPostModalOpen(false);
-        }}
-        onLike={toggleLike}
-        onShare={(post) => {
-          handleSharePost(post);
-          setPostModalOpen(false);
-        }}
-        onImageClick={(post) => {
-          handleImageClick(post);
-          setPostModalOpen(false);
-        }}
-        onCommentChange={(postId, value) => 
-          setCommentInputs((prev) => ({ ...prev, [postId]: value }))
-        }
-        onAddComment={addComment}
-        onLoadMoreComments={loadMoreComments}
-        onViewProfile={handleViewProfile}
       />
     </div>
   );

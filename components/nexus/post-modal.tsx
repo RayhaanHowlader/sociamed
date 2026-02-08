@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, MoreHorizontal, Trash2, Pencil } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -70,6 +70,7 @@ interface PostModalProps {
   onAddComment: (postId: string) => void;
   onLoadMoreComments: (postId: string) => void;
   onViewProfile: (userId: string) => void;
+  onLoadComments?: (postId: string) => void;
 }
 
 export function PostModal({
@@ -90,12 +91,25 @@ export function PostModal({
   onAddComment,
   onLoadMoreComments,
   onViewProfile,
+  onLoadComments,
 }: PostModalProps) {
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState('');
-  const { isOpen, photoData, openPhotoViewer, closePhotoViewer } = useProfilePhotoViewer();
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const { isOpen, photoData, openPhotoViewer, closePhotoViewer, setIsOpen } = useProfilePhotoViewer();
 
   if (!post) return null;
+
+  // Load comments when comments section is toggled open
+  const handleToggleComments = () => {
+    const newState = !commentsOpen;
+    setCommentsOpen(newState);
+    
+    // Load comments if opening and no comments loaded yet
+    if (newState && comments.length === 0 && onLoadComments) {
+      onLoadComments(post._id);
+    }
+  };
 
   const startEditing = (post: Post) => {
     setEditingPostId(post._id);
@@ -254,8 +268,8 @@ export function PostModal({
                 post={post}
                 onLike={onLike}
                 onShare={onShare}
-                onToggleComments={() => {}} // Comments are always shown in modal
-                isCommentsOpen={true}
+                onToggleComments={handleToggleComments}
+                isCommentsOpen={commentsOpen}
               />
             </div>
 
@@ -265,13 +279,13 @@ export function PostModal({
                 postId={post._id}
                 comments={comments}
                 commentValue={commentValue}
-                hasMoreComments={hasMoreComments}
-                loadingMoreComments={loadingMoreComments}
+                isOpen={commentsOpen}
+                hasMore={hasMoreComments}
+                loadingMore={loadingMoreComments}
                 currentUserId={currentUserId}
                 onCommentChange={onCommentChange}
                 onAddComment={onAddComment}
-                onLoadMoreComments={onLoadMoreComments}
-                onViewProfile={onViewProfile}
+                onLoadMore={onLoadMoreComments}
               />
             </div>
           </div>
@@ -279,9 +293,12 @@ export function PostModal({
       </Dialog>
 
       <ProfilePhotoViewer
-        isOpen={isOpen}
-        photoData={photoData}
-        onClose={closePhotoViewer}
+        open={isOpen}
+        onOpenChange={setIsOpen}
+        photoUrl={photoData?.photoUrl}
+        userName={photoData?.userName || ''}
+        userUsername={photoData?.userUsername || ''}
+        fallbackText={photoData?.fallbackText || ''}
       />
     </>
   );
