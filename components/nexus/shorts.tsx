@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { Loader2, Video, UploadCloud } from 'lucide-react';
+import { Loader2, Video, UploadCloud, BarChart3 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CreateShortModal } from './create-short-modal';
@@ -9,6 +9,8 @@ import { ShortCard } from './short-card';
 import { ShortViewerModal } from './short-viewer-modal';
 import { DeleteShortModal } from './delete-short-modal';
 import { ShareShortModal } from './share-short-modal';
+import { ShortsAnalytics } from './shorts-analytics';
+import { ShortsAnalyticsDashboard } from './shorts-analytics-dashboard';
 
 interface ShortItem {
   _id: string;
@@ -48,6 +50,9 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
   const [deletingShort, setDeletingShort] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [shortToShare, setShortToShare] = useState<ShortItem | null>(null);
+  const [analyticsModalOpen, setAnalyticsModalOpen] = useState(false);
+  const [analyticsShort, setAnalyticsShort] = useState<ShortItem | null>(null);
+  const [showDashboard, setShowDashboard] = useState(false);
 
   useEffect(() => {
     setModalOpen(createModalOpen);
@@ -246,24 +251,40 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-50 dark:bg-slate-950">
-      <div className="max-w-5xl mx-auto py-6 px-4 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Video className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-              Shorts
-            </h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Share quick updates with short vertical videos.</p>
-          </div>
-          <Button
-            className="bg-gradient-to-r from-blue-600 to-cyan-600"
-            onClick={() => setModalOpen(true)}
-          >
-            <UploadCloud className="w-4 h-4 mr-2" />
-            Upload short
-          </Button>
-        </div>
+    <>
+      {showDashboard ? (
+        <ShortsAnalyticsDashboard onBack={() => setShowDashboard(false)} />
+      ) : (
+        <div className="h-full overflow-y-auto bg-slate-50 dark:bg-slate-950">
+          <div className="max-w-5xl mx-auto py-6 px-4 space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Video className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                  Shorts
+                </h1>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Share quick updates with short vertical videos.</p>
+              </div>
+              <div className="flex gap-2">
+                {profile?.userId && shorts.some(s => s.userId === profile.userId) && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowDashboard(true)}
+                    className="dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                  >
+                    <BarChart3 className="w-4 h-4 mr-2" />
+                    Analytics Dashboard
+                  </Button>
+                )}
+                <Button
+                  className="bg-gradient-to-r from-blue-600 to-cyan-600"
+                  onClick={() => setModalOpen(true)}
+                >
+                  <UploadCloud className="w-4 h-4 mr-2" />
+                  Upload short
+                </Button>
+              </div>
+            </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
@@ -290,6 +311,10 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
                 onLike={toggleLike}
                 onDelete={promptDeleteShort}
                 onShare={handleShareShort}
+                onAnalytics={(s) => {
+                  setAnalyticsShort(s);
+                  setAnalyticsModalOpen(true);
+                }}
               />
             ))}
           </div>
@@ -333,6 +358,15 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
           console.log(`Short shared with ${count} friends`);
         }}
       />
-    </div>
+
+      <ShortsAnalytics
+        open={analyticsModalOpen}
+        onOpenChange={setAnalyticsModalOpen}
+        shortId={analyticsShort?._id || ''}
+        shortTitle={analyticsShort?.caption || 'Short Video'}
+      />
+        </div>
+      )}
+    </>
   );
 }

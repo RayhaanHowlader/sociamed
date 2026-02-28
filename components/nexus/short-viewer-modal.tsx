@@ -64,6 +64,8 @@ export function ShortViewerModal({
   const [commentInput, setCommentInput] = useState('');
   const [viewTracked, setViewTracked] = useState(false);
   const [views, setViews] = useState(0);
+  const [videoStartTime, setVideoStartTime] = useState<number | null>(null);
+  const [totalWatchTime, setTotalWatchTime] = useState(0);
 
   // Track the current short ID to prevent unnecessary reloads
   const [currentShortId, setCurrentShortId] = useState<string | null>(null);
@@ -75,6 +77,8 @@ export function ShortViewerModal({
         void loadComments(short._id);
         setCurrentShortId(short._id);
         setViewTracked(false);
+        setVideoStartTime(null);
+        setTotalWatchTime(0);
       }
       // Always update views from the short object (but don't reload comments)
       setViews(short.stats?.views || 0);
@@ -84,6 +88,8 @@ export function ShortViewerModal({
       setViewTracked(false);
       setViews(0);
       setCurrentShortId(null);
+      setVideoStartTime(null);
+      setTotalWatchTime(0);
     }
   }, [open, short?._id, short?.stats?.views]); // Depend on views to update when parent updates
 
@@ -106,7 +112,7 @@ export function ShortViewerModal({
     }
   };
 
-  const trackView = async () => {
+  const trackView = async (watchTime: number = 0, completed: boolean = false) => {
     if (!short?._id) {
       console.log('No short ID available for view tracking');
       return;
@@ -117,13 +123,17 @@ export function ShortViewerModal({
       return;
     }
 
-    console.log('Tracking view for short:', short._id);
+    console.log('Tracking view for short:', short._id, 'Watch time:', watchTime, 'Completed:', completed);
     try {
       const res = await fetch('/api/shorts/view', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ shortId: short._id }),
+        body: JSON.stringify({ 
+          shortId: short._id,
+          watchTime,
+          completed
+        }),
       });
       const data = await res.json();
       console.log('View tracking response:', data);
@@ -244,11 +254,37 @@ export function ShortViewerModal({
               autoPlay
               className="w-full h-full object-contain"
               style={{ maxHeight: '70vh' }}
-              onEnded={() => {
-                // Track view only when video ends completely
-                console.log('Video ended! Tracking view. ViewTracked:', viewTracked, 'Short ID:', short?._id);
-                console.log('Calling trackView function...');
-                trackView();
+              onPlay={(e) => {
+                // Track when video starts playing
+                const video = e.currentTarget;
+                setVideoStartTime(video.currentTime);
+              }}
+              onPause={(e) => {
+                // Update total watch time when paused
+                const video = e.currentTarget;
+                if (videoStartTime !== null) {
+                  const watchedDuration = video.currentTime - videoStartTime;
+                  setTotalWatchTime(prev => prev + watchedDuration);
+                  setVideoStartTime(null);
+                }
+              }}
+              onSeeking={(e) => {
+                // Reset start time when seeking
+                const video = e.currentTarget;
+                setVideoStartTime(video.currentTime);
+              }}
+              onEnded={(e) => {
+                // Track view when video ends completely
+                const video = e.currentTarget;
+                if (videoStartTime !== null) {
+                  const watchedDuration = video.currentTime - videoStartTime;
+                  const finalWatchTime = totalWatchTime + watchedDuration;
+                  console.log('Video ended! Total watch time:', finalWatchTime, 'seconds');
+                  trackView(Math.round(finalWatchTime), true);
+                } else {
+                  console.log('Video ended! Total watch time:', totalWatchTime, 'seconds');
+                  trackView(Math.round(totalWatchTime), true);
+                }
               }}
             />
           </div>

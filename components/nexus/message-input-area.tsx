@@ -1,13 +1,14 @@
 'use client';
 
 import { useRef } from 'react';
-import { Send, Paperclip, Smile, Mic, AlertCircle, X } from 'lucide-react';
+import { Send, Paperclip, Smile, Mic, AlertCircle, X, Sparkles } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { EmojiPicker } from './emoji-picker';
 import { VoiceInput } from './voice-input';
 import { FilePreview } from './file-preview';
 import { UploadProgress } from './upload-progress';
+import { AIMessageGenerator } from './ai-message-generator';
 
 interface FriendConversation {
   userId: string;
@@ -145,6 +146,18 @@ export function MessageInputArea({
               <Mic className="w-5 h-5" />
             </Button>
           </VoiceInput>
+
+          <AIMessageGenerator onMessageGenerated={onMessageChange}>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="text-slate-600 dark:text-slate-300 hover:text-purple-600 dark:hover:text-purple-400"
+              disabled={!selectedChat || uploadingFile}
+              title="Generate message with AI"
+            >
+              <Sparkles className="w-5 h-5" />
+            </Button>
+          </AIMessageGenerator>
           
           <Input
             placeholder={selectedChat ? 'Type a message...' : 'Select a friend to start chatting'}

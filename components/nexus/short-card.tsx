@@ -1,6 +1,6 @@
 'use client';
 
-import { Video, Heart, MessageCircle, Trash2, Share, Eye } from 'lucide-react';
+import { Video, Heart, MessageCircle, Trash2, Share, Eye, BarChart3 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -31,9 +31,10 @@ interface ShortCardProps {
   onLike: (shortId: string) => void;
   onDelete: (shortId: string) => void;
   onShare: (short: ShortItem) => void;
+  onAnalytics?: (short: ShortItem) => void;
 }
 
-export function ShortCard({ short, currentUserId, onView, onLike, onDelete, onShare }: ShortCardProps) {
+export function ShortCard({ short, currentUserId, onView, onLike, onDelete, onShare, onAnalytics }: ShortCardProps) {
   const isOwnShort = currentUserId && short.userId === currentUserId;
 
   return (
@@ -42,17 +43,32 @@ export function ShortCard({ short, currentUserId, onView, onLike, onDelete, onSh
       onClick={() => onView(short)}
     >
       {isOwnShort && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(short._id);
-          }}
-          className="absolute top-2 right-2 z-10 p-2 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-lg transition-colors"
-          aria-label="Delete short"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(short._id);
+            }}
+            className="absolute top-2 right-2 z-10 p-2 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-lg transition-colors"
+            aria-label="Delete short"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+          {onAnalytics && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAnalytics(short);
+              }}
+              className="absolute top-2 right-14 z-10 p-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg transition-colors"
+              aria-label="View analytics"
+            >
+              <BarChart3 className="w-4 h-4" />
+            </button>
+          )}
+        </>
       )}
       <CardContent className="p-0">
         <div className="relative aspect-[9/16] bg-black rounded-t-lg overflow-hidden">

@@ -13,8 +13,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { shortId } = await request.json();
-    console.log('View tracking request:', { shortId, userId: user.sub });
+    const { shortId, watchTime, completed } = await request.json();
+    console.log('View tracking request:', { shortId, userId: user.sub, watchTime, completed });
     
     if (!shortId) {
       return NextResponse.json({ error: 'shortId is required' }, { status: 400 });
@@ -36,10 +36,12 @@ export async function POST(request: NextRequest) {
     // Always increment view count - no time window restrictions
     console.log('Incrementing view count for short:', shortId);
 
-    // Add view record
+    // Add view record with watch time and completion data
     const viewRecord = await shortViews.insertOne({
       shortId: shortId,
       userId: String(user.sub),
+      watchTime: watchTime || 0, // Watch time in seconds
+      completed: completed || false, // Whether video was watched to completion
       createdAt: new Date()
     });
     console.log('Added view record to shortViews collection:', viewRecord.insertedId);
@@ -66,7 +68,9 @@ export async function POST(request: NextRequest) {
       newView: true, // Always true since we always increment
       debug: {
         shortExists: !!existingShort,
-        currentViews: views
+        currentViews: views,
+        watchTime,
+        completed
       }
     });
   } catch (error) {

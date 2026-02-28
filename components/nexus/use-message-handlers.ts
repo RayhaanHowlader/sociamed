@@ -158,8 +158,8 @@ export function useMessageHandlers({
       console.log('[handleSharedPostClick] Fetched post data:', postData);
       
       // Dispatch event to open post modal with the fetched data
-      console.log('[handleSharedPostClick] Dispatching open-post-modal event');
-      window.dispatchEvent(new CustomEvent('open-post-modal', { 
+      console.log('[handleSharedPostClick] Dispatching open-chat-post-modal event');
+      window.dispatchEvent(new CustomEvent('open-chat-post-modal', { 
         detail: { post: postData.post } 
       }));
     } catch (error) {

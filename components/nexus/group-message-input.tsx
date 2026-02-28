@@ -1,13 +1,14 @@
 'use client';
 
 import { useRef } from 'react';
-import { Send, Paperclip, Smile, Mic, AlertCircle, X, BarChart3 } from 'lucide-react';
+import { Send, Paperclip, Smile, Mic, AlertCircle, X, BarChart3, Sparkles } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { FilePreview } from './file-preview';
 import { UploadProgress } from './upload-progress';
 import { EmojiPicker } from './emoji-picker';
 import { VoiceInput } from './voice-input';
+import { AIMessageGenerator } from './ai-message-generator';
 
 interface Group {
   _id: string;
@@ -141,6 +142,17 @@ export function GroupMessageInput({
               <Mic className="w-5 h-5" />
             </Button>
           </VoiceInput>
+          <AIMessageGenerator onMessageGenerated={onMessageChange}>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-400"
+              disabled={!selectedGroup || uploadingFile}
+              title="Generate message with AI"
+            >
+              <Sparkles className="w-5 h-5" />
+            </Button>
+          </AIMessageGenerator>
           <Button
             variant="ghost"
             size="icon"
