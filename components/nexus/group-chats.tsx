@@ -100,6 +100,8 @@ export function GroupChats() {
     setCustomIconUrl,
     settingsName,
     setSettingsName,
+    settingsIcon,
+    setSettingsIcon,
     settingsAllowEdit,
     setSettingsAllowEdit,
     settingsAllowInvite,
@@ -372,6 +374,7 @@ export function GroupChats() {
   const openSettings = () => {
     if (!selectedGroup) return;
     setSettingsName(selectedGroup.name);
+    setSettingsIcon(selectedGroup.icon);
     setSettingsAllowEdit(!!selectedGroup.allowMemberEdit);
     setSettingsAllowInvite(!!selectedGroup.allowMemberInvite);
     setSettingsAddMemberIds(new Set());
@@ -393,7 +396,7 @@ export function GroupChats() {
 
   const handleSaveSettingsWrapper = () => {
     if (!selectedGroup) return;
-    handleSaveSettings(selectedGroup, settingsName, settingsAllowEdit, settingsAllowInvite, settingsAddMemberIds, setSelectedGroup, setSettingsOpen);
+    handleSaveSettings(selectedGroup, settingsName, settingsIcon, settingsAllowEdit, settingsAllowInvite, settingsAddMemberIds, setSelectedGroup, setSettingsOpen);
   };
 
   const handleSendMessage = async () => {
@@ -653,6 +656,8 @@ export function GroupChats() {
         selectedGroup={selectedGroup}
         settingsName={settingsName}
         onSettingsNameChange={setSettingsName}
+        settingsIcon={settingsIcon}
+        onSettingsIconChange={setSettingsIcon}
         settingsAllowEdit={settingsAllowEdit}
         onSettingsAllowEditChange={(value) => setSettingsAllowEdit(value)}
         settingsAllowInvite={settingsAllowInvite}

@@ -124,6 +124,7 @@ export function useGroupOperations({
   const handleSaveSettings = useCallback(async (
     selectedGroup: Group,
     settingsName: string,
+    settingsIcon: string,
     settingsAllowEdit: boolean,
     settingsAllowInvite: boolean,
     settingsAddMemberIds: Set<string>,
@@ -146,6 +147,7 @@ export function useGroupOperations({
         credentials: 'include',
         body: JSON.stringify({
           name: settingsName,
+          icon: settingsIcon,
           allowMemberEdit: settingsAllowEdit,
           allowMemberInvite: settingsAllowInvite,
           addMemberIds: Array.from(settingsAddMemberIds),

@@ -55,7 +55,12 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
   ])
 
   const postWithDetails = {
-    ...post,
+    _id: post._id.toString(),
+    content: post.content,
+    imageUrl: post.imageUrl,
+    imagePublicId: post.imagePublicId,
+    createdAt: post.createdAt,
+    userId: post.userId,
     author: {
       name: author.name,
       username: author.username,

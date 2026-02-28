@@ -256,32 +256,36 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
         <ShortsAnalyticsDashboard onBack={() => setShowDashboard(false)} />
       ) : (
         <div className="h-full overflow-y-auto bg-slate-50 dark:bg-slate-950">
-          <div className="max-w-5xl mx-auto py-6 px-4 space-y-6">
-            <div className="flex items-center justify-between">
+          <div className="max-w-5xl mx-auto py-4 sm:py-6 px-3 sm:px-4 space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
               <div>
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Video className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Video className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400" />
                   Shorts
                 </h1>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Share quick updates with short vertical videos.</p>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Share quick updates with short vertical videos.</p>
               </div>
               <div className="flex gap-2">
                 {profile?.userId && shorts.some(s => s.userId === profile.userId) && (
                   <Button
                     variant="outline"
+                    size="sm"
                     onClick={() => setShowDashboard(true)}
-                    className="dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                    className="dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700 text-xs sm:text-sm"
                   >
-                    <BarChart3 className="w-4 h-4 mr-2" />
-                    Analytics Dashboard
+                    <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Analytics Dashboard</span>
+                    <span className="sm:hidden">Analytics</span>
                   </Button>
                 )}
                 <Button
-                  className="bg-gradient-to-r from-blue-600 to-cyan-600"
+                  size="sm"
+                  className="bg-gradient-to-r from-blue-600 to-cyan-600 text-xs sm:text-sm"
                   onClick={() => setModalOpen(true)}
                 >
-                  <UploadCloud className="w-4 h-4 mr-2" />
-                  Upload short
+                  <UploadCloud className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Upload short</span>
+                  <span className="sm:hidden">Upload</span>
                 </Button>
               </div>
             </div>
@@ -292,13 +296,13 @@ export function Shorts({ createModalOpen, onCloseCreateModal }: ShortsProps) {
           </div>
         ) : shorts.length === 0 ? (
           <Card className="border-dashed border-2 border-slate-200 dark:border-slate-700 dark:bg-slate-900">
-            <CardContent className="py-16 text-center space-y-3">
-              <Video className="w-10 h-10 text-blue-500 dark:text-blue-400 mx-auto" />
-              <p className="text-slate-500 dark:text-slate-400">No shorts yet. Be the first to share a short video!</p>
+            <CardContent className="py-12 sm:py-16 text-center space-y-3">
+              <Video className="w-8 h-8 sm:w-10 sm:h-10 text-blue-500 dark:text-blue-400 mx-auto" />
+              <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 px-4">No shorts yet. Be the first to share a short video!</p>
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-2 md:grid-cols-3">
             {shorts.map((short) => (
               <ShortCard
                 key={short._id}

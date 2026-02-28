@@ -25,6 +25,7 @@ export function useGroupModals() {
   const [groupIcon, setGroupIcon] = useState('🎨');
   const [customIconUrl, setCustomIconUrl] = useState('');
   const [settingsName, setSettingsName] = useState('');
+  const [settingsIcon, setSettingsIcon] = useState('👥');
   const [settingsAllowEdit, setSettingsAllowEdit] = useState(false);
   const [settingsAllowInvite, setSettingsAllowInvite] = useState(false);
   const [settingsAddMemberIds, setSettingsAddMemberIds] = useState<Set<string>>(new Set());
@@ -111,6 +112,8 @@ export function useGroupModals() {
     setCustomIconUrl,
     settingsName,
     setSettingsName,
+    settingsIcon,
+    setSettingsIcon,
     settingsAllowEdit,
     setSettingsAllowEdit,
     settingsAllowInvite,

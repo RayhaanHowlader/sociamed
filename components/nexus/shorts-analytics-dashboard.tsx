@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, TrendingUp, Eye, Users, Clock, BarChart3, Activity, Play, Video, Heart, MessageCircle, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface ShortAnalytics {
   _id: string;
@@ -80,42 +81,45 @@ export function ShortsAnalyticsDashboard({ onBack }: ShortsAnalyticsDashboardPro
     <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-900">
       {/* Header */}
       <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex-shrink-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="relative flex items-center justify-between">
-            {/* Back Button - Icon Only */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onBack}
-              className="dark:text-slate-300 dark:hover:bg-slate-700"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            
-            {/* Centered Title */}
-            <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <BarChart3 className="h-7 w-7 text-blue-600 dark:text-blue-400" />
-                Shorts Analytics Dashboard
-              </h1>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                Track your shorts performance and engagement
-              </p>
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Back Button and Title */}
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onBack}
+                className="dark:text-slate-300 dark:hover:bg-slate-700 flex-shrink-0"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 sm:h-7 sm:w-7 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                <div>
+                  <h1 className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white">
+                    Analytics Dashboard
+                  </h1>
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 hidden sm:block">
+                    Track your shorts performance
+                  </p>
+                </div>
+              </div>
             </div>
             
             {/* Time Range Selector */}
-            <div className="flex gap-2">
+            <div className="flex gap-1 sm:gap-2 overflow-x-auto">
               {(['7d', '30d', 'all'] as const).map((range) => (
                 <button
                   key={range}
                   onClick={() => setTimeRange(range)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
                     timeRange === range
                       ? 'bg-blue-600 text-white shadow-md'
                       : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
                   }`}
                 >
-                  {range === '7d' ? 'Last 7 days' : range === '30d' ? 'Last 30 days' : 'All time'}
+                  {range === '7d' ? '7 days' : range === '30d' ? '30 days' : 'All time'}
                 </button>
               ))}
             </div>
@@ -129,29 +133,29 @@ export function ShortsAnalyticsDashboard({ onBack }: ShortsAnalyticsDashboardPro
         </div>
       ) : stats ? (
         <div className="flex-1 overflow-y-auto">
-          <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+          <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
           {/* Overall Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <StatCard
-              icon={<Video className="h-6 w-6" />}
+              icon={<Video className="h-5 w-5 sm:h-6 sm:w-6" />}
               label="Total Shorts"
               value={stats.totalShorts.toString()}
               color="blue"
             />
             <StatCard
-              icon={<Eye className="h-6 w-6" />}
+              icon={<Eye className="h-5 w-5 sm:h-6 sm:w-6" />}
               label="Total Views"
               value={formatNumber(stats.totalViews)}
               color="green"
             />
             <StatCard
-              icon={<Clock className="h-6 w-6" />}
+              icon={<Clock className="h-5 w-5 sm:h-6 sm:w-6" />}
               label="Avg Watch Time"
               value={formatDuration(stats.averageWatchTime)}
               color="purple"
             />
             <StatCard
-              icon={<Activity className="h-6 w-6" />}
+              icon={<Activity className="h-5 w-5 sm:h-6 sm:w-6" />}
               label="Avg Completion"
               value={`${stats.averageCompletionRate.toFixed(1)}%`}
               color="orange"
@@ -159,21 +163,21 @@ export function ShortsAnalyticsDashboard({ onBack }: ShortsAnalyticsDashboardPro
           </div>
 
           {/* Engagement Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-3 sm:gap-4">
             <EngagementCard
-              icon={<Heart className="h-5 w-5" />}
+              icon={<Heart className="h-4 w-4 sm:h-5 sm:w-5" />}
               label="Total Likes"
               value={formatNumber(stats.totalLikes)}
               color="red"
             />
             <EngagementCard
-              icon={<MessageCircle className="h-5 w-5" />}
+              icon={<MessageCircle className="h-4 w-4 sm:h-5 sm:w-5" />}
               label="Total Comments"
               value={formatNumber(stats.totalComments)}
               color="blue"
             />
             <EngagementCard
-              icon={<Share2 className="h-5 w-5" />}
+              icon={<Share2 className="h-4 w-4 sm:h-5 sm:w-5" />}
               label="Total Shares"
               value={formatNumber(stats.totalShares)}
               color="green"
@@ -181,20 +185,20 @@ export function ShortsAnalyticsDashboard({ onBack }: ShortsAnalyticsDashboardPro
           </div>
 
           {/* Views Over Time Chart */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          <div className="bg-white dark:bg-slate-800 rounded-xl p-4 sm:p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-3 sm:mb-4 flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400" />
               Views Over Time
             </h3>
-            <div className="relative h-64">
+            <div className="h-48 sm:h-64">
               <ViewsChart data={stats.viewsByDay} timeRange={timeRange} />
             </div>
           </div>
 
           {/* Individual Shorts Performance */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-              <Video className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+          <div className="bg-white dark:bg-slate-800 rounded-xl p-4 sm:p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-3 sm:mb-4 flex items-center gap-2">
+              <Video className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 dark:text-purple-400" />
               Individual Shorts Performance
             </h3>
             <div className="space-y-3">
@@ -202,7 +206,7 @@ export function ShortsAnalyticsDashboard({ onBack }: ShortsAnalyticsDashboardPro
                 <ShortPerformanceCard key={short._id} short={short} />
               ))}
               {shorts.length === 0 && (
-                <p className="text-center text-slate-500 dark:text-slate-400 py-8">
+                <p className="text-center text-slate-500 dark:text-slate-400 py-8 text-sm">
                   No shorts data available for this period
                 </p>
               )}
@@ -211,12 +215,12 @@ export function ShortsAnalyticsDashboard({ onBack }: ShortsAnalyticsDashboardPro
 
           {/* Top Performing Shorts */}
           {stats.topPerformingShorts.length > 0 && (
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
+            <div className="bg-white dark:bg-slate-800 rounded-xl p-4 sm:p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
+              <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-3 sm:mb-4 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 dark:text-green-400" />
                 Top Performing Shorts
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {stats.topPerformingShorts.map((short, index) => (
                   <TopShortCard key={short._id} short={short} rank={index + 1} />
                 ))}
@@ -243,12 +247,12 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label:
   };
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
-      <div className={`inline-flex p-3 rounded-lg ${colorClasses[color as keyof typeof colorClasses]} mb-3`}>
+    <div className="bg-white dark:bg-slate-800 rounded-xl p-4 sm:p-6 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
+      <div className={`inline-flex p-2 sm:p-3 rounded-lg ${colorClasses[color as keyof typeof colorClasses]} mb-2 sm:mb-3`}>
         {icon}
       </div>
-      <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{label}</p>
-      <p className="text-3xl font-bold text-slate-900 dark:text-white">{value}</p>
+      <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mb-1">{label}</p>
+      <p className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">{value}</p>
     </div>
   );
 }
@@ -261,59 +265,77 @@ function EngagementCard({ icon, label, value, color }: { icon: React.ReactNode; 
   };
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
-      <div className={`inline-flex p-2 rounded-lg ${colorClasses[color as keyof typeof colorClasses]} mb-2`}>
+    <div className="bg-white dark:bg-slate-800 rounded-xl p-3 sm:p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
+      <div className={`inline-flex p-1.5 sm:p-2 rounded-lg ${colorClasses[color as keyof typeof colorClasses]} mb-1 sm:mb-2`}>
         {icon}
       </div>
-      <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{label}</p>
-      <p className="text-2xl font-bold text-slate-900 dark:text-white">{value}</p>
+      <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mb-1">{label}</p>
+      <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{value}</p>
     </div>
   );
 }
 
 function ViewsChart({ data, timeRange }: { data: { date: string; views: number }[]; timeRange: '7d' | '30d' | 'all' }) {
-  const maxViews = Math.max(...data.map(d => d.views), 1);
-  
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     
     if (timeRange === '7d') {
-      // Daily format: "Dec 4"
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     } else if (timeRange === '30d') {
-      // Weekly format: "Jan 4"
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     } else {
-      // Monthly format: "Jan" or "Feb"
       return date.toLocaleDateString('en-US', { month: 'short' });
     }
   };
-  
+
+  const chartData = data.map(point => ({
+    date: formatDate(point.date),
+    views: point.views,
+    fullDate: point.date
+  }));
+
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex-1 flex items-end gap-2 pb-8">
-        {data.map((point, index) => (
-          <div key={index} className="flex-1 flex flex-col items-center group relative">
-            <div
-              className="w-full bg-gradient-to-t from-blue-600 to-cyan-400 dark:from-blue-500 dark:to-cyan-300 rounded-t-lg transition-all hover:opacity-80 cursor-pointer"
-              style={{ height: `${(point.views / maxViews) * 100}%`, minHeight: point.views > 0 ? '4px' : '0' }}
-            />
-            <div className="absolute -top-10 bg-slate-900 dark:bg-slate-700 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-lg z-10">
-              {point.views} views
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="flex gap-2 justify-between px-1">
-        {data.map((point, index) => (
-          <div key={index} className="flex-1 text-center">
-            <p className="text-xs text-slate-600 dark:text-slate-400">
-              {formatDate(point.date)}
-            </p>
-          </div>
-        ))}
-      </div>
-    </div>
+    <ResponsiveContainer width="100%" height="100%">
+      <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+        <defs>
+          <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+            <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.1}/>
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.3} />
+        <XAxis 
+          dataKey="date" 
+          stroke="#64748b"
+          style={{ fontSize: '12px' }}
+          tick={{ fill: '#64748b' }}
+        />
+        <YAxis 
+          stroke="#64748b"
+          style={{ fontSize: '12px' }}
+          tick={{ fill: '#64748b' }}
+        />
+        <Tooltip 
+          contentStyle={{ 
+            backgroundColor: '#1e293b',
+            border: 'none',
+            borderRadius: '8px',
+            color: '#fff',
+            fontSize: '12px'
+          }}
+          labelStyle={{ color: '#94a3b8' }}
+          formatter={(value: number) => [`${value} views`, 'Views']}
+        />
+        <Area 
+          type="monotone" 
+          dataKey="views" 
+          stroke="#3b82f6" 
+          strokeWidth={2}
+          fillOpacity={1} 
+          fill="url(#colorViews)" 
+        />
+      </AreaChart>
+    </ResponsiveContainer>
   );
 }
 
@@ -330,8 +352,8 @@ function ShortPerformanceCard({ short }: { short: ShortAnalytics }) {
   };
 
   return (
-    <div className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors">
-      <div className="relative w-24 h-32 flex-shrink-0 bg-black rounded-lg overflow-hidden">
+    <div className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors">
+      <div className="relative w-16 h-20 sm:w-24 sm:h-32 flex-shrink-0 bg-black rounded-lg overflow-hidden">
         <video
           src={short.videoUrl}
           className="w-full h-full object-cover"
@@ -342,10 +364,10 @@ function ShortPerformanceCard({ short }: { short: ShortAnalytics }) {
       </div>
       
       <div className="flex-1 min-w-0">
-        <h4 className="font-semibold text-slate-900 dark:text-white mb-2 truncate">
+        <h4 className="font-semibold text-sm sm:text-base text-slate-900 dark:text-white mb-2 truncate">
           {short.caption || 'Untitled Short'}
         </h4>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 text-xs sm:text-sm">
           <div>
             <p className="text-slate-500 dark:text-slate-400 text-xs">Views</p>
             <p className="font-bold text-slate-900 dark:text-white">{formatNumber(short.views)}</p>

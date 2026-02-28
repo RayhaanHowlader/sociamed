@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, TrendingUp, Eye, Users, Clock, BarChart3, Activity, Play } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
 interface ShortAnalytics {
   shortId: string;
@@ -136,7 +137,7 @@ export function ShortsAnalytics({ open, onOpenChange, shortId, shortTitle }: Sho
                 <Activity className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                 Audience Retention
               </h3>
-              <div className="relative h-64">
+              <div className="h-64">
                 <RetentionGraph data={analytics.retentionData} />
               </div>
               <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
@@ -150,7 +151,7 @@ export function ShortsAnalytics({ open, onOpenChange, shortId, shortTitle }: Sho
                 <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 Views Over Time
               </h3>
-              <div className="relative h-64">
+              <div className="h-64">
                 <ViewsGraph data={analytics.viewsByDay} />
               </div>
             </div>
@@ -223,44 +224,100 @@ function EngagementCard({ label, value, percentage, color }: { label: string; va
 }
 
 function RetentionGraph({ data }: { data: { time: number; percentage: number }[] }) {
-  const maxPercentage = 100;
-  
+  const chartData = data.map(point => ({
+    time: `${point.time}s`,
+    percentage: point.percentage,
+    timeValue: point.time
+  }));
+
   return (
-    <div className="h-full flex items-end gap-1">
-      {data.map((point, index) => (
-        <div key={index} className="flex-1 flex flex-col items-center group relative">
-          <div
-            className="w-full bg-gradient-to-t from-purple-600 to-purple-400 dark:from-purple-500 dark:to-purple-300 rounded-t-sm transition-all hover:opacity-80"
-            style={{ height: `${(point.percentage / maxPercentage) * 100}%` }}
-          />
-          <div className="absolute -top-8 bg-slate-900 dark:bg-slate-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-            {point.time}s: {point.percentage.toFixed(1)}%
-          </div>
-        </div>
-      ))}
-    </div>
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.3} />
+        <XAxis 
+          dataKey="time" 
+          stroke="#64748b"
+          style={{ fontSize: '12px' }}
+          tick={{ fill: '#64748b' }}
+        />
+        <YAxis 
+          stroke="#64748b"
+          style={{ fontSize: '12px' }}
+          tick={{ fill: '#64748b' }}
+          domain={[0, 100]}
+        />
+        <Tooltip 
+          contentStyle={{ 
+            backgroundColor: '#1e293b',
+            border: 'none',
+            borderRadius: '8px',
+            color: '#fff',
+            fontSize: '12px'
+          }}
+          labelStyle={{ color: '#94a3b8' }}
+          formatter={(value: number) => [`${value.toFixed(1)}%`, 'Retention']}
+        />
+        <Bar 
+          dataKey="percentage" 
+          fill="url(#colorPurple)"
+          radius={[4, 4, 0, 0]}
+        />
+        <defs>
+          <linearGradient id="colorPurple" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="#9333ea" stopOpacity={0.9}/>
+            <stop offset="95%" stopColor="#a855f7" stopOpacity={0.6}/>
+          </linearGradient>
+        </defs>
+      </BarChart>
+    </ResponsiveContainer>
   );
 }
 
 function ViewsGraph({ data }: { data: { date: string; views: number }[] }) {
-  const maxViews = Math.max(...data.map(d => d.views));
-  
+  const chartData = data.map(point => ({
+    date: new Date(point.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    views: point.views,
+    fullDate: point.date
+  }));
+
   return (
-    <div className="h-full flex items-end gap-2">
-      {data.map((point, index) => (
-        <div key={index} className="flex-1 flex flex-col items-center group relative">
-          <div
-            className="w-full bg-gradient-to-t from-blue-600 to-cyan-400 dark:from-blue-500 dark:to-cyan-300 rounded-t-sm transition-all hover:opacity-80"
-            style={{ height: `${(point.views / maxViews) * 100}%` }}
-          />
-          <p className="text-xs text-slate-600 dark:text-slate-400 mt-2 rotate-45 origin-left">
-            {new Date(point.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-          </p>
-          <div className="absolute -top-8 bg-slate-900 dark:bg-slate-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-            {point.views} views
-          </div>
-        </div>
-      ))}
-    </div>
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+        <defs>
+          <linearGradient id="colorViewsBar" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.9}/>
+            <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.6}/>
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.3} />
+        <XAxis 
+          dataKey="date" 
+          stroke="#64748b"
+          style={{ fontSize: '12px' }}
+          tick={{ fill: '#64748b' }}
+        />
+        <YAxis 
+          stroke="#64748b"
+          style={{ fontSize: '12px' }}
+          tick={{ fill: '#64748b' }}
+        />
+        <Tooltip 
+          contentStyle={{ 
+            backgroundColor: '#1e293b',
+            border: 'none',
+            borderRadius: '8px',
+            color: '#fff',
+            fontSize: '12px'
+          }}
+          labelStyle={{ color: '#94a3b8' }}
+          formatter={(value: number) => [`${value} views`, 'Views']}
+        />
+        <Bar 
+          dataKey="views" 
+          fill="url(#colorViewsBar)"
+          radius={[4, 4, 0, 0]}
+        />
+      </BarChart>
+    </ResponsiveContainer>
   );
 }
